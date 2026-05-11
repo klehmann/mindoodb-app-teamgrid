@@ -1,0 +1,42 @@
+{
+  "name": "mindoodb-app-teamgrid",
+  "version": "1.0.0",
+  "description": "Collaborative spreadsheet sample app for MindooDB Haven",
+  "license": "Apache-2.0",
+  "author": "Mindoo GmbH",
+  "type": "module",
+  "main": "./src/main.ts",
+  "scripts": {
+    "dev": "vite --port 4207",
+    "dev:local": "LOCAL_MINDOODB=1 vite --port 4207",
+    "build": "vue-tsc --noEmit && vite build",
+    "build:local": "LOCAL_MINDOODB=1 vite build",
+    "deploy": "npm run build && wrangler deploy",
+    "preview": "npm run build && wrangler dev",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/rubik": "^5.2.8",
+    "@primeuix/styled": "^0.7.4",
+    "@primeuix/themes": "^2.0.3",
+    "mindoodb-app-sdk": "0.0.16",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.4",
+    "vue": "^3.5.31"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@vitejs/plugin-vue": "^6.0.5",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^29.0.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3",
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^4.1.2",
+    "vue-tsc": "^3.2.6",
+    "wrangler": "^4.83.0"
+  }
+}
