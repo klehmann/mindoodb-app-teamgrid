@@ -13,7 +13,12 @@ import { useTeamGridDocument, readDocumentSummaryLabel } from "@/composables/use
 import { coerceInputToCellValue, formatCellValue, formulaResultToCellValue } from "@/lib/cellFormatting";
 import { evaluateFormula, parseFormula } from "@/lib/formulas";
 import { createCellId, createId, getFirstVisibleWorksheet, type Cell, type CellStyle, type WorksheetId } from "@/lib/teamgridDocument";
-import { projectWorksheet } from "@/lib/gridProjection";
+import { getCell, projectWorksheet } from "@/lib/gridProjection";
+
+interface CellSelectionRange {
+  startCellId: string;
+  endCellId: string;
+}
 
 const app = useTeamGridDocument();
 
@@ -23,6 +28,7 @@ const revisionDialogVisible = ref(false);
 const selectedOpenDocId = ref("");
 const activeWorksheetId = ref<WorksheetId | null>(null);
 const selectedCellId = ref<string | null>(null);
+const selectedRange = ref<CellSelectionRange | null>(null);
 const selectedCellAddress = ref("");
 const formulaDraft = ref("");
 const formulaError = ref<string | null>(null);
@@ -41,11 +47,43 @@ const activeWorksheet = computed(() => {
 const projection = computed(() => activeWorksheet.value ? projectWorksheet(activeWorksheet.value) : null);
 
 const selectedCell = computed(() => {
-  if (!activeWorksheet.value || !selectedCellId.value) {
+  if (!activeWorksheet.value || !projection.value || !selectedCellId.value) {
     return null;
+  }
+  for (const row of projection.value.rows) {
+    for (const column of projection.value.columns) {
+      const cell = getCell(activeWorksheet.value, row.id, column.id);
+      if (cell.id === selectedCellId.value) {
+        return cell;
+      }
+    }
   }
   return activeWorksheet.value.cellsById[selectedCellId.value] ?? null;
 });
+
+const selectedCells = computed(() => {
+  if (!activeWorksheet.value || !projection.value || !selectedRange.value) {
+    return selectedCell.value ? [selectedCell.value] : [];
+  }
+  const start = findCellCoordinates(selectedRange.value.startCellId);
+  const end = findCellCoordinates(selectedRange.value.endCellId);
+  if (!start || !end) {
+    return selectedCell.value ? [selectedCell.value] : [];
+  }
+  const cells: Cell[] = [];
+  for (let rowIndex = Math.min(start.rowIndex, end.rowIndex); rowIndex <= Math.max(start.rowIndex, end.rowIndex); rowIndex += 1) {
+    for (let columnIndex = Math.min(start.columnIndex, end.columnIndex); columnIndex <= Math.max(start.columnIndex, end.columnIndex); columnIndex += 1) {
+      const row = projection.value.rows[rowIndex];
+      const column = projection.value.columns[columnIndex];
+      if (row && column) {
+        cells.push(getCell(activeWorksheet.value, row.id, column.id));
+      }
+    }
+  }
+  return cells;
+});
+
+const hasSelection = computed(() => selectedCells.value.length > 0);
 
 const statusBadgeLabel = computed(() => {
   if (app.isViewingHistorical.value) {
@@ -117,9 +155,9 @@ const menuItems = computed<MenuItem[]>(() => [
   {
     label: "Format",
     items: [
-      { label: "Bold", icon: "pi pi-bold", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => patchSelectedStyle({ bold: !selectedCell.value?.style?.bold }) },
-      { label: "Italic", icon: "pi pi-italic", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => patchSelectedStyle({ italic: !selectedCell.value?.style?.italic }) },
-      { label: "Underline", icon: "pi pi-underline", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => patchSelectedStyle({ underline: !selectedCell.value?.style?.underline }) },
+      { label: "Bold", icon: "pi pi-bold", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => patchSelectedStyle({ bold: !selectedCell.value?.style?.bold }) },
+      { label: "Italic", icon: "pi pi-italic", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => patchSelectedStyle({ italic: !selectedCell.value?.style?.italic }) },
+      { label: "Underline", icon: "pi pi-underline", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => patchSelectedStyle({ underline: !selectedCell.value?.style?.underline }) },
     ],
   },
   {
@@ -146,6 +184,33 @@ watch(
       return;
     }
     formulaDraft.value = cell.formula?.source ?? formatCellValue(cell.value, app.activeGrid.value?.settings.locale);
+  },
+);
+
+watch(
+  [activeWorksheet, projection],
+  () => {
+    if (!activeWorksheet.value || !projection.value) {
+      selectedCellId.value = null;
+      selectedRange.value = null;
+      selectedCellAddress.value = "";
+      return;
+    }
+    if (selectedCellId.value && findCellCoordinates(selectedCellId.value)) {
+      return;
+    }
+    const firstRow = projection.value.rows[0];
+    const firstColumn = projection.value.columns[0];
+    if (!firstRow || !firstColumn) {
+      selectedCellId.value = null;
+      selectedRange.value = null;
+      selectedCellAddress.value = "";
+      return;
+    }
+    const cell = getCell(activeWorksheet.value, firstRow.id, firstColumn.id);
+    selectedCellId.value = cell.id;
+    selectedRange.value = { startCellId: cell.id, endCellId: cell.id };
+    selectedCellAddress.value = projection.value.cellAddressById.get(cell.id) ?? "";
   },
 );
 
@@ -186,7 +251,29 @@ function selectCell(cell: Cell, address: string) {
   }
   formulaEditing.value = false;
   selectedCellId.value = cell.id;
+  selectedRange.value = { startCellId: cell.id, endCellId: cell.id };
   selectedCellAddress.value = address;
+}
+
+function selectRange(range: CellSelectionRange) {
+  if (formulaEditing.value) {
+    return;
+  }
+  selectedRange.value = range;
+}
+
+function findCellCoordinates(cellId: string) {
+  if (!activeWorksheet.value || !projection.value) {
+    return null;
+  }
+  for (const row of projection.value.rows) {
+    for (const column of projection.value.columns) {
+      if (getCell(activeWorksheet.value, row.id, column.id).id === cellId) {
+        return { rowIndex: row.index, columnIndex: column.index };
+      }
+    }
+  }
+  return null;
 }
 
 function appendPickedAddress(source: string, address: string) {
@@ -237,6 +324,7 @@ function commitCell(cell: Cell, rawValue: string) {
       formulaError.value = null;
     }
     worksheet.cellsById[targetCell.id] = targetCell;
+    return [{ type: "setCell", worksheetId: worksheet.id, cell: targetCell }];
   });
 }
 
@@ -245,8 +333,7 @@ function addWorksheet() {
     const worksheetId = createId("sheet");
     const rowOrder = Array.from({ length: 24 }, () => createId("row"));
     const columnOrder = Array.from({ length: 12 }, () => createId("col"));
-    grid.workbook.worksheetOrder.push(worksheetId);
-    grid.workbook.worksheetsById[worksheetId] = {
+    const worksheet = {
       id: worksheetId,
       title: `Sheet ${grid.workbook.worksheetOrder.length}`,
       rowOrder,
@@ -255,7 +342,10 @@ function addWorksheet() {
       columnsById: Object.fromEntries(columnOrder.map((id) => [id, { id, width: 120 }])),
       cellsById: {},
     };
+    grid.workbook.worksheetOrder.push(worksheetId);
+    grid.workbook.worksheetsById[worksheetId] = worksheet;
     activeWorksheetId.value = worksheetId;
+    return [{ type: "addWorksheet", worksheet, index: grid.workbook.worksheetOrder.length - 1 }];
   });
 }
 
@@ -266,13 +356,16 @@ function renameWorksheet(worksheetId: WorksheetId) {
   }
   app.updateGrid((grid) => {
     grid.workbook.worksheetsById[worksheetId].title = nextTitle.trim();
+    return [{ type: "renameWorksheet", worksheetId, title: nextTitle.trim() }];
   });
 }
 
 function deleteWorksheet(worksheetId: WorksheetId) {
   app.updateGrid((grid) => {
-    grid.workbook.worksheetsById[worksheetId].deletedAt = new Date().toISOString();
+    const deletedAt = new Date().toISOString();
+    grid.workbook.worksheetsById[worksheetId].deletedAt = deletedAt;
     activeWorksheetId.value = getFirstVisibleWorksheet(grid)?.id ?? null;
+    return [{ type: "tombstoneWorksheet", worksheetId, deletedAt }];
   });
 }
 
@@ -282,8 +375,11 @@ function insertRow(position: "before" | "after") {
     const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
     const rowId = createId("row");
     const selectedIndex = worksheet.rowOrder.indexOf(selectedCell.value!.rowId);
-    worksheet.rowsById[rowId] = { id: rowId };
-    worksheet.rowOrder.splice(position === "before" ? selectedIndex : selectedIndex + 1, 0, rowId);
+    const index = position === "before" ? selectedIndex : selectedIndex + 1;
+    const row = { id: rowId };
+    worksheet.rowsById[rowId] = row;
+    worksheet.rowOrder.splice(index, 0, rowId);
+    return [{ type: "insertRow", worksheetId: worksheet.id, rowId, row, index }];
   });
 }
 
@@ -293,37 +389,53 @@ function insertColumn(position: "before" | "after") {
     const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
     const columnId = createId("col");
     const selectedIndex = worksheet.columnOrder.indexOf(selectedCell.value!.columnId);
-    worksheet.columnsById[columnId] = { id: columnId, width: 120 };
-    worksheet.columnOrder.splice(position === "before" ? selectedIndex : selectedIndex + 1, 0, columnId);
+    const index = position === "before" ? selectedIndex : selectedIndex + 1;
+    const column = { id: columnId, width: 120 };
+    worksheet.columnsById[columnId] = column;
+    worksheet.columnOrder.splice(index, 0, columnId);
+    return [{ type: "insertColumn", worksheetId: worksheet.id, columnId, column, index }];
   });
 }
 
 function deleteSelectedRow() {
   if (!activeWorksheet.value || !selectedCell.value) return;
   app.updateGrid((grid) => {
-    grid.workbook.worksheetsById[activeWorksheet.value!.id].rowsById[selectedCell.value!.rowId].deletedAt = new Date().toISOString();
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const deletedAt = new Date().toISOString();
+    worksheet.rowsById[selectedCell.value!.rowId].deletedAt = deletedAt;
+    return [{ type: "tombstoneRow", worksheetId: worksheet.id, rowId: selectedCell.value!.rowId, deletedAt }];
   });
 }
 
 function deleteSelectedColumn() {
   if (!activeWorksheet.value || !selectedCell.value) return;
   app.updateGrid((grid) => {
-    grid.workbook.worksheetsById[activeWorksheet.value!.id].columnsById[selectedCell.value!.columnId].deletedAt = new Date().toISOString();
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const deletedAt = new Date().toISOString();
+    worksheet.columnsById[selectedCell.value!.columnId].deletedAt = deletedAt;
+    return [{ type: "tombstoneColumn", worksheetId: worksheet.id, columnId: selectedCell.value!.columnId, deletedAt }];
   });
 }
 
 function patchSelectedStyle(style: CellStyle) {
-  if (!selectedCell.value) return;
+  if (!activeWorksheet.value || selectedCells.value.length === 0) return;
+  const cellsToPatch = selectedCells.value;
   app.updateGrid((grid) => {
     const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
-    const existing = worksheet.cellsById[selectedCell.value!.id] ?? selectedCell.value!;
-    worksheet.cellsById[existing.id] = {
-      ...existing,
-      style: {
-        ...existing.style,
-        ...style,
-      },
-    };
+    const patchedCells: Cell[] = [];
+    for (const cell of cellsToPatch) {
+      const existing = worksheet.cellsById[cell.id] ?? cell;
+      const patchedCell = {
+        ...existing,
+        style: {
+          ...existing.style,
+          ...style,
+        },
+      };
+      worksheet.cellsById[existing.id] = patchedCell;
+      patchedCells.push(patchedCell);
+    }
+    return [{ type: "setCellsStyle", worksheetId: worksheet.id, cells: patchedCells, style }];
   });
 }
 </script>
@@ -370,16 +482,47 @@ function patchSelectedStyle(style: CellStyle) {
         <div class="format-toolbar">
           <label>
             Text
-            <input type="color" :disabled="app.gridReadOnly.value || !selectedCell" :value="selectedCell?.style?.textColor ?? '#eef2ff'" @input="patchSelectedStyle({ textColor: ($event.target as HTMLInputElement).value })">
+            <input type="color" :disabled="app.gridReadOnly.value || !hasSelection" :value="selectedCell?.style?.textColor ?? '#eef2ff'" @input="patchSelectedStyle({ textColor: ($event.target as HTMLInputElement).value })">
           </label>
           <label>
             Fill
-            <input type="color" :disabled="app.gridReadOnly.value || !selectedCell" :value="selectedCell?.style?.backgroundColor ?? '#111827'" @input="patchSelectedStyle({ backgroundColor: ($event.target as HTMLInputElement).value })">
+            <input type="color" :disabled="app.gridReadOnly.value || !hasSelection" :value="selectedCell?.style?.backgroundColor ?? '#111827'" @input="patchSelectedStyle({ backgroundColor: ($event.target as HTMLInputElement).value })">
           </label>
           <label>
             Font size
-            <input class="format-toolbar__number" type="number" min="8" max="48" :disabled="app.gridReadOnly.value || !selectedCell" :value="selectedCell?.style?.fontSize ?? 14" @change="patchSelectedStyle({ fontSize: Number(($event.target as HTMLInputElement).value) })">
+            <input class="format-toolbar__number" type="number" min="8" max="48" :disabled="app.gridReadOnly.value || !hasSelection" :value="selectedCell?.style?.fontSize ?? 14" @change="patchSelectedStyle({ fontSize: Number(($event.target as HTMLInputElement).value) })">
           </label>
+          <span class="format-toolbar__divider" aria-hidden="true" />
+          <button
+            type="button"
+            class="format-toolbar__text-button format-toolbar__text-button--bold"
+            aria-label="Bold"
+            :disabled="app.gridReadOnly.value || !hasSelection"
+            :class="{ 'format-toolbar__button--active': selectedCell?.style?.bold }"
+            @click="patchSelectedStyle({ bold: !selectedCell?.style?.bold })"
+          >
+            B
+          </button>
+          <button
+            type="button"
+            class="format-toolbar__text-button format-toolbar__text-button--italic"
+            aria-label="Italic"
+            :disabled="app.gridReadOnly.value || !hasSelection"
+            :class="{ 'format-toolbar__button--active': selectedCell?.style?.italic }"
+            @click="patchSelectedStyle({ italic: !selectedCell?.style?.italic })"
+          >
+            I
+          </button>
+          <button
+            type="button"
+            class="format-toolbar__text-button format-toolbar__text-button--underline"
+            aria-label="Underline"
+            :disabled="app.gridReadOnly.value || !hasSelection"
+            :class="{ 'format-toolbar__button--active': selectedCell?.style?.underline }"
+            @click="patchSelectedStyle({ underline: !selectedCell?.style?.underline })"
+          >
+            U
+          </button>
         </div>
 
         <FormulaBar
@@ -395,10 +538,12 @@ function patchSelectedStyle(style: CellStyle) {
           :worksheet="activeWorksheet"
           :projection="projection"
           :selected-cell-id="selectedCellId"
+          :selected-range="selectedRange"
           :highlighted-cell-ids="highlightedCellIds"
           :readonly="app.gridReadOnly.value"
           :locale="app.activeGrid.value.settings.locale"
           @select="selectCell"
+          @select-range="selectRange"
           @commit="commitCell"
         />
         <WorksheetTabs

@@ -16,6 +16,11 @@ import {
 import { applyAppTheme } from "@/lib/theme";
 import { canMutateGrid, isGridSessionReadOnly } from "@/lib/capabilities";
 import {
+  hasTeamGridOperations,
+  serializeTeamGridOperations,
+  type TeamGridOperation,
+} from "@/lib/teamgridOps";
+import {
   createTeamGridDocument,
   cloneTeamGridDocument,
   migrateTeamGridDocument,
@@ -42,6 +47,8 @@ export function useTeamGridDocument() {
   const revisionEntries = ref<MindooDBAppDocumentHistoryEntry[]>([]);
   const revisionLoading = ref(false);
   const revisionErrorMessage = ref<string | null>(null);
+  const pendingOps = ref<TeamGridOperation[]>([]);
+  const pendingOpsBaseHeads = ref<string[]>([]);
 
   let cleanupTheme: (() => void) | null = null;
   let cleanupUiPreferences: (() => void) | null = null;
@@ -197,11 +204,20 @@ export function useTeamGridDocument() {
       return;
     }
     try {
-      const updated = await currentDatabase.value.documents.update(currentDocument.value.id, {
-        set: currentEnvelope.value as unknown as Record<string, unknown>,
-      });
+      if (!hasTeamGridOperations(pendingOps.value)) {
+        status.value = "No granular spreadsheet changes are pending.";
+        isDirty.value = false;
+        return;
+      }
+      const optimisticEnvelope = currentEnvelope.value;
+      const updated = await currentDatabase.value.documents.update(
+        currentDocument.value.id,
+        serializeTeamGridOperations(pendingOps.value, { baseHeads: pendingOpsBaseHeads.value }),
+      );
+      const returnedEnvelope = migrateTeamGridDocument(updated.data);
       loadDocument(currentDatabase.value, currentDatabaseId.value, updated);
-      status.value = "Saved.";
+      const reconciled = JSON.stringify(returnedEnvelope.teamgrid) !== JSON.stringify(optimisticEnvelope.teamgrid);
+      status.value = reconciled ? "Saved and merged concurrent changes." : "Saved.";
     } catch (error) {
       status.value = readError(error);
     }
@@ -262,6 +278,8 @@ export function useTeamGridDocument() {
       }
       viewingHistoricalSnapshot.value = snapshot;
       currentEnvelope.value = migrateTeamGridDocument(snapshot.data);
+      pendingOps.value = [];
+      pendingOpsBaseHeads.value = [];
       isDirty.value = false;
       status.value = "Opened historical revision read-only.";
     } catch (error) {
@@ -274,11 +292,15 @@ export function useTeamGridDocument() {
       currentEnvelope.value = migrateTeamGridDocument(currentDocument.value.data);
     }
     viewingHistoricalSnapshot.value = null;
+    pendingOps.value = [];
+    pendingOpsBaseHeads.value = [];
     isDirty.value = false;
     status.value = "Returned to the current spreadsheet.";
   }
 
-  function updateGrid(mutator: (grid: TeamGridDocumentV1, envelope: TeamGridDocumentEnvelope) => void) {
+  function updateGrid(
+    mutator: (grid: TeamGridDocumentV1, envelope: TeamGridDocumentEnvelope) => TeamGridOperation[] | void,
+  ) {
     if (!currentEnvelope.value || gridReadOnly.value) {
       return;
     }
@@ -286,7 +308,13 @@ export function useTeamGridDocument() {
       ...currentEnvelope.value,
       teamgrid: cloneTeamGridDocument(currentEnvelope.value.teamgrid),
     };
-    mutator(nextEnvelope.teamgrid, nextEnvelope);
+    const operations = mutator(nextEnvelope.teamgrid, nextEnvelope) ?? [];
+    if (operations.length > 0) {
+      if (pendingOps.value.length === 0) {
+        pendingOpsBaseHeads.value = currentDocument.value?.heads ? [...currentDocument.value.heads] : [];
+      }
+      pendingOps.value.push(...operations);
+    }
     currentEnvelope.value = nextEnvelope;
     isDirty.value = true;
   }
@@ -297,6 +325,8 @@ export function useTeamGridDocument() {
     currentDocument.value = document;
     currentEnvelope.value = migrateTeamGridDocument(document.data);
     viewingHistoricalSnapshot.value = null;
+    pendingOps.value = [];
+    pendingOpsBaseHeads.value = [];
     isDirty.value = false;
   }
 
@@ -313,6 +343,8 @@ export function useTeamGridDocument() {
     revisionEntries,
     revisionLoading,
     revisionErrorMessage,
+    pendingOps,
+    pendingOpsBaseHeads,
     readableDatabases,
     selectedDatabaseInfo,
     currentDatabaseInfo,

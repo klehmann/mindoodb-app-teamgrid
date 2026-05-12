@@ -7,12 +7,18 @@ import {
 } from "@/lib/cellFormatting";
 import { evaluateFormula } from "@/lib/formulas";
 import { getCell, getCellAddress, type GridProjection } from "@/lib/gridProjection";
-import type { Cell, ColumnId, RowId, Worksheet } from "@/lib/teamgridDocument";
+import type { Cell, CellId, ColumnId, RowId, Worksheet } from "@/lib/teamgridDocument";
+
+export interface CellSelectionRange {
+  startCellId: CellId;
+  endCellId: CellId;
+}
 
 const props = defineProps<{
   worksheet: Worksheet;
   projection: GridProjection;
   selectedCellId: string | null;
+  selectedRange: CellSelectionRange | null;
   highlightedCellIds: string[];
   readonly: boolean;
   locale: string;
@@ -20,14 +26,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [cell: Cell, address: string];
+  "select-range": [range: CellSelectionRange];
   commit: [cell: Cell, rawValue: string];
 }>();
 
 const editingCellId = ref<string | null>(null);
 const editDraft = ref("");
 const gridViewport = ref<HTMLElement | null>(null);
+const draggingRangeStart = ref<CellId | null>(null);
+let suppressNextBlurCommit = false;
 
 const highlighted = computed(() => new Set(props.highlightedCellIds));
+const selectedRangeIds = computed(() => new Set(props.selectedRange ? getRangeCellIds(props.selectedRange) : []));
 
 watch(
   () => props.selectedCellId,
@@ -40,10 +50,12 @@ watch(
 
 onMounted(() => {
   window.addEventListener("keydown", handleWindowKeydown);
+  window.addEventListener("mouseup", endRangeDrag);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleWindowKeydown);
+  window.removeEventListener("mouseup", endRangeDrag);
 });
 
 function displayCell(cell: Cell) {
@@ -75,6 +87,36 @@ function commitEdit(cell: Cell) {
   editingCellId.value = null;
 }
 
+function commitEditFromKeyboard(event: KeyboardEvent, cell: Cell) {
+  suppressNextBlurCommit = true;
+  commitEdit(cell);
+  (event.currentTarget as HTMLInputElement | null)?.blur();
+  queueMicrotask(() => {
+    suppressNextBlurCommit = false;
+  });
+}
+
+function handleEditorKeydown(event: KeyboardEvent, cell: Cell) {
+  if (event.key === "Enter" || event.code === "NumpadEnter" || event.keyCode === 13) {
+    event.preventDefault();
+    event.stopPropagation();
+    commitEditFromKeyboard(event, cell);
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    editingCellId.value = null;
+  }
+}
+
+function commitEditFromBlur(cell: Cell) {
+  if (suppressNextBlurCommit) {
+    return;
+  }
+  commitEdit(cell);
+}
+
 function cellStyle(cell: Cell) {
   const mergedStyle = mergeCellStyle(props.worksheet.rowsById[cell.rowId], props.worksheet.columnsById[cell.columnId], cell);
   return {
@@ -93,6 +135,66 @@ function cellStyle(cell: Cell) {
 function handleCellClick(event: MouseEvent, rowId: RowId, columnId: ColumnId) {
   selectCell(rowId, columnId);
   (event.currentTarget as HTMLElement | null)?.focus();
+}
+
+function startRangeSelection(event: MouseEvent, rowId: RowId, columnId: ColumnId) {
+  if (event.button !== 0) {
+    return;
+  }
+  const cell = getCell(props.worksheet, rowId, columnId);
+  if (editingCellId.value) {
+    appendPickedCellToInlineFormula(cell);
+    return;
+  }
+  draggingRangeStart.value = cell.id;
+  emit("select-range", { startCellId: cell.id, endCellId: cell.id });
+  handleCellClick(event, rowId, columnId);
+}
+
+function selectWholeRow(rowId: RowId) {
+  if (editingCellId.value || props.projection.columns.length === 0) {
+    return;
+  }
+  const firstColumn = props.projection.columns[0];
+  const lastColumn = props.projection.columns[props.projection.columns.length - 1];
+  const firstCell = getCell(props.worksheet, rowId, firstColumn.id);
+  const lastCell = getCell(props.worksheet, rowId, lastColumn.id);
+  emit("select", firstCell, getCellAddress(props.projection, firstCell.rowId, firstCell.columnId));
+  emit("select-range", { startCellId: firstCell.id, endCellId: lastCell.id });
+}
+
+function selectWholeColumn(columnId: ColumnId) {
+  if (editingCellId.value || props.projection.rows.length === 0) {
+    return;
+  }
+  const firstRow = props.projection.rows[0];
+  const lastRow = props.projection.rows[props.projection.rows.length - 1];
+  const firstCell = getCell(props.worksheet, firstRow.id, columnId);
+  const lastCell = getCell(props.worksheet, lastRow.id, columnId);
+  emit("select", firstCell, getCellAddress(props.projection, firstCell.rowId, firstCell.columnId));
+  emit("select-range", { startCellId: firstCell.id, endCellId: lastCell.id });
+}
+
+function appendPickedCellToInlineFormula(cell: Cell) {
+  if (!editDraft.value.trim().startsWith("=") || cell.id === editingCellId.value) {
+    return;
+  }
+  const address = getCellAddress(props.projection, cell.rowId, cell.columnId);
+  editDraft.value = /[\w)]$/.test(editDraft.value.trimEnd())
+    ? `${editDraft.value}+${address}`
+    : `${editDraft.value}${address}`;
+}
+
+function extendRangeSelection(rowId: RowId, columnId: ColumnId) {
+  if (!draggingRangeStart.value) {
+    return;
+  }
+  const cell = getCell(props.worksheet, rowId, columnId);
+  emit("select-range", { startCellId: draggingRangeStart.value, endCellId: cell.id });
+}
+
+function endRangeDrag() {
+  draggingRangeStart.value = null;
 }
 
 function handleWindowKeydown(event: KeyboardEvent) {
@@ -141,6 +243,46 @@ function findSelectedCell() {
   return null;
 }
 
+function getRangeCellIds(range: CellSelectionRange) {
+  const start = findCellCoordinates(range.startCellId);
+  const end = findCellCoordinates(range.endCellId);
+  if (!start || !end) {
+    return [];
+  }
+  const ids: CellId[] = [];
+  for (let rowIndex = Math.min(start.rowIndex, end.rowIndex); rowIndex <= Math.max(start.rowIndex, end.rowIndex); rowIndex += 1) {
+    for (let columnIndex = Math.min(start.columnIndex, end.columnIndex); columnIndex <= Math.max(start.columnIndex, end.columnIndex); columnIndex += 1) {
+      const row = props.projection.rows[rowIndex];
+      const column = props.projection.columns[columnIndex];
+      if (row && column) {
+        ids.push(getCell(props.worksheet, row.id, column.id).id);
+      }
+    }
+  }
+  return ids;
+}
+
+function isWholeRowSelected(rowId: RowId) {
+  return props.projection.columns.length > 0
+    && props.projection.columns.every((column) => selectedRangeIds.value.has(getCell(props.worksheet, rowId, column.id).id));
+}
+
+function isWholeColumnSelected(columnId: ColumnId) {
+  return props.projection.rows.length > 0
+    && props.projection.rows.every((row) => selectedRangeIds.value.has(getCell(props.worksheet, row.id, columnId).id));
+}
+
+function findCellCoordinates(cellId: CellId) {
+  for (const row of props.projection.rows) {
+    for (const column of props.projection.columns) {
+      if (getCell(props.worksheet, row.id, column.id).id === cellId) {
+        return { rowIndex: row.index, columnIndex: column.index };
+      }
+    }
+  }
+  return null;
+}
+
 function isTypingInAnotherEditor(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -163,8 +305,10 @@ function isPrintableKey(event: KeyboardEvent) {
             v-for="column in projection.columns"
             :key="column.id"
             class="grid-column-header"
+            :class="{ 'grid-axis-header--selected': isWholeColumnSelected(column.id) }"
             scope="col"
             :style="{ width: `${column.width}px`, minWidth: `${column.width}px` }"
+            @mousedown.prevent="selectWholeColumn(column.id)"
           >
             {{ column.label }}
           </th>
@@ -172,19 +316,28 @@ function isPrintableKey(event: KeyboardEvent) {
       </thead>
       <tbody>
         <tr v-for="row in projection.rows" :key="row.id" :style="{ height: row.height ? `${row.height}px` : undefined }">
-          <th class="grid-row-header" scope="row">{{ row.label }}</th>
+          <th
+            class="grid-row-header"
+            :class="{ 'grid-axis-header--selected': isWholeRowSelected(row.id) }"
+            scope="row"
+            @mousedown.prevent="selectWholeRow(row.id)"
+          >
+            {{ row.label }}
+          </th>
           <td
             v-for="column in projection.columns"
             :key="column.id"
             class="grid-cell"
             :class="{
               'grid-cell--selected': getCell(worksheet, row.id, column.id).id === selectedCellId,
+              'grid-cell--range-selected': selectedRangeIds.has(getCell(worksheet, row.id, column.id).id),
               'grid-cell--highlighted': highlighted.has(getCell(worksheet, row.id, column.id).id),
               'grid-cell--formula': Boolean(getCell(worksheet, row.id, column.id).formula),
             }"
             :style="cellStyle(getCell(worksheet, row.id, column.id))"
             tabindex="0"
-            @click="handleCellClick($event, row.id, column.id)"
+            @mousedown.prevent="startRangeSelection($event, row.id, column.id)"
+            @mouseenter="extendRangeSelection(row.id, column.id)"
             @dblclick="startEditing(row.id, column.id)"
             @keydown="handleEditKey($event, row.id, column.id)"
           >
@@ -193,9 +346,8 @@ function isPrintableKey(event: KeyboardEvent) {
               v-model="editDraft"
               class="grid-cell__editor"
               autofocus
-              @keydown.enter.prevent="commitEdit(getCell(worksheet, row.id, column.id))"
-              @keydown.escape.prevent="editingCellId = null"
-              @blur="commitEdit(getCell(worksheet, row.id, column.id))"
+              @keydown="handleEditorKeydown($event, getCell(worksheet, row.id, column.id))"
+              @blur="commitEditFromBlur(getCell(worksheet, row.id, column.id))"
             >
             <span v-else>{{ displayCell(getCell(worksheet, row.id, column.id)) }}</span>
           </td>
@@ -251,6 +403,16 @@ function isPrintableKey(event: KeyboardEvent) {
   min-width: 3rem;
 }
 
+.grid-column-header,
+.grid-row-header {
+  cursor: pointer;
+}
+
+.grid-axis-header--selected {
+  background: rgb(212 160 23 / 0.18);
+  color: var(--text);
+}
+
 .grid-cell {
   height: 2rem;
   max-width: 18rem;
@@ -266,6 +428,10 @@ function isPrintableKey(event: KeyboardEvent) {
 .grid-cell--selected {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+.grid-cell--range-selected {
+  background: rgb(212 160 23 / 0.12);
 }
 
 .grid-cell--highlighted {
