@@ -42,15 +42,26 @@ import type { MenuItem } from "primevue/menuitem";
 import type { MindooDBAppViewNavigator } from "mindoodb-app-sdk";
 
 import DocumentRevisionDialog from "@/components/DocumentRevisionDialog.vue";
+import FormulaAssistPanel from "@/components/FormulaAssistPanel.vue";
 import FormulaBar from "@/components/FormulaBar.vue";
 import GridViewport from "@/components/GridViewport.vue";
 import TagTreeList from "@/components/TagTreeList.vue";
 import WorksheetTabs from "@/components/WorksheetTabs.vue";
 import { useTeamGridDocument, readDocumentSummaryLabel } from "@/composables/useTeamGridDocument";
 import { coerceInputToCellValue, formatCellValue, formulaResultToCellValue } from "@/lib/cellFormatting";
-import { evaluateFormula, parseFormula } from "@/lib/formulas";
+import {
+  decodePayload,
+  rewriteFormulaSource,
+  serializeRange,
+  type ClipboardPayload,
+  type ClipboardRange,
+  type SerializedClipboardPayload,
+} from "@/lib/clipboard";
+import { evaluateFormula, parseFormula, type FunctionDefinition } from "@/lib/formulas";
 import { createCellId, createId, getFirstVisibleWorksheet, normalizeTags, type Cell, type CellStyle, type WorksheetId } from "@/lib/teamgridDocument";
 import { getCell, projectWorksheet } from "@/lib/gridProjection";
+import type { TeamGridOperation } from "@/lib/teamgridOps";
+import { writeTeamGridExcelBuffer } from "@/lib/xlsx/exportWorkbook";
 import {
   ALL_SPREADSHEETS_NODE_KEY,
   buildOpenCategoryTree,
@@ -68,12 +79,36 @@ interface CellSelectionRange {
   endCellId: string;
 }
 
+/**
+ * Identifies which editor the formula assist panel is anchored against, so
+ * `handleFormulaAssistSelect` can route the chosen function back into the
+ * right input element.
+ */
+type FormulaAssistEditor = "formulaBar" | "inlineCell";
+
+/**
+ * Payload emitted by either editor when the user requests formula assist
+ * (Ctrl+Space or the `fx` button). The panel uses `anchorEl` to compute its
+ * floating coordinates and `draft` / `caretPos` to derive context-aware
+ * suggestions.
+ */
+interface FormulaAssistRequest {
+  anchorEl: HTMLElement;
+  draft: string;
+  caretPos: number;
+}
+
 const app = useTeamGridDocument();
+const formulaBarComponent = ref<InstanceType<typeof FormulaBar> | null>(null);
+const gridViewportComponent = ref<InstanceType<typeof GridViewport> | null>(null);
 
 const openDialogVisible = ref(false);
 const propertiesDialogVisible = ref(false);
 const deleteDialogVisible = ref(false);
 const revisionDialogVisible = ref(false);
+const renameDialogVisible = ref(false);
+const renameTargetId = ref<WorksheetId | null>(null);
+const renameDraft = ref("");
 const selectedOpenDocId = ref("");
 const selectedOpenCategoryKey = ref(ALL_SPREADSHEETS_NODE_KEY);
 const openCategoryNodes = ref<OpenCategoryNode[]>([]);
@@ -87,9 +122,25 @@ const selectedCellAddress = ref("");
 const formulaDraft = ref("");
 const formulaError = ref<string | null>(null);
 const formulaEditing = ref(false);
+const inlineCellEditing = ref(false);
+const inlineCellDraft = ref("");
+const formulaAssistOpen = ref(false);
+const formulaAssistEditor = ref<FormulaAssistEditor>("formulaBar");
+const formulaAssistAnchor = ref<HTMLElement | null>(null);
+const formulaAssistDraft = ref("");
+const formulaAssistCaretPos = ref(0);
+const clipboardSourceRange = ref<ClipboardRange | null>(null);
+const internalClipboard = ref<SerializedClipboardPayload | null>(null);
 const propertiesTitleDraft = ref("");
 const propertiesTagsDraft = ref("");
 
+/**
+ * The worksheet currently displayed in the grid.
+ *
+ * Defaults to whichever worksheet the user explicitly picked via the tab
+ * strip, falling back to the first non-tombstoned worksheet so deleting the
+ * active tab does not leave the UI without a worksheet to render.
+ */
 const activeWorksheet = computed(() => {
   if (!app.activeGrid.value) {
     return null;
@@ -100,8 +151,20 @@ const activeWorksheet = computed(() => {
   return explicit && !explicit.deletedAt ? explicit : getFirstVisibleWorksheet(app.activeGrid.value);
 });
 
+/**
+ * Render-time projection of {@link activeWorksheet} (ordered rows/columns and
+ * A1 address lookups). Recomputed automatically when the worksheet changes
+ * so consumers never have to track invalidation themselves.
+ */
 const projection = computed(() => activeWorksheet.value ? projectWorksheet(activeWorksheet.value) : null);
 
+/**
+ * Persisted cell record for {@link selectedCellId}.
+ *
+ * Returns `null` when nothing is selected or when the worksheet is not yet
+ * loaded. The lookup walks the projection so we get a fresh `Cell` (synthetic
+ * empty if the cell has never been persisted) rather than a stale reference.
+ */
 const selectedCell = computed(() => {
   if (!activeWorksheet.value || !projection.value || !selectedCellId.value) {
     return null;
@@ -117,6 +180,11 @@ const selectedCell = computed(() => {
   return activeWorksheet.value.cellsById[selectedCellId.value] ?? null;
 });
 
+/**
+ * All cells covered by the current {@link selectedRange}, or just the single
+ * {@link selectedCell} when no range is active. Used by every action that
+ * applies to "everything the user picked", e.g. the format toolbar.
+ */
 const selectedCells = computed(() => {
   if (!activeWorksheet.value || !projection.value || !selectedRange.value) {
     return selectedCell.value ? [selectedCell.value] : [];
@@ -139,9 +207,34 @@ const selectedCells = computed(() => {
   return cells;
 });
 
+/** Convenience flag used to gate selection-dependent menu commands. */
 const hasSelection = computed(() => selectedCells.value.length > 0);
+
+/** Document subject with a sensible default for the toolbar title button. */
 const documentTitle = computed(() => app.activeSubject.value || "Untitled spreadsheet");
 
+/**
+ * True when at least one formula editor (bar or in-cell) is open with a
+ * formula draft. Drives the discreet "Press Ctrl+Space for function help"
+ * hint in the status line.
+ */
+const showFormulaAssistHint = computed(() =>
+  (formulaEditing.value && formulaDraft.value.trim().startsWith("="))
+  || (inlineCellEditing.value && inlineCellDraft.value.trim().startsWith("=")));
+
+/**
+ * Status line text. Appends the assist hint while the user is editing a
+ * formula so the keyboard shortcut stays discoverable without rendering
+ * a full popover by default.
+ */
+const statusLineText = computed(() => showFormulaAssistHint.value
+  ? `${app.status.value} · Press Ctrl+Space for function help`
+  : app.status.value);
+
+/**
+ * Right-hand toolbar badge that summarizes the current document mode:
+ * read-only revision, active time-travel cursor, or live-edit + dirty state.
+ */
 const statusBadgeLabel = computed(() => {
   if (app.isViewingHistorical.value) {
     return "Historical · read-only";
@@ -152,6 +245,11 @@ const statusBadgeLabel = computed(() => {
   return `Current · ${app.isDirty.value ? "Unsaved" : "Saved"}`;
 });
 
+/**
+ * Cell ids that the grid should overlay while the user is composing a
+ * formula in the formula bar. Each parsed reference contributes one or more
+ * cells so the user gets instant visual feedback for formula targets.
+ */
 const highlightedCellIds = computed(() => {
   if (!activeWorksheet.value || !projection.value || !formulaDraft.value.trim().startsWith("=")) {
     return [];
@@ -188,6 +286,13 @@ const highlightedCellIds = computed(() => {
   });
 });
 
+/**
+ * PrimeVue Menubar model.
+ *
+ * Built from `computed` rather than declared as a constant so menu item
+ * `disabled` flags and `command` closures stay reactive to the document
+ * lifecycle (read-only mode, selection, dirty state, etc.).
+ */
 const menuItems = computed<MenuItem[]>(() => [
   {
     label: "File",
@@ -196,12 +301,17 @@ const menuItems = computed<MenuItem[]>(() => [
       { label: "Open", icon: "pi pi-folder-open", command: () => void openFileDialog() },
       { separator: true },
       { label: "Save", icon: "pi pi-save", disabled: !app.canSave.value, command: () => void app.saveDocument() },
+      { label: "Export XLSX", icon: "pi pi-download", disabled: !app.activeGrid.value, command: () => void exportCurrentWorkbook() },
       { label: "Delete", icon: "pi pi-trash", disabled: !app.canDelete.value, command: () => { deleteDialogVisible.value = true; } },
     ],
   },
   {
     label: "Edit",
     items: [
+      { label: "Copy", icon: "pi pi-copy", shortcut: "⌘C", disabled: !hasSelection.value, command: () => void copySelectionFromMenu("copy") },
+      { label: "Cut", icon: "pi pi-file-export", shortcut: "⌘X", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => void copySelectionFromMenu("cut") },
+      { label: "Paste", icon: "pi pi-clipboard", shortcut: "⌘V", disabled: app.gridReadOnly.value || (!internalClipboard.value && !navigator.clipboard), command: () => void pasteFromMenu() },
+      { separator: true },
       { label: "Insert row below", icon: "pi pi-arrow-down", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertRow("after") },
       { label: "Insert column right", icon: "pi pi-arrow-right", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertColumn("after") },
       { separator: true },
@@ -226,6 +336,9 @@ const menuItems = computed<MenuItem[]>(() => [
   },
 ]);
 
+// Keep the explicit `activeWorksheetId` ref in sync with whatever
+// `activeWorksheet` resolved to. This matters when the previously active
+// worksheet was deleted and we fell back to the first visible one.
 watch(
   () => activeWorksheet.value?.id,
   (worksheetId) => {
@@ -233,6 +346,9 @@ watch(
   },
 );
 
+// Mirror the selected cell into the formula bar draft. Formula cells expose
+// their `source` (e.g. `=SUM(A1:A10)`); plain cells get their formatted
+// display value so the user can edit it as text.
 watch(
   selectedCell,
   (cell) => {
@@ -244,6 +360,10 @@ watch(
   },
 );
 
+// Guarantee a valid selection whenever the worksheet or its projection
+// changes: clear the selection when there is no worksheet, keep the current
+// selection when it still maps to a visible cell, otherwise snap to the
+// top-left cell of the new projection.
 watch(
   [activeWorksheet, projection],
   () => {
@@ -271,6 +391,8 @@ watch(
   },
 );
 
+// Reset the Properties dialog draft whenever the active document changes,
+// but never clobber values while the dialog is open mid-edit.
 watch(
   () => app.currentEnvelope.value,
   () => {
@@ -286,6 +408,22 @@ async function openFileDialog() {
   try {
     await rebuildOpenNavigator();
     openDialogVisible.value = true;
+  } catch (error) {
+    app.status.value = readError(error);
+  }
+}
+
+/** Export the current workbook as a local .xlsx download. */
+async function exportCurrentWorkbook() {
+  const grid = app.activeGrid.value;
+  if (!grid) {
+    return;
+  }
+  try {
+    const buffer = await writeTeamGridExcelBuffer(grid);
+    const filename = `${sanitizeDownloadFilename(documentTitle.value)}.xlsx`;
+    downloadBlob(buffer, filename);
+    app.status.value = `Exported ${filename}`;
   } catch (error) {
     app.status.value = readError(error);
   }
@@ -400,11 +538,37 @@ function readError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Trigger a browser download for generated export content. */
+function downloadBlob(buffer: ArrayBuffer, filename: string) {
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function sanitizeDownloadFilename(filename: string) {
+  const sanitized = filename
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
+    .replace(/\.+$/g, "")
+    .slice(0, 120);
+  return sanitized || "Untitled spreadsheet";
+}
+
+/**
+ * Pre-fetch the revision history through the composable and show the
+ * revisions dialog once the data is in hand, so users never see an empty
+ * shell while the network request is in flight.
+ */
 async function openRevisionDialog() {
   await app.openRevisionDialog();
   revisionDialogVisible.value = true;
 }
 
+/** Close the revisions dialog and time-travel to the chosen revision. */
 function handleRevisionSelect(revisionId: string) {
   revisionDialogVisible.value = false;
   void app.loadHistoricalRevision(revisionId);
@@ -430,11 +594,19 @@ function selectCell(cell: Cell, address: string) {
     return;
   }
   formulaEditing.value = false;
+  formulaAssistOpen.value = false;
   selectedCellId.value = cell.id;
   selectedRange.value = { startCellId: cell.id, endCellId: cell.id };
   selectedCellAddress.value = address;
 }
 
+/**
+ * Update the multi-cell selection.
+ *
+ * We deliberately ignore range changes while the user is editing a formula
+ * so that drag selecting inside the grid does not accidentally clobber the
+ * picked-references list in the formula bar.
+ */
 function selectRange(range: CellSelectionRange) {
   if (formulaEditing.value) {
     return;
@@ -442,18 +614,472 @@ function selectRange(range: CellSelectionRange) {
   selectedRange.value = range;
 }
 
+/** Grid-emitted `copy` event: serialize the selection into the clipboard. */
+function handleGridClipboardCopy(payload: { range: CellSelectionRange | null; event: ClipboardEvent }) {
+  writeSelectionToClipboard(payload.range, payload.event, "copy");
+}
+
+/**
+ * Grid-emitted `cut` event: same as copy, but mark the cells as "cut" so the
+ * paste handler knows to clear the source range and rewrite incoming
+ * formulas using move-tracking deltas.
+ */
+function handleGridClipboardCut(payload: { range: CellSelectionRange | null; event: ClipboardEvent }) {
+  writeSelectionToClipboard(payload.range, payload.event, "cut");
+}
+
+/**
+ * Grid-emitted `paste` event.
+ *
+ * Tries the OS clipboard first (so Excel-originated HTML wins over an older
+ * internal copy), then falls back to the in-memory clipboard for sandboxed
+ * hosts that block `navigator.clipboard`.
+ */
+function handleGridClipboardPaste(payload: { event: ClipboardEvent }) {
+  const clipboardPayload = readClipboardPayload(payload.event) ?? internalClipboard.value?.payload ?? null;
+  const anchor = selectedCell.value ? findCellCoordinates(selectedCell.value.id) : null;
+  if (!clipboardPayload || !anchor) {
+    return;
+  }
+  applyPasteAtAnchor(clipboardPayload, { row: anchor.rowIndex, col: anchor.columnIndex });
+}
+
+/** Stop drawing the "marching ants" marquee, e.g. on Escape or paste. */
+function clearClipboardMarquee() {
+  clipboardSourceRange.value = null;
+}
+
+/**
+ * Serialize the current selection into the native `ClipboardEvent` plus the
+ * in-memory fallback. We always write both `text/html` (rich Teamgrid +
+ * Excel-compatible payload) and `text/plain` (TSV) so paste targets across
+ * the ecosystem get the richest data they can consume.
+ */
+function writeSelectionToClipboard(range: CellSelectionRange | null, event: ClipboardEvent, mode: "copy" | "cut") {
+  const serialized = serializeSelection(range, mode);
+  if (!serialized) {
+    return;
+  }
+  event.clipboardData?.setData("text/html", serialized.html);
+  event.clipboardData?.setData("text/plain", serialized.tsv);
+  internalClipboard.value = serialized;
+  clipboardSourceRange.value = serialized.payload.source.worksheetId ? {
+    worksheetId: serialized.payload.source.worksheetId,
+    startRow: serialized.payload.source.anchor.row,
+    startCol: serialized.payload.source.anchor.col,
+    endRow: serialized.payload.source.anchor.row + serialized.payload.source.rows - 1,
+    endCol: serialized.payload.source.anchor.col + serialized.payload.source.cols - 1,
+  } : null;
+}
+
+/** Decode a paste-event clipboard, preferring Teamgrid JSON over Excel HTML over TSV. */
+function readClipboardPayload(event: ClipboardEvent) {
+  const html = event.clipboardData?.getData("text/html") ?? "";
+  const tsv = event.clipboardData?.getData("text/plain") ?? "";
+  return decodePayload(html, tsv);
+}
+
+/**
+ * Convert the given (or active) selection into the serialized clipboard
+ * payload used by both the native event and the in-memory fallback.
+ * Returns `null` when there is no worksheet or no usable range.
+ */
+function serializeSelection(range: CellSelectionRange | null, mode: "copy" | "cut") {
+  const clipboardRange = selectionToClipboardRange(range);
+  if (!clipboardRange || !activeWorksheet.value || !projection.value) {
+    return null;
+  }
+  return serializeRange(
+    clipboardRange,
+    (rowIndex, columnIndex) => {
+      const row = projection.value!.rows[rowIndex];
+      const column = projection.value!.columns[columnIndex];
+      return getCell(activeWorksheet.value!, row.id, column.id);
+    },
+    mode,
+  );
+}
+
+/**
+ * Edit menu entry point for Copy / Cut.
+ *
+ * The clipboard `copy`/`cut` events only fire for keyboard shortcuts and the
+ * browser's own menu, so this path uses the async `navigator.clipboard`
+ * write API. Sandboxed Haven hosts often reject this API, so we always
+ * populate the in-memory clipboard as a fallback before attempting the
+ * async write.
+ */
+async function copySelectionFromMenu(mode: "copy" | "cut") {
+  const serialized = serializeSelection(selectedRange.value, mode);
+  if (!serialized) {
+    return;
+  }
+  internalClipboard.value = serialized;
+  clipboardSourceRange.value = payloadSourceRange(serialized.payload);
+  try {
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([serialized.html], { type: "text/html" }),
+        "text/plain": new Blob([serialized.tsv], { type: "text/plain" }),
+      })]);
+      return;
+    }
+    await navigator.clipboard.writeText(serialized.tsv);
+  } catch {
+    // Sandboxed hosts often block navigator.clipboard; internalClipboard keeps the menu useful.
+  }
+}
+
+/**
+ * Edit menu entry point for Paste.
+ *
+ * Reads the OS clipboard via the async API (richer than the synchronous
+ * `ClipboardEvent` path because we can pull both `text/html` and
+ * `text/plain`), falling back to the in-memory clipboard when the host
+ * blocks the API.
+ */
+async function pasteFromMenu() {
+  if (app.gridReadOnly.value) {
+    return;
+  }
+  const anchor = selectedCell.value ? findCellCoordinates(selectedCell.value.id) : null;
+  if (!anchor) {
+    return;
+  }
+  const payload = await readNavigatorClipboardPayload() ?? internalClipboard.value?.payload ?? null;
+  if (!payload) {
+    return;
+  }
+  applyPasteAtAnchor(payload, { row: anchor.rowIndex, col: anchor.columnIndex });
+}
+
+/**
+ * Read the OS clipboard via `navigator.clipboard.read()` (preferred because
+ * it exposes HTML data) and decode the first item that yields a usable
+ * Teamgrid/Excel/TSV payload. Returns `null` on permission errors or empty
+ * clipboards.
+ */
+async function readNavigatorClipboardPayload() {
+  try {
+    if (navigator.clipboard.read) {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const html = item.types.includes("text/html")
+          ? await (await item.getType("text/html")).text()
+          : "";
+        const text = item.types.includes("text/plain")
+          ? await (await item.getType("text/plain")).text()
+          : "";
+        const payload = decodePayload(html, text);
+        if (payload) {
+          return payload;
+        }
+      }
+    }
+    const text = await navigator.clipboard.readText();
+    return decodePayload("", text);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Project a `CellSelectionRange` (selection by stable cell ids) onto a
+ * worksheet-relative {@link ClipboardRange} (selection by row/column index).
+ * Returns `null` when there is nothing to copy, e.g. before the worksheet
+ * is loaded.
+ */
+function selectionToClipboardRange(range: CellSelectionRange | null): ClipboardRange | null {
+  if (!activeWorksheet.value || !projection.value) {
+    return null;
+  }
+  const activeRange = range ?? (selectedCell.value ? { startCellId: selectedCell.value.id, endCellId: selectedCell.value.id } : null);
+  if (!activeRange) {
+    return null;
+  }
+  const start = findCellCoordinates(activeRange.startCellId);
+  const end = findCellCoordinates(activeRange.endCellId);
+  if (!start || !end) {
+    return null;
+  }
+  return {
+    worksheetId: activeWorksheet.value.id,
+    startRow: Math.min(start.rowIndex, end.rowIndex),
+    startCol: Math.min(start.columnIndex, end.columnIndex),
+    endRow: Math.max(start.rowIndex, end.rowIndex),
+    endCol: Math.max(start.columnIndex, end.columnIndex),
+  };
+}
+
+/**
+ * Apply a decoded clipboard payload starting at the given anchor cell.
+ *
+ * Performs the heavy lifting of the paste pipeline:
+ * 1. Auto-extends the worksheet so the entire payload fits.
+ * 2. Writes each clipboard cell into its target position, rewriting any
+ *    formula references by the copy delta so relative references shift
+ *    Excel-style.
+ * 3. For cut payloads, clears the source cells and rewrites formulas
+ *    elsewhere in the sheet that pointed at the cut range (move tracking).
+ * 4. Bundles every change into one `updateGrid` mutation so the granular
+ *    save / `baseHeads` machinery treats the paste as a single edit.
+ *
+ * A cut that resolves back to its own source range is a no-op apart from
+ * clearing the marquee.
+ */
+function applyPasteAtAnchor(payload: ClipboardPayload, anchor: { row: number; col: number }) {
+  if (!activeWorksheet.value) {
+    return;
+  }
+  const activeWorksheetBeforePaste = activeWorksheet.value;
+  const sourceRange = payloadSourceRange(payload);
+  const destinationRange = {
+    worksheetId: activeWorksheetBeforePaste.id,
+    startRow: anchor.row,
+    startCol: anchor.col,
+    endRow: anchor.row + payload.source.rows - 1,
+    endCol: anchor.col + payload.source.cols - 1,
+  };
+  if (payload.mode === "cut" && sourceRange && rangesEqual(sourceRange, destinationRange)) {
+    clipboardSourceRange.value = null;
+    return;
+  }
+
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheetBeforePaste.id];
+    const operations: TeamGridOperation[] = [];
+    ensureGridSize(worksheet, destinationRange.endRow + 1, destinationRange.endCol + 1, operations);
+    const nextProjection = projectWorksheet(worksheet);
+    const destinationIds = new Set<string>();
+    const formulaDelta = {
+      rows: payload.mode === "copy" ? anchor.row - payload.source.anchor.row : 0,
+      cols: payload.mode === "copy" ? anchor.col - payload.source.anchor.col : 0,
+    };
+
+    for (const clipboardCell of payload.cells) {
+      const targetRow = nextProjection.rows[anchor.row + clipboardCell.rowOffset];
+      const targetColumn = nextProjection.columns[anchor.col + clipboardCell.colOffset];
+      if (!targetRow || !targetColumn) {
+        continue;
+      }
+      const targetCellId = createCellId(targetRow.id, targetColumn.id);
+      destinationIds.add(targetCellId);
+      const formulaSource = clipboardCell.formulaSource
+        ? rewriteFormulaSource(clipboardCell.formulaSource, formulaDelta)
+        : undefined;
+      const nextCell: Cell = {
+        id: targetCellId,
+        rowId: targetRow.id,
+        columnId: targetColumn.id,
+        value: cloneCellValue(clipboardCell.value),
+        style: clipboardCell.style ? { ...clipboardCell.style } : undefined,
+        formula: undefined,
+      };
+      if (formulaSource) {
+        applyFormulaToCell(nextCell, formulaSource, worksheet, nextProjection);
+      }
+      worksheet.cellsById[targetCellId] = nextCell;
+      operations.push({ type: "setCell", worksheetId: worksheet.id, cell: nextCell });
+    }
+
+    if (payload.mode === "cut" && payload.source.worksheetId === worksheet.id && payload.cutCellIds) {
+      for (const cellId of payload.cutCellIds) {
+        if (destinationIds.has(cellId)) {
+          continue;
+        }
+        const existing = worksheet.cellsById[cellId];
+        if (!existing) {
+          continue;
+        }
+        const emptyCell: Cell = { ...existing, value: { kind: "empty" }, formula: undefined };
+        worksheet.cellsById[cellId] = emptyCell;
+        operations.push({ type: "setCell", worksheetId: worksheet.id, cell: emptyCell });
+      }
+    }
+
+    if (payload.mode === "cut" && sourceRange && payload.source.worksheetId === worksheet.id) {
+      operations.push(...applyMoveTracking(worksheet, nextProjection, sourceRange, destinationRange));
+    }
+
+    return operations;
+  });
+
+  selectedRange.value = {
+    startCellId: cellIdAt(destinationRange.startRow, destinationRange.startCol),
+    endCellId: cellIdAt(destinationRange.endRow, destinationRange.endCol),
+  };
+  clipboardSourceRange.value = null;
+}
+
+/**
+ * Append rows/columns to the worksheet until the projection reaches at
+ * least `minRows` rows and `minCols` columns. Mutations are appended to
+ * the caller's `operations` array so they participate in the granular
+ * patch generated by the enclosing `updateGrid` call.
+ */
+function ensureGridSize(worksheet: NonNullable<typeof activeWorksheet.value>, minRows: number, minCols: number, operations: TeamGridOperation[]) {
+  while (projectWorksheet(worksheet).rows.length < minRows) {
+    const rowId = createId("row");
+    const row = { id: rowId };
+    worksheet.rowsById[rowId] = row;
+    worksheet.rowOrder.push(rowId);
+    operations.push({ type: "insertRow", worksheetId: worksheet.id, rowId, row, index: worksheet.rowOrder.length - 1 });
+  }
+  while (projectWorksheet(worksheet).columns.length < minCols) {
+    const columnId = createId("col");
+    const column = { id: columnId, width: 120 };
+    worksheet.columnsById[columnId] = column;
+    worksheet.columnOrder.push(columnId);
+    operations.push({ type: "insertColumn", worksheetId: worksheet.id, columnId, column, index: worksheet.columnOrder.length - 1 });
+  }
+}
+
+/**
+ * Parse, evaluate, and cache a formula on the given cell.
+ *
+ * Mutates `cell` in place so callers can build a fresh cell record and pipe
+ * it through a single setCell operation. The cached `references` allow the
+ * dependency tracker to skip re-parsing on subsequent reads.
+ */
+function applyFormulaToCell(cell: Cell, formulaSource: string, worksheet: NonNullable<typeof activeWorksheet.value>, worksheetProjection: NonNullable<typeof projection.value>) {
+  const evaluated = evaluateFormula(formulaSource, worksheet, worksheetProjection);
+  cell.formula = {
+    kind: "formula",
+    source: formulaSource,
+    references: evaluated.references,
+    cached: evaluated.result,
+    error: evaluated.result.kind === "error" ? evaluated.result.code : undefined,
+  };
+  cell.value = formulaResultToCellValue(evaluated.result);
+}
+
+/**
+ * Rewrite formulas across the worksheet that referenced the cut range so
+ * they follow the moved cells (Excel-style "move tracking").
+ *
+ * Cells inside the source or destination range are skipped because they
+ * have already been rewritten by `applyPasteAtAnchor` with the standard
+ * copy delta. Cells whose formula source does not change are not touched
+ * to keep the generated patch minimal.
+ */
+function applyMoveTracking(
+  worksheet: NonNullable<typeof activeWorksheet.value>,
+  worksheetProjection: NonNullable<typeof projection.value>,
+  sourceRange: ClipboardRange,
+  destinationRange: ClipboardRange,
+) {
+  const operations: TeamGridOperation[] = [];
+  const delta = {
+    rows: destinationRange.startRow - sourceRange.startRow,
+    cols: destinationRange.startCol - sourceRange.startCol,
+  };
+  for (const cell of Object.values(worksheet.cellsById)) {
+    const coordinates = findCellCoordinatesInProjection(cell.id, worksheet, worksheetProjection);
+    if (!coordinates || rangeContains(sourceRange, coordinates.rowIndex, coordinates.columnIndex) || rangeContains(destinationRange, coordinates.rowIndex, coordinates.columnIndex) || !cell.formula?.source) {
+      continue;
+    }
+    const nextSource = rewriteFormulaSource(cell.formula.source, delta, {
+      insideRange: {
+        startRow: sourceRange.startRow,
+        startCol: sourceRange.startCol,
+        endRow: sourceRange.endRow,
+        endCol: sourceRange.endCol,
+      },
+    });
+    if (nextSource === cell.formula.source) {
+      continue;
+    }
+    const nextCell: Cell = { ...cell, formula: undefined };
+    applyFormulaToCell(nextCell, nextSource, worksheet, worksheetProjection);
+    worksheet.cellsById[nextCell.id] = nextCell;
+    operations.push({ type: "setCell", worksheetId: worksheet.id, cell: nextCell });
+  }
+  return operations;
+}
+
+/** Resolve a stable cell id to its `{rowIndex, columnIndex}` in the current projection. */
 function findCellCoordinates(cellId: string) {
   if (!activeWorksheet.value || !projection.value) {
     return null;
   }
-  for (const row of projection.value.rows) {
-    for (const column of projection.value.columns) {
-      if (getCell(activeWorksheet.value, row.id, column.id).id === cellId) {
+  return findCellCoordinatesInProjection(cellId, activeWorksheet.value, projection.value);
+}
+
+/**
+ * Variant of {@link findCellCoordinates} that operates on an explicit
+ * worksheet + projection pair. Used inside `updateGrid` mutations where the
+ * `worksheet` argument is a draft copy that the reactive `activeWorksheet`
+ * has not yet observed.
+ */
+function findCellCoordinatesInProjection(
+  cellId: string,
+  worksheet: NonNullable<typeof activeWorksheet.value>,
+  worksheetProjection: NonNullable<typeof projection.value>,
+) {
+  for (const row of worksheetProjection.rows) {
+    for (const column of worksheetProjection.columns) {
+      if (getCell(worksheet, row.id, column.id).id === cellId) {
         return { rowIndex: row.index, columnIndex: column.index };
       }
     }
   }
   return null;
+}
+
+/** Inverse of {@link findCellCoordinates}: turn `(row, col)` into a stable cell id. */
+function cellIdAt(rowIndex: number, columnIndex: number) {
+  if (!activeWorksheet.value || !projection.value) {
+    return "";
+  }
+  const row = projection.value.rows[rowIndex];
+  const column = projection.value.columns[columnIndex];
+  return row && column ? createCellId(row.id, column.id) : "";
+}
+
+/**
+ * Deep-clone a cell value. The clipboard payload is shared across paste
+ * destinations, so cloning prevents accidental aliasing when the same
+ * structured value (e.g. `{ kind: "number", value: 42 }`) ends up in many
+ * target cells.
+ */
+function cloneCellValue(value: Cell["value"]): Cell["value"] {
+  return JSON.parse(JSON.stringify(value)) as Cell["value"];
+}
+
+/**
+ * Reconstruct the source range of a clipboard payload in worksheet-relative
+ * coordinates. Returns `null` for payloads that did not come from this app
+ * (no `worksheetId`), which avoids accidentally treating an Excel paste as
+ * a cut-from-self.
+ */
+function payloadSourceRange(payload: ClipboardPayload): ClipboardRange | null {
+  if (!payload.source.worksheetId) {
+    return null;
+  }
+  return {
+    worksheetId: payload.source.worksheetId,
+    startRow: payload.source.anchor.row,
+    startCol: payload.source.anchor.col,
+    endRow: payload.source.anchor.row + payload.source.rows - 1,
+    endCol: payload.source.anchor.col + payload.source.cols - 1,
+  };
+}
+
+/** Structural equality for `ClipboardRange`. */
+function rangesEqual(left: ClipboardRange, right: ClipboardRange) {
+  return left.worksheetId === right.worksheetId
+    && left.startRow === right.startRow
+    && left.startCol === right.startCol
+    && left.endRow === right.endRow
+    && left.endCol === right.endCol;
+}
+
+/** Test whether `(rowIndex, columnIndex)` falls inside the inclusive `range`. */
+function rangeContains(range: ClipboardRange, rowIndex: number, columnIndex: number) {
+  return rowIndex >= range.startRow
+    && rowIndex <= range.endRow
+    && columnIndex >= range.startCol
+    && columnIndex <= range.endCol;
 }
 
 /**
@@ -470,12 +1096,49 @@ function appendPickedAddress(source: string, address: string) {
   return `${source}${address}`;
 }
 
+/** Open content assist against whichever formula editor is active. */
+function openFormulaAssist(editor: FormulaAssistEditor, request: FormulaAssistRequest) {
+  formulaAssistEditor.value = editor;
+  formulaAssistAnchor.value = request.anchorEl;
+  formulaAssistDraft.value = request.draft;
+  formulaAssistCaretPos.value = request.caretPos;
+  formulaAssistOpen.value = true;
+}
+
+/**
+ * Route a function pick from the assist panel back into the editor that
+ * triggered it. The panel itself is intentionally agnostic of the editor
+ * implementation; this coordinator owns the routing decision.
+ */
+function handleFormulaAssistSelect(definition: FunctionDefinition) {
+  if (formulaAssistEditor.value === "formulaBar") {
+    void formulaBarComponent.value?.applyFormulaAssistSuggestion(definition);
+  } else {
+    void gridViewportComponent.value?.applyFormulaAssistSuggestion(definition);
+  }
+  formulaAssistOpen.value = false;
+}
+
+/**
+ * Track the inline cell editor's open/close state and current draft so the
+ * status-line hint stays in sync and so closing the editor also closes the
+ * formula assist panel that was anchored to it.
+ */
+function handleInlineEditState(payload: { editing: boolean; draft: string }) {
+  inlineCellEditing.value = payload.editing;
+  inlineCellDraft.value = payload.draft;
+  if (!payload.editing && formulaAssistEditor.value === "inlineCell") {
+    formulaAssistOpen.value = false;
+  }
+}
+
 /** Commit the formula bar to the selected cell and leave formula-edit mode. */
 function commitFormulaBar(value: string) {
   if (!selectedCell.value) {
     return;
   }
   formulaEditing.value = false;
+  formulaAssistOpen.value = false;
   commitCell(selectedCell.value, value);
 }
 
@@ -485,11 +1148,18 @@ function commitFormulaBar(value: string) {
  */
 function cancelFormulaEdit() {
   formulaEditing.value = false;
+  formulaAssistOpen.value = false;
   formulaError.value = null;
   formulaDraft.value = selectedCell.value?.formula?.source
     ?? (selectedCell.value ? formatCellValue(selectedCell.value.value, app.activeGrid.value?.settings.locale) : "");
 }
 
+/**
+ * Open the Properties (title + tags) dialog.
+ *
+ * Guarded so we never offer edits for read-only revisions or empty states
+ * where there is no document to edit.
+ */
 function openPropertiesDialog() {
   if (!app.currentEnvelope.value || app.gridReadOnly.value) {
     return;
@@ -520,6 +1190,11 @@ function applyDocumentProperties() {
   propertiesDialogVisible.value = false;
 }
 
+/**
+ * Reset the Properties dialog inputs to the current document state. Called
+ * both when the dialog opens and when the active document changes while the
+ * dialog is closed, so reopening always shows fresh values.
+ */
 function resetPropertiesDraft() {
   propertiesTitleDraft.value = app.activeSubject.value || "Untitled spreadsheet";
   propertiesTagsDraft.value = app.activeTags.value.join("\n");
@@ -566,6 +1241,13 @@ function commitCell(cell: Cell, rawValue: string) {
   });
 }
 
+/**
+ * Append a new worksheet to the workbook seeded with 24 rows × 12 columns
+ * (a reasonable Excel-like default) and switch the UI to the new tab.
+ *
+ * The title is chosen by {@link nextWorksheetTitle} to avoid collisions
+ * with existing or tombstoned worksheets.
+ */
 function addWorksheet() {
   app.updateGrid((grid) => {
     const worksheetId = createId("sheet");
@@ -573,7 +1255,7 @@ function addWorksheet() {
     const columnOrder = Array.from({ length: 12 }, () => createId("col"));
     const worksheet = {
       id: worksheetId,
-      title: `Sheet ${grid.workbook.worksheetOrder.length}`,
+      title: nextWorksheetTitle(grid),
       rowOrder,
       columnOrder,
       rowsById: Object.fromEntries(rowOrder.map((id) => [id, { id }])),
@@ -587,17 +1269,70 @@ function addWorksheet() {
   });
 }
 
+/**
+ * Generate a "Sheet N" title that does not collide with any existing
+ * worksheet, including tombstoned ones (their entries still live in the
+ * workbook and may be restored, so we don't want to recycle their names).
+ */
+function nextWorksheetTitle(grid: { workbook: { worksheetsById: Record<string, { title: string }> } }) {
+  const usedTitles = new Set(
+    Object.values(grid.workbook.worksheetsById).map((worksheet) => worksheet.title),
+  );
+  for (let index = 1; index < 1000; index += 1) {
+    const candidate = `Sheet ${index}`;
+    if (!usedTitles.has(candidate)) {
+      return candidate;
+    }
+  }
+  return `Sheet ${Date.now()}`;
+}
+
+/**
+ * Open the rename dialog for the given worksheet.
+ *
+ * We can't rely on `window.prompt` here because Haven's app shell renders
+ * the iframe with a sandbox that does not include `allow-modals`, which
+ * silently suppresses native prompts. A regular PrimeVue Dialog works
+ * in every host configuration.
+ */
 function renameWorksheet(worksheetId: WorksheetId) {
-  const nextTitle = window.prompt("Worksheet name", app.activeGrid.value?.workbook.worksheetsById[worksheetId]?.title ?? "");
-  if (!nextTitle?.trim()) {
+  if (app.gridReadOnly.value) {
+    return;
+  }
+  const currentTitle = app.activeGrid.value?.workbook.worksheetsById[worksheetId]?.title ?? "";
+  renameTargetId.value = worksheetId;
+  renameDraft.value = currentTitle;
+  renameDialogVisible.value = true;
+}
+
+/** Persist the rename dialog's draft title for the captured worksheet. */
+function applyWorksheetRename() {
+  const worksheetId = renameTargetId.value;
+  const nextTitle = renameDraft.value.trim();
+  if (!worksheetId || !nextTitle) {
+    renameDialogVisible.value = false;
     return;
   }
   app.updateGrid((grid) => {
-    grid.workbook.worksheetsById[worksheetId].title = nextTitle.trim();
-    return [{ type: "renameWorksheet", worksheetId, title: nextTitle.trim() }];
+    const worksheet = grid.workbook.worksheetsById[worksheetId];
+    if (!worksheet || worksheet.title === nextTitle) {
+      return [];
+    }
+    worksheet.title = nextTitle;
+    return [{ type: "renameWorksheet", worksheetId, title: nextTitle }];
   });
+  renameDialogVisible.value = false;
+  renameTargetId.value = null;
 }
 
+/**
+ * Tombstone a worksheet rather than removing it from the workbook entirely.
+ *
+ * Keeping the entry preserves stable references for cells and formulas
+ * that pointed at this worksheet so the change merges cleanly with other
+ * collaborators. The active worksheet jumps to the first remaining tab so
+ * the grid is never left blank.
+ */
 function deleteWorksheet(worksheetId: WorksheetId) {
   app.updateGrid((grid) => {
     const deletedAt = new Date().toISOString();
@@ -607,6 +1342,11 @@ function deleteWorksheet(worksheetId: WorksheetId) {
   });
 }
 
+/**
+ * Insert a new row immediately before or after the row containing the
+ * current selection. Emits an `insertRow` operation so the granular patch
+ * carries the inserted row id and target index.
+ */
 function insertRow(position: "before" | "after") {
   if (!activeWorksheet.value || !selectedCell.value) return;
   app.updateGrid((grid) => {
@@ -621,6 +1361,11 @@ function insertRow(position: "before" | "after") {
   });
 }
 
+/**
+ * Insert a new column immediately before or after the column containing
+ * the current selection. Defaults the new column to the standard 120px
+ * width used elsewhere in the app.
+ */
 function insertColumn(position: "before" | "after") {
   if (!activeWorksheet.value || !selectedCell.value) return;
   app.updateGrid((grid) => {
@@ -635,6 +1380,11 @@ function insertColumn(position: "before" | "after") {
   });
 }
 
+/**
+ * Tombstone the row containing the current selection. Like worksheet
+ * deletion, we keep the row entry so collaborators with concurrent edits
+ * to the same row do not see their work disappear after a merge.
+ */
 function deleteSelectedRow() {
   if (!activeWorksheet.value || !selectedCell.value) return;
   app.updateGrid((grid) => {
@@ -645,6 +1395,7 @@ function deleteSelectedRow() {
   });
 }
 
+/** Column-side counterpart of {@link deleteSelectedRow}. */
 function deleteSelectedColumn() {
   if (!activeWorksheet.value || !selectedCell.value) return;
   app.updateGrid((grid) => {
@@ -690,7 +1441,7 @@ function patchSelectedStyle(style: CellStyle) {
   <main class="teamgrid-shell">
     <header class="toolbar glass-card" :class="{ 'toolbar--ios-multitasking': app.hostUiPreferences.value.iosMultitaskingOptimized }">
       <div class="toolbar__leading">
-        <span class="toolbar__title">Teamgrid</span>
+        <span class="toolbar__title">TeamGrid</span>
         <Menubar :model="menuItems" class="toolbar__menubar" />
         <Button
           :icon="app.isViewingHistorical.value ? 'pi pi-history' : 'pi pi-refresh'"
@@ -722,7 +1473,7 @@ function patchSelectedStyle(style: CellStyle) {
       <span v-else class="toolbar__status-badge">{{ statusBadgeLabel }}</span>
     </header>
 
-    <section class="workspace glass-card">
+    <section class="workspace">
       <template v-if="app.activeGrid.value && activeWorksheet && projection">
         <div v-if="app.isTimeTravelActive.value" class="history-banner">
           <i class="pi pi-clock" aria-hidden="true" />
@@ -781,6 +1532,7 @@ function patchSelectedStyle(style: CellStyle) {
         </div>
 
         <FormulaBar
+          ref="formulaBarComponent"
           v-model="formulaDraft"
           :active-address="selectedCellAddress"
           :readonly="app.gridReadOnly.value || !selectedCell"
@@ -788,18 +1540,27 @@ function patchSelectedStyle(style: CellStyle) {
           @begin-edit="formulaEditing = true"
           @commit="commitFormulaBar"
           @cancel="cancelFormulaEdit"
+          @request-help="openFormulaAssist('formulaBar', $event)"
         />
         <GridViewport
+          ref="gridViewportComponent"
           :worksheet="activeWorksheet"
           :projection="projection"
           :selected-cell-id="selectedCellId"
           :selected-range="selectedRange"
+          :clipboard-range="clipboardSourceRange"
           :highlighted-cell-ids="highlightedCellIds"
           :readonly="app.gridReadOnly.value"
           :locale="app.activeGrid.value.settings.locale"
           @select="selectCell"
           @select-range="selectRange"
           @commit="commitCell"
+          @request-help="openFormulaAssist('inlineCell', $event)"
+          @edit-state="handleInlineEditState"
+          @clipboard-copy="handleGridClipboardCopy"
+          @clipboard-cut="handleGridClipboardCut"
+          @clipboard-paste="handleGridClipboardPaste"
+          @clipboard-clear="clearClipboardMarquee"
         />
         <WorksheetTabs
           :grid="app.activeGrid.value"
@@ -812,8 +1573,8 @@ function patchSelectedStyle(style: CellStyle) {
         />
       </template>
       <section v-else class="empty-state">
-        <h1>Collaborative spreadsheets for Haven</h1>
-        <p>Create or open a Teamgrid spreadsheet. Each file is stored as one MindooDB Automerge document with stable rows, columns, worksheet tabs, and formulas.</p>
+        <h1>Collaborative spreadsheets</h1>
+        <p>Create a new spreadsheet or open an existing one. Edit cells, write formulas, organize your work across multiple sheet tabs, and see your teammates' changes in real time.</p>
         <div class="empty-state__actions">
           <Button label="New spreadsheet" icon="pi pi-file-plus" :disabled="!app.canCreate.value" @click="app.createNewDocument" />
           <Button label="Open spreadsheet" icon="pi pi-folder-open" severity="secondary" @click="openFileDialog" />
@@ -821,7 +1582,17 @@ function patchSelectedStyle(style: CellStyle) {
       </section>
     </section>
 
-    <footer class="status-line">{{ app.status.value }}</footer>
+    <footer class="status-line">{{ statusLineText }}</footer>
+
+    <FormulaAssistPanel
+      v-model:visible="formulaAssistOpen"
+      :draft="formulaAssistDraft"
+      :caret-pos="formulaAssistCaretPos"
+      :anchor-el="formulaAssistAnchor"
+      :readonly="app.gridReadOnly.value"
+      @select="handleFormulaAssistSelect"
+      @dismiss="formulaAssistOpen = false"
+    />
 
     <Dialog v-model:visible="openDialogVisible" modal header="Open spreadsheet" :style="{ width: '58rem', maxWidth: '96vw' }" @hide="disposeOpenNavigator">
       <div class="open-dialog">
@@ -849,7 +1620,7 @@ function patchSelectedStyle(style: CellStyle) {
               @click="selectedOpenDocId = document.id"
               @dblclick="openSelectedDocument"
             >
-              <strong>{{ readDocumentSummaryLabel(document) }}</strong>
+              <strong>{{ document.title }}</strong>
               <small>{{ document.detail }}</small>
               <small>{{ document.id }}</small>
             </button>
@@ -886,6 +1657,24 @@ function patchSelectedStyle(style: CellStyle) {
       <template #footer>
         <Button label="Cancel" text @click="deleteDialogVisible = false" />
         <Button label="Delete" icon="pi pi-trash" severity="danger" @click="deleteDialogVisible = false; app.deleteCurrentDocument()" />
+      </template>
+    </Dialog>
+
+    <Dialog v-model:visible="renameDialogVisible" modal header="Rename worksheet" :style="{ width: '24rem', maxWidth: '96vw' }">
+      <label class="field">
+        Name
+        <input
+          v-model="renameDraft"
+          class="native-input"
+          type="text"
+          autocomplete="off"
+          autofocus
+          @keyup.enter="applyWorksheetRename"
+        >
+      </label>
+      <template #footer>
+        <Button label="Cancel" text @click="renameDialogVisible = false" />
+        <Button label="Rename" icon="pi pi-check" :disabled="!renameDraft.trim()" @click="applyWorksheetRename" />
       </template>
     </Dialog>
 

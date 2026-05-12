@@ -36,8 +36,10 @@ import {
   mergeCellStyle,
 } from "@/lib/cellFormatting";
 import { evaluateFormula } from "@/lib/formulas";
+import { insertFunctionAtCaret } from "@/lib/formulas/assist";
 import { getCell, getCellAddress, type GridProjection } from "@/lib/gridProjection";
 import type { Cell, CellId, ColumnId, RowId, Worksheet } from "@/lib/teamgridDocument";
+import type { FunctionDefinition } from "@/lib/formulas";
 
 /** Inclusive rectangular cell range, addressed by stable cell ids. */
 export interface CellSelectionRange {
@@ -45,11 +47,20 @@ export interface CellSelectionRange {
   endCellId: CellId;
 }
 
+/** Coordinate range used to draw the clipboard source marquee. */
+export interface GridClipboardRange {
+  startRow: number;
+  startCol: number;
+  endRow: number;
+  endCol: number;
+}
+
 const props = defineProps<{
   worksheet: Worksheet;
   projection: GridProjection;
   selectedCellId: string | null;
   selectedRange: CellSelectionRange | null;
+  clipboardRange: GridClipboardRange | null;
   highlightedCellIds: string[];
   readonly: boolean;
   locale: string;
@@ -59,11 +70,18 @@ const emit = defineEmits<{
   select: [cell: Cell, address: string];
   "select-range": [range: CellSelectionRange];
   commit: [cell: Cell, rawValue: string];
+  "request-help": [payload: { anchorEl: HTMLElement; draft: string; caretPos: number }];
+  "edit-state": [payload: { editing: boolean; draft: string }];
+  "clipboard-copy": [payload: { range: CellSelectionRange | null; event: ClipboardEvent }];
+  "clipboard-cut": [payload: { range: CellSelectionRange | null; event: ClipboardEvent }];
+  "clipboard-paste": [payload: { event: ClipboardEvent }];
+  "clipboard-clear": [];
 }>();
 
 const editingCellId = ref<string | null>(null);
 const editDraft = ref("");
 const gridViewport = ref<HTMLElement | null>(null);
+const editorInputEl = ref<HTMLInputElement | HTMLInputElement[] | null>(null);
 const draggingRangeStart = ref<CellId | null>(null);
 let suppressNextBlurCommit = false;
 
@@ -108,14 +126,16 @@ async function startEditing(rowId: RowId, columnId: ColumnId, initialValue?: str
   const cell = getCell(props.worksheet, rowId, columnId);
   editingCellId.value = cell.id;
   editDraft.value = initialValue ?? cell.formula?.source ?? displayCell(cell);
+  emit("edit-state", { editing: true, draft: editDraft.value });
   selectCell(rowId, columnId);
   await nextTick();
-  gridViewport.value?.querySelector<HTMLInputElement>(".grid-cell__editor")?.focus();
+  getEditorInputEl()?.focus();
 }
 
 function commitEdit(cell: Cell) {
   emit("commit", cell, editDraft.value);
   editingCellId.value = null;
+  emit("edit-state", { editing: false, draft: "" });
 }
 
 function commitEditFromKeyboard(event: KeyboardEvent, cell: Cell) {
@@ -128,6 +148,12 @@ function commitEditFromKeyboard(event: KeyboardEvent, cell: Cell) {
 }
 
 function handleEditorKeydown(event: KeyboardEvent, cell: Cell) {
+  if ((event.ctrlKey || event.metaKey) && event.code === "Space") {
+    event.preventDefault();
+    event.stopPropagation();
+    requestFormulaHelp();
+    return;
+  }
   if (event.key === "Enter" || event.code === "NumpadEnter" || event.keyCode === 13) {
     event.preventDefault();
     event.stopPropagation();
@@ -138,7 +164,38 @@ function handleEditorKeydown(event: KeyboardEvent, cell: Cell) {
     event.preventDefault();
     event.stopPropagation();
     editingCellId.value = null;
+    emit("edit-state", { editing: false, draft: "" });
   }
+}
+
+function updateEditDraft(value: string) {
+  editDraft.value = value;
+  emit("edit-state", { editing: Boolean(editingCellId.value), draft: editDraft.value });
+}
+
+async function applyFormulaAssistSuggestion(definition: FunctionDefinition) {
+  if (!editingCellId.value) {
+    return;
+  }
+  const input = getEditorInputEl();
+  const caretPos = input?.selectionStart ?? editDraft.value.length;
+  const inserted = insertFunctionAtCaret(editDraft.value, caretPos, definition.name);
+  editDraft.value = inserted.next;
+  await nextTick();
+  getEditorInputEl()?.focus();
+  getEditorInputEl()?.setSelectionRange(inserted.nextCaret, inserted.nextCaret);
+}
+
+function requestFormulaHelp() {
+  const input = getEditorInputEl();
+  if (props.readonly || !input || !editDraft.value.trim().startsWith("=")) {
+    return;
+  }
+  emit("request-help", {
+    anchorEl: input,
+    draft: editDraft.value,
+    caretPos: input.selectionStart ?? editDraft.value.length,
+  });
 }
 
 function commitEditFromBlur(cell: Cell) {
@@ -174,8 +231,18 @@ function startRangeSelection(event: MouseEvent, rowId: RowId, columnId: ColumnId
   }
   const cell = getCell(props.worksheet, rowId, columnId);
   if (editingCellId.value) {
-    appendPickedCellToInlineFormula(cell);
-    return;
+    if (editDraft.value.trim().startsWith("=")) {
+      appendPickedCellToInlineFormula(cell);
+      return;
+    }
+    const editingCell = findEditingCell();
+    if (editingCell) {
+      suppressNextBlurCommit = true;
+      commitEdit(editingCell);
+      queueMicrotask(() => {
+        suppressNextBlurCommit = false;
+      });
+    }
   }
   draggingRangeStart.value = cell.id;
   emit("select-range", { startCellId: cell.id, endCellId: cell.id });
@@ -274,6 +341,21 @@ function findSelectedCell() {
   return null;
 }
 
+function findEditingCell() {
+  if (!editingCellId.value) {
+    return null;
+  }
+  for (const row of props.projection.rows) {
+    for (const column of props.projection.columns) {
+      const cell = getCell(props.worksheet, row.id, column.id);
+      if (cell.id === editingCellId.value) {
+        return cell;
+      }
+    }
+  }
+  return null;
+}
+
 function getRangeCellIds(range: CellSelectionRange) {
   const start = findCellCoordinates(range.startCellId);
   const end = findCellCoordinates(range.endCellId);
@@ -303,6 +385,17 @@ function isWholeColumnSelected(columnId: ColumnId) {
     && props.projection.rows.every((row) => selectedRangeIds.value.has(getCell(props.worksheet, row.id, columnId).id));
 }
 
+function isInClipboardRange(rowIndex: number, columnIndex: number) {
+  if (!props.clipboardRange) {
+    return false;
+  }
+  const startRow = Math.min(props.clipboardRange.startRow, props.clipboardRange.endRow);
+  const endRow = Math.max(props.clipboardRange.startRow, props.clipboardRange.endRow);
+  const startCol = Math.min(props.clipboardRange.startCol, props.clipboardRange.endCol);
+  const endCol = Math.max(props.clipboardRange.startCol, props.clipboardRange.endCol);
+  return rowIndex >= startRow && rowIndex <= endRow && columnIndex >= startCol && columnIndex <= endCol;
+}
+
 function findCellCoordinates(cellId: CellId) {
   for (const row of props.projection.rows) {
     for (const column of props.projection.columns) {
@@ -321,13 +414,57 @@ function isTypingInAnotherEditor(target: EventTarget | null) {
   return target.matches("input, textarea, select, [contenteditable='true']");
 }
 
+function getEditorInputEl() {
+  return Array.isArray(editorInputEl.value) ? editorInputEl.value[0] : editorInputEl.value;
+}
+
 function isPrintableKey(event: KeyboardEvent) {
   return event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey;
 }
+
+function handleViewportCopy(event: ClipboardEvent) {
+  if (isTypingInAnotherEditor(event.target)) {
+    return;
+  }
+  event.preventDefault();
+  emit("clipboard-copy", { range: props.selectedRange, event });
+}
+
+function handleViewportCut(event: ClipboardEvent) {
+  if (isTypingInAnotherEditor(event.target) || props.readonly) {
+    return;
+  }
+  event.preventDefault();
+  emit("clipboard-cut", { range: props.selectedRange, event });
+}
+
+function handleViewportPaste(event: ClipboardEvent) {
+  if (isTypingInAnotherEditor(event.target) || props.readonly) {
+    return;
+  }
+  event.preventDefault();
+  emit("clipboard-paste", { event });
+}
+
+function handleViewportKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape" && !editingCellId.value) {
+    emit("clipboard-clear");
+  }
+}
+
+defineExpose({ applyFormulaAssistSuggestion });
 </script>
 
 <template>
-  <div ref="gridViewport" class="grid-viewport">
+  <div
+    ref="gridViewport"
+    class="grid-viewport"
+    tabindex="0"
+    @copy="handleViewportCopy"
+    @cut="handleViewportCut"
+    @paste="handleViewportPaste"
+    @keydown="handleViewportKeydown"
+  >
     <table class="grid-table" aria-label="Spreadsheet grid">
       <thead>
         <tr>
@@ -364,6 +501,7 @@ function isPrintableKey(event: KeyboardEvent) {
               'grid-cell--range-selected': selectedRangeIds.has(getCell(worksheet, row.id, column.id).id),
               'grid-cell--highlighted': highlighted.has(getCell(worksheet, row.id, column.id).id),
               'grid-cell--formula': Boolean(getCell(worksheet, row.id, column.id).formula),
+              'grid-cell--clipboard-source': isInClipboardRange(row.index, column.index),
             }"
             :style="cellStyle(getCell(worksheet, row.id, column.id))"
             tabindex="0"
@@ -374,9 +512,11 @@ function isPrintableKey(event: KeyboardEvent) {
           >
             <input
               v-if="editingCellId === getCell(worksheet, row.id, column.id).id"
+              ref="editorInputEl"
               v-model="editDraft"
               class="grid-cell__editor"
               autofocus
+              @input="updateEditDraft(($event.target as HTMLInputElement).value)"
               @keydown="handleEditorKeydown($event, getCell(worksheet, row.id, column.id))"
               @blur="commitEditFromBlur(getCell(worksheet, row.id, column.id))"
             >

@@ -22,6 +22,7 @@
     "@fontsource/rubik": "^5.2.8",
     "@primeuix/styled": "^0.7.4",
     "@primeuix/themes": "^2.0.3",
+    "exceljs": "^4.4.0",
     "mindoodb-app-sdk": "0.0.16",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",

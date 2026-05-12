@@ -6,6 +6,15 @@
  * and reacts to events to mutate the workbook through the
  * `useTeamGridDocument` composable.
  *
+ * Deleted worksheets are kept in the document's `worksheetOrder` as
+ * tombstones so concurrent edits remain merge-safe, but the tab strip
+ * only renders live worksheets to keep the UI clean.
+ *
+ * Interaction:
+ * - Click a tab to activate it.
+ * - Double-click a tab (or right-click → Rename) to rename it.
+ * - Right-click a tab to open a context menu with Rename / Delete.
+ *
  * Props:
  * - `grid`: full workbook used to render tabs in `worksheetOrder`.
  * - `activeWorksheetId`: currently visible worksheet, or `null` if none.
@@ -14,13 +23,16 @@
  * Emits:
  * - `select(id)`: user clicked a tab.
  * - `add()`: user clicked the plus button.
- * - `rename(id)`: user double-clicked a tab to rename it.
+ * - `rename(id)`: user requested a rename for a tab.
  * - `delete(id)`: user requested deletion of a tab.
  */
+import { computed, ref } from "vue";
 import Button from "primevue/button";
+import ContextMenu from "primevue/contextmenu";
+import type { MenuItem } from "primevue/menuitem";
 import type { TeamGridDocumentV1, WorksheetId } from "@/lib/teamgridDocument";
 
-defineProps<{
+const props = defineProps<{
   grid: TeamGridDocumentV1;
   activeWorksheetId: WorksheetId | null;
   readonly: boolean;
@@ -32,24 +44,64 @@ const emit = defineEmits<{
   rename: [worksheetId: WorksheetId];
   delete: [worksheetId: WorksheetId];
 }>();
+
+const visibleWorksheetIds = computed(() =>
+  props.grid.workbook.worksheetOrder.filter(
+    (id) => !props.grid.workbook.worksheetsById[id]?.deletedAt,
+  ),
+);
+
+const contextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
+const contextWorksheetId = ref<WorksheetId | null>(null);
+
+const contextMenuItems = computed<MenuItem[]>(() => {
+  const targetId = contextWorksheetId.value;
+  const canDelete = targetId !== null && visibleWorksheetIds.value.length > 1;
+  return [
+    {
+      label: "Rename",
+      icon: "pi pi-pencil",
+      disabled: props.readonly || targetId === null,
+      command: () => {
+        if (targetId !== null) {
+          emit("rename", targetId);
+        }
+      },
+    },
+    {
+      label: "Delete",
+      icon: "pi pi-trash",
+      disabled: props.readonly || !canDelete,
+      command: () => {
+        if (targetId !== null) {
+          emit("delete", targetId);
+        }
+      },
+    },
+  ];
+});
+
+function openContextMenu(event: MouseEvent, worksheetId: WorksheetId) {
+  contextWorksheetId.value = worksheetId;
+  contextMenu.value?.show(event);
+}
 </script>
 
 <template>
   <nav class="worksheet-tabs" aria-label="Worksheets">
     <button
-      v-for="worksheetId in grid.workbook.worksheetOrder"
+      v-for="worksheetId in visibleWorksheetIds"
       :key="worksheetId"
       class="worksheet-tab"
       :class="{ 'worksheet-tab--active': worksheetId === activeWorksheetId }"
       type="button"
-      :disabled="Boolean(grid.workbook.worksheetsById[worksheetId]?.deletedAt)"
       @click="emit('select', worksheetId)"
       @dblclick="!readonly && emit('rename', worksheetId)"
+      @contextmenu.prevent="openContextMenu($event, worksheetId)"
     >
-      {{ grid.workbook.worksheetsById[worksheetId]?.title ?? "Deleted sheet" }}
-      <span v-if="grid.workbook.worksheetsById[worksheetId]?.deletedAt" class="worksheet-tab__deleted">deleted</span>
+      {{ grid.workbook.worksheetsById[worksheetId]?.title }}
       <span
-        v-else-if="worksheetId === activeWorksheetId && !readonly && grid.workbook.worksheetOrder.length > 1"
+        v-if="worksheetId === activeWorksheetId && !readonly && visibleWorksheetIds.length > 1"
         class="worksheet-tab__delete"
         role="button"
         tabindex="0"
@@ -61,6 +113,7 @@ const emit = defineEmits<{
       </span>
     </button>
     <Button icon="pi pi-plus" text rounded size="small" aria-label="Add worksheet" :disabled="readonly" @click="emit('add')" />
+    <ContextMenu ref="contextMenu" :model="contextMenuItems" />
   </nav>
 </template>
 
@@ -91,11 +144,6 @@ const emit = defineEmits<{
 .worksheet-tab--active {
   border-color: var(--accent);
   background: rgb(212 160 23 / 0.18);
-}
-
-.worksheet-tab__deleted {
-  color: var(--muted);
-  font-size: 0.75rem;
 }
 
 .worksheet-tab__delete {
