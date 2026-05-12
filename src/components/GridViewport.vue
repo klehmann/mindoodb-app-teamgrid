@@ -38,7 +38,7 @@ import {
 import { evaluateFormula } from "@/lib/formulas";
 import { insertFunctionAtCaret } from "@/lib/formulas/assist";
 import { getCell, getCellAddress, type GridProjection } from "@/lib/gridProjection";
-import type { Cell, CellId, ColumnId, RowId, Worksheet } from "@/lib/teamgridDocument";
+import { createCellId, type Cell, type CellId, type ColumnId, type RowId, type Worksheet } from "@/lib/teamgridDocument";
 import type { FunctionDefinition } from "@/lib/formulas";
 
 /** Inclusive rectangular cell range, addressed by stable cell ids. */
@@ -72,6 +72,7 @@ const emit = defineEmits<{
   commit: [cell: Cell, rawValue: string];
   "request-help": [payload: { anchorEl: HTMLElement; draft: string; caretPos: number }];
   "edit-state": [payload: { editing: boolean; draft: string }];
+  "cell-context": [payload: { event: MouseEvent; cell: Cell; address: string; range: CellSelectionRange }];
   "clipboard-copy": [payload: { range: CellSelectionRange | null; event: ClipboardEvent }];
   "clipboard-cut": [payload: { range: CellSelectionRange | null; event: ClipboardEvent }];
   "clipboard-paste": [payload: { event: ClipboardEvent }];
@@ -84,6 +85,13 @@ const gridViewport = ref<HTMLElement | null>(null);
 const editorInputEl = ref<HTMLInputElement | HTMLInputElement[] | null>(null);
 const draggingRangeStart = ref<CellId | null>(null);
 let suppressNextBlurCommit = false;
+
+const KEYBOARD_SELECTION_DELTAS: Record<string, { rows: number; cols: number }> = {
+  ArrowUp: { rows: -1, cols: 0 },
+  ArrowDown: { rows: 1, cols: 0 },
+  ArrowLeft: { rows: 0, cols: -1 },
+  ArrowRight: { rows: 0, cols: 1 },
+};
 
 const highlighted = computed(() => new Set(props.highlightedCellIds));
 const selectedRangeIds = computed(() => new Set(props.selectedRange ? getRangeCellIds(props.selectedRange) : []));
@@ -249,6 +257,15 @@ function startRangeSelection(event: MouseEvent, rowId: RowId, columnId: ColumnId
   handleCellClick(event, rowId, columnId);
 }
 
+function openCellContextMenu(event: MouseEvent, rowId: RowId, columnId: ColumnId) {
+  const cell = getCell(props.worksheet, rowId, columnId);
+  const address = getCellAddress(props.projection, rowId, columnId);
+  const range = props.selectedRange && selectedRangeIds.value.has(cell.id)
+    ? props.selectedRange
+    : { startCellId: cell.id, endCellId: cell.id };
+  emit("cell-context", { event, cell, address, range });
+}
+
 function selectWholeRow(rowId: RowId) {
   if (editingCellId.value || props.projection.columns.length === 0) {
     return;
@@ -307,7 +324,13 @@ function handleWindowKeydown(event: KeyboardEvent) {
 }
 
 function handleEditKey(event: KeyboardEvent, rowId: RowId, columnId: ColumnId) {
-  if (props.readonly || editingCellId.value) {
+  if (editingCellId.value) {
+    return;
+  }
+  if (handleSelectionKey(event, rowId, columnId)) {
+    return;
+  }
+  if (props.readonly) {
     return;
   }
   if (event.key === "Enter" || event.key === "F2") {
@@ -323,6 +346,49 @@ function handleEditKey(event: KeyboardEvent, rowId: RowId, columnId: ColumnId) {
   if (isPrintableKey(event)) {
     event.preventDefault();
     void startEditing(rowId, columnId, event.key);
+  }
+}
+
+function handleSelectionKey(event: KeyboardEvent, rowId: RowId, columnId: ColumnId) {
+  const delta = KEYBOARD_SELECTION_DELTAS[event.key];
+  if (!delta) {
+    return false;
+  }
+  const currentRowIndex = props.projection.rowIndexById.get(rowId);
+  const currentColumnIndex = props.projection.columnIndexById.get(columnId);
+  if (currentRowIndex == null || currentColumnIndex == null) {
+    return false;
+  }
+
+  event.preventDefault();
+  const targetRow = props.projection.rows[clampIndex(currentRowIndex + delta.rows, props.projection.rows.length)];
+  const targetColumn = props.projection.columns[clampIndex(currentColumnIndex + delta.cols, props.projection.columns.length)];
+  if (!targetRow || !targetColumn) {
+    return true;
+  }
+
+  const targetCell = getCell(props.worksheet, targetRow.id, targetColumn.id);
+  const range = event.shiftKey
+    ? { startCellId: props.selectedRange?.startCellId ?? createCellId(rowId, columnId), endCellId: targetCell.id }
+    : { startCellId: targetCell.id, endCellId: targetCell.id };
+  emit("select", targetCell, getCellAddress(props.projection, targetRow.id, targetColumn.id));
+  emit("select-range", range);
+  void focusCell(targetCell.id);
+  return true;
+}
+
+function clampIndex(index: number, length: number) {
+  return Math.max(0, Math.min(index, length - 1));
+}
+
+async function focusCell(cellId: CellId) {
+  await nextTick();
+  const cells = gridViewport.value?.querySelectorAll<HTMLElement>("[data-cell-id]") ?? [];
+  for (const cell of cells) {
+    if (cell.dataset.cellId === cellId) {
+      cell.focus();
+      return;
+    }
   }
 }
 
@@ -504,8 +570,10 @@ defineExpose({ applyFormulaAssistSuggestion });
               'grid-cell--clipboard-source': isInClipboardRange(row.index, column.index),
             }"
             :style="cellStyle(getCell(worksheet, row.id, column.id))"
+            :data-cell-id="getCell(worksheet, row.id, column.id).id"
             tabindex="0"
             @mousedown.prevent="startRangeSelection($event, row.id, column.id)"
+            @contextmenu.prevent="openCellContextMenu($event, row.id, column.id)"
             @mouseenter="extendRangeSelection(row.id, column.id)"
             @dblclick="startEditing(row.id, column.id)"
             @keydown="handleEditKey($event, row.id, column.id)"

@@ -36,6 +36,7 @@
  */
 import { computed, ref, watch } from "vue";
 import Button from "primevue/button";
+import ContextMenu from "primevue/contextmenu";
 import Dialog from "primevue/dialog";
 import Menubar from "primevue/menubar";
 import type { MenuItem } from "primevue/menuitem";
@@ -99,6 +100,7 @@ interface FormulaAssistRequest {
 }
 
 const app = useTeamGridDocument();
+const cellContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
 const formulaBarComponent = ref<InstanceType<typeof FormulaBar> | null>(null);
 const gridViewportComponent = ref<InstanceType<typeof GridViewport> | null>(null);
 
@@ -119,6 +121,7 @@ const activeWorksheetId = ref<WorksheetId | null>(null);
 const selectedCellId = ref<string | null>(null);
 const selectedRange = ref<CellSelectionRange | null>(null);
 const selectedCellAddress = ref("");
+const cellContextRange = ref<CellSelectionRange | null>(null);
 const formulaDraft = ref("");
 const formulaError = ref<string | null>(null);
 const formulaEditing = ref(false);
@@ -333,6 +336,27 @@ const menuItems = computed<MenuItem[]>(() => [
       { label: "Browse revisions", icon: "pi pi-history", disabled: !app.currentCanBrowseHistory.value || !app.currentDocument.value, command: () => void openRevisionDialog() },
       { label: "Return to current", icon: "pi pi-refresh", disabled: !app.isViewingHistorical.value, command: app.returnToCurrent },
     ],
+  },
+]);
+
+const cellContextMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: "Copy",
+    icon: "pi pi-copy",
+    disabled: !cellContextRange.value,
+    command: () => void copySelectionFromMenu("copy", cellContextRange.value),
+  },
+  {
+    label: "Cut",
+    icon: "pi pi-file-export",
+    disabled: app.gridReadOnly.value || !cellContextRange.value,
+    command: () => void copySelectionFromMenu("cut", cellContextRange.value),
+  },
+  {
+    label: "Paste",
+    icon: "pi pi-clipboard",
+    disabled: app.gridReadOnly.value || (!internalClipboard.value && !navigator.clipboard),
+    command: () => void pasteFromMenu(),
   },
 ]);
 
@@ -614,6 +638,19 @@ function selectRange(range: CellSelectionRange) {
   selectedRange.value = range;
 }
 
+/** Open the cell context menu, preserving an existing range when right-clicked inside it. */
+function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: string; range: CellSelectionRange }) {
+  if (!selectedRange.value || selectedRange.value.startCellId !== payload.range.startCellId || selectedRange.value.endCellId !== payload.range.endCellId) {
+    formulaEditing.value = false;
+    formulaAssistOpen.value = false;
+    selectedCellId.value = payload.cell.id;
+    selectedCellAddress.value = payload.address;
+    selectedRange.value = payload.range;
+  }
+  cellContextRange.value = payload.range;
+  cellContextMenu.value?.show(payload.event);
+}
+
 /** Grid-emitted `copy` event: serialize the selection into the clipboard. */
 function handleGridClipboardCopy(payload: { range: CellSelectionRange | null; event: ClipboardEvent }) {
   writeSelectionToClipboard(payload.range, payload.event, "copy");
@@ -709,8 +746,8 @@ function serializeSelection(range: CellSelectionRange | null, mode: "copy" | "cu
  * populate the in-memory clipboard as a fallback before attempting the
  * async write.
  */
-async function copySelectionFromMenu(mode: "copy" | "cut") {
-  const serialized = serializeSelection(selectedRange.value, mode);
+async function copySelectionFromMenu(mode: "copy" | "cut", range = selectedRange.value) {
+  const serialized = serializeSelection(range, mode);
   if (!serialized) {
     return;
   }
@@ -1555,6 +1592,7 @@ function patchSelectedStyle(style: CellStyle) {
           @select="selectCell"
           @select-range="selectRange"
           @commit="commitCell"
+          @cell-context="openCellContextMenu"
           @request-help="openFormulaAssist('inlineCell', $event)"
           @edit-state="handleInlineEditState"
           @clipboard-copy="handleGridClipboardCopy"
@@ -1571,6 +1609,7 @@ function patchSelectedStyle(style: CellStyle) {
           @rename="renameWorksheet"
           @delete="deleteWorksheet"
         />
+        <ContextMenu ref="cellContextMenu" :model="cellContextMenuItems" />
       </template>
       <section v-else class="empty-state">
         <h1>Collaborative spreadsheets</h1>
