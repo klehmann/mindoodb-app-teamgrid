@@ -75,4 +75,19 @@ describe("teamgrid operation serialization", () => {
       },
     }]);
   });
+
+  it("serializes document properties as top-level metadata patches", () => {
+    expect(serializeTeamGridOperations([{
+      type: "setDocumentProperties",
+      subject: "Budget",
+      tags: ["Finance\\Q1", "Planning"],
+    }])).toEqual({
+      json: {
+        set: [
+          { path: ["subject"], value: "Budget" },
+          { path: ["tags"], value: ["Finance\\Q1", "Planning"] },
+        ],
+      },
+    });
+  });
 });

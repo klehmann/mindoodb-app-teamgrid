@@ -1,3 +1,34 @@
+/**
+ * Composable that owns Teamgrid's bridge connection, document lifecycle,
+ * capability gating, time travel, and granular-save bookkeeping.
+ *
+ * This is the central public surface of the sample app: the root `App.vue`
+ * binds to the refs returned here, and every UI mutation goes through
+ * {@link useTeamGridDocument.updateGrid} so that an Automerge-friendly JSON
+ * patch can be produced when the user saves.
+ *
+ * Design notes that are easy to miss when reading the code top-to-bottom:
+ *
+ * - The composable keeps two parallel representations of the document. The
+ *   `currentDocument` ref is the raw `MindooDBAppDocument` we got from Haven,
+ *   used for IDs and Automerge `heads`. The `currentEnvelope` ref is a typed
+ *   {@link TeamGridDocumentEnvelope} clone the UI freely mutates without
+ *   touching the SDK's payload object.
+ * - Each call to {@link useTeamGridDocument.updateGrid} clones the workbook
+ *   before applying the mutator. That makes Vue's reactivity see a new object
+ *   reference and, more importantly, prevents the mutator from accidentally
+ *   modifying state that is shared with the previous `currentEnvelope`.
+ * - The first mutation in a save batch captures `currentDocument.heads` into
+ *   `pendingOpsBaseHeads`. That value is later attached as `baseHeads` on the
+ *   JSON patch so the Haven host (and ultimately Automerge) can replay the
+ *   patch at the document version the user actually saw, instead of at HEAD.
+ *   Without this, two users inserting rows concurrently would race on list
+ *   indices and last-writer-wins.
+ * - Time travel and historical-revision snapshots flip the grid to read-only
+ *   via {@link isGridSessionReadOnly}. Mutators silently short-circuit in
+ *   those modes rather than throwing, because the UI already disables the
+ *   triggering menu/toolbar items via {@link canMutateGrid}.
+ */
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   createMindooDBAppBridge,
@@ -8,6 +39,8 @@ import {
   type MindooDBAppDocumentRevisionId,
   type MindooDBAppDocumentSummary,
   type MindooDBAppHistoricalDocument,
+  type MindooDBAppCreateViewNavigatorInput,
+  type MindooDBAppViewNavigator,
   type MindooDBAppRuntime,
   type MindooDBAppSession,
   type MindooDBAppUiPreferences,
@@ -29,6 +62,14 @@ import {
   type TeamGridDocumentV1,
 } from "@/lib/teamgridDocument";
 
+/**
+ * Construct the Teamgrid document composable.
+ *
+ * Returns refs and helpers that `App.vue` and its child components bind to.
+ * The returned API is intentionally flat: every interesting piece of state
+ * is a {@link Ref} that templates can read directly, and every transition is
+ * an `async` helper that swallows errors into the human-readable `status` ref.
+ */
 export function useTeamGridDocument() {
   const session = ref<MindooDBAppSession | null>(null);
   const databases = ref<MindooDBAppDatabaseInfo[]>([]);
@@ -68,6 +109,7 @@ export function useTeamGridDocument() {
   }));
   const activeGrid = computed(() => currentEnvelope.value?.teamgrid ?? null);
   const activeSubject = computed(() => currentEnvelope.value?.subject ?? "");
+  const activeTags = computed(() => currentEnvelope.value?.tags ?? []);
   const hasCurrentDocument = computed(() => Boolean(currentDocument.value && currentEnvelope.value));
   const canCreate = computed(() => !isTimeTravelActive.value && creatableDatabases.value.length > 0);
   const canSave = computed(() => Boolean(currentDatabase.value && canMutateGrid({
@@ -84,6 +126,15 @@ export function useTeamGridDocument() {
     launchTimeTravelDate.value == null ? "" : new Date(launchTimeTravelDate.value).toLocaleString(),
   );
 
+  /**
+   * Connect to the Haven host bridge once Vue mounts the consuming component.
+   *
+   * The launch context tells the app which databases it is allowed to see,
+   * which runtime it runs under (iframe vs. native), whether the host opened
+   * the database in time-travel mode, and the initial theme. Theme and
+   * UI-preference changes are then pushed by the host via the listeners
+   * registered below, which we tear down in {@link onBeforeUnmount}.
+   */
   onMounted(async () => {
     try {
       const bridge = createMindooDBAppBridge();
@@ -115,6 +166,13 @@ export function useTeamGridDocument() {
     await session.value?.disconnect();
   });
 
+  /**
+   * Resolve a database handle via the SDK session.
+   *
+   * Throws when the session is not yet connected or when the caller did not
+   * pick a database id. The session caches handles internally, so calling
+   * this repeatedly with the same id is cheap.
+   */
   async function openDatabaseById(databaseId: string) {
     if (!session.value || !databaseId) {
       throw new Error("Select a database first.");
@@ -122,6 +180,26 @@ export function useTeamGridDocument() {
     return await session.value.openDatabase(databaseId);
   }
 
+  /**
+   * Create a dynamic view navigator on the current session.
+   *
+   * Exposed so the File/Open dialog in `App.vue` can build a tag-categorized
+   * tree without having to import the bridge directly.
+   */
+  async function createViewNavigator(input: MindooDBAppCreateViewNavigatorInput): Promise<MindooDBAppViewNavigator> {
+    if (!session.value) {
+      throw new Error("Connect to Haven before opening a view.");
+    }
+    return await session.value.createViewNavigator(input);
+  }
+
+  /**
+   * Refresh the legacy flat document list for the currently selected database.
+   *
+   * The view-backed Open dialog uses {@link createViewNavigator} instead, but
+   * this helper is still used by callers that just need a sorted summary list
+   * (for example to resolve a previously selected document id).
+   */
   async function refreshDocuments() {
     const database = await openDatabaseById(selectedDatabaseId.value);
     const result = await database.documents.list({
@@ -135,6 +213,14 @@ export function useTeamGridDocument() {
       }));
   }
 
+  /**
+   * Create a brand-new spreadsheet document.
+   *
+   * Falls back to the first creatable database when the currently selected
+   * one does not advertise the `create` capability, so the menu's "New"
+   * action remains useful even when the user only has read access to the
+   * primary database.
+   */
   async function createNewDocument() {
     try {
       const targetDatabaseInfo = selectedDatabaseInfo.value?.capabilities.includes("create")
@@ -156,6 +242,7 @@ export function useTeamGridDocument() {
     }
   }
 
+  /** Open an existing document by id from the currently selected database. */
   async function openDocument(documentId: string) {
     try {
       const databaseId = selectedDatabaseId.value;
@@ -171,6 +258,13 @@ export function useTeamGridDocument() {
     }
   }
 
+  /**
+   * Re-read the currently open document from Haven and discard local edits.
+   *
+   * This drops any pending granular operations and resets the dirty flag, so
+   * the UI should warn the user before calling this when there are unsaved
+   * changes.
+   */
   async function refreshCurrentDocument() {
     if (!currentDatabase.value || !currentDocument.value) {
       status.value = "Open a document before refreshing.";
@@ -188,6 +282,19 @@ export function useTeamGridDocument() {
     }
   }
 
+  /**
+   * Flush all pending granular operations to Haven.
+   *
+   * The pending operations are serialized into one {@link MindooDBAppJsonPatch}
+   * with `baseHeads` set to the document heads captured when the batch
+   * started. Haven applies the patch against that historical version using
+   * `Automerge.changeAt`, then merges the result with any concurrent writes.
+   *
+   * If the returned payload differs from the optimistic envelope we sent
+   * (for example, because another collaborator inserted a row), we surface
+   * "Saved and merged concurrent changes." so the user knows the visible
+   * sheet has been reconciled rather than just round-tripped.
+   */
   async function saveDocument() {
     if (!currentDatabase.value || !currentDocument.value || !currentEnvelope.value) {
       status.value = "Open or create a spreadsheet before saving.";
@@ -216,13 +323,14 @@ export function useTeamGridDocument() {
       );
       const returnedEnvelope = migrateTeamGridDocument(updated.data);
       loadDocument(currentDatabase.value, currentDatabaseId.value, updated);
-      const reconciled = JSON.stringify(returnedEnvelope.teamgrid) !== JSON.stringify(optimisticEnvelope.teamgrid);
+      const reconciled = JSON.stringify(returnedEnvelope) !== JSON.stringify(optimisticEnvelope);
       status.value = reconciled ? "Saved and merged concurrent changes." : "Saved.";
     } catch (error) {
       status.value = readError(error);
     }
   }
 
+  /** Hard-delete the currently open document from its database. */
   async function deleteCurrentDocument() {
     if (!currentDatabase.value || !currentDocument.value) {
       status.value = "Open a spreadsheet before deleting.";
@@ -245,6 +353,12 @@ export function useTeamGridDocument() {
     }
   }
 
+  /**
+   * Load the document history list shown in the Revisions dialog.
+   *
+   * No-ops when the host did not advertise the `history` capability so the
+   * sample app still works against minimal database bindings.
+   */
   async function openRevisionDialog() {
     if (!currentDatabase.value || !currentDocument.value || !currentCanBrowseHistory.value) {
       return;
@@ -260,6 +374,13 @@ export function useTeamGridDocument() {
     }
   }
 
+  /**
+   * Switch the editor to a historical snapshot.
+   *
+   * The grid becomes read-only via {@link gridReadOnly}, pending operations
+   * are cleared, and the snapshot data is migrated through
+   * {@link migrateTeamGridDocument} so older schemas still render.
+   */
   async function loadHistoricalRevision(revisionId: MindooDBAppDocumentRevisionId) {
     if (!currentDatabase.value || !currentDocument.value) {
       return;
@@ -287,6 +408,11 @@ export function useTeamGridDocument() {
     }
   }
 
+  /**
+   * Leave historical-revision mode and reattach the editor to the current
+   * version. The current document's data is re-migrated so we never carry
+   * stale grid state from a previously displayed snapshot.
+   */
   function returnToCurrent() {
     if (currentDocument.value) {
       currentEnvelope.value = migrateTeamGridDocument(currentDocument.value.data);
@@ -298,6 +424,23 @@ export function useTeamGridDocument() {
     status.value = "Returned to the current spreadsheet.";
   }
 
+  /**
+   * Apply a UI mutation to the workbook and record the equivalent granular
+   * operations for the next save.
+   *
+   * `mutator` receives a freshly cloned workbook so it can mutate it in place
+   * without worrying about reactivity. It must return the list of semantic
+   * {@link TeamGridOperation} entries that describe the same change, so the
+   * saver can later serialize them into an Automerge-friendly JSON patch.
+   *
+   * The first mutation in a batch captures `currentDocument.heads` into
+   * `pendingOpsBaseHeads`. Subsequent mutations append to the same batch
+   * without re-capturing heads, so the entire batch is replayed at the
+   * version the user saw when they started editing.
+   *
+   * Silently no-ops in read-only modes; the UI is expected to disable the
+   * triggering controls in those modes (see {@link gridReadOnly}).
+   */
   function updateGrid(
     mutator: (grid: TeamGridDocumentV1, envelope: TeamGridDocumentEnvelope) => TeamGridOperation[] | void,
   ) {
@@ -319,6 +462,13 @@ export function useTeamGridDocument() {
     isDirty.value = true;
   }
 
+  /**
+   * Replace the editor's state with a freshly fetched document.
+   *
+   * Resets pending operations and the dirty flag because the new document
+   * starts clean. Callers should make sure they don't overwrite unsaved
+   * local edits before invoking this.
+   */
   function loadDocument(database: MindooDBAppDatabase, databaseId: string, document: MindooDBAppDocument) {
     currentDatabase.value = database;
     currentDatabaseId.value = databaseId;
@@ -354,6 +504,7 @@ export function useTeamGridDocument() {
     gridReadOnly,
     activeGrid,
     activeSubject,
+    activeTags,
     canCreate,
     canSave,
     canDelete,
@@ -361,6 +512,7 @@ export function useTeamGridDocument() {
     currentRevisionId,
     timeTravelDateLabel,
     refreshDocuments,
+    createViewNavigator,
     createNewDocument,
     openDocument,
     refreshCurrentDocument,
@@ -373,10 +525,15 @@ export function useTeamGridDocument() {
   };
 }
 
+/**
+ * Pick a user-facing label for a document summary, preferring the saved
+ * subject and falling back to the document id when no title is set.
+ */
 export function readDocumentSummaryLabel(summary: MindooDBAppDocumentSummary) {
   return readSubject(summary.data) || summary.id;
 }
 
+/** Normalize an unknown thrown value into a human-readable status message. */
 function readError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }

@@ -1,5 +1,22 @@
+/**
+ * Registry of built-in formula functions used by both the evaluator and the
+ * formula bar's content assist.
+ *
+ * Each {@link FunctionDefinition} carries enough metadata for runtime
+ * evaluation (`minArgs` / `maxArgs` / `evaluate`) and for editor UX
+ * (`signature`, `description`, `category`). Keeping these in one registry
+ * means the help overlay and the evaluator never disagree about which
+ * functions exist.
+ *
+ * The function set is intentionally small; this is a sample app rather than
+ * an Excel-compatible engine. To add a function, append a new entry here
+ * with the same shape and the evaluator will pick it up automatically.
+ */
+
+/** Grouping shown in the content-assist help overlay. */
 export type FunctionCategory = "Math" | "Statistics" | "Text" | "Date";
 
+/** One callable formula function. */
 export interface FunctionDefinition {
   name: string;
   category: FunctionCategory;
@@ -10,6 +27,11 @@ export interface FunctionDefinition {
   evaluate(args: FormulaRuntimeValue[]): FormulaRuntimeValue;
 }
 
+/**
+ * Discriminated runtime value used inside the evaluator. It's a superset of
+ * the persisted {@link CellValue} shapes plus an `error` variant, so the
+ * first error short-circuits its enclosing operation.
+ */
 export type FormulaRuntimeValue =
   | { kind: "number"; value: number }
   | { kind: "string"; value: string }
@@ -17,6 +39,7 @@ export type FormulaRuntimeValue =
   | { kind: "empty" }
   | { kind: "error"; code: "#REF!" | "#CYCLE!" | "#VALUE!" | "#NAME?" | "#DIV/0!" };
 
+/** Built-in functions, keyed by uppercase name. */
 export const FUNCTION_REGISTRY: Record<string, FunctionDefinition> = {
   SUM: {
     name: "SUM",
@@ -96,6 +119,12 @@ export const FUNCTION_REGISTRY: Record<string, FunctionDefinition> = {
   },
 };
 
+/**
+ * Filter the registry by name prefix for the content-assist popup.
+ *
+ * Returns all functions when `query` is empty, otherwise functions whose
+ * name starts with the (case-insensitive) query.
+ */
 export function suggestFunctions(query: string) {
   const normalizedQuery = query.trim().toUpperCase();
   return Object.values(FUNCTION_REGISTRY)

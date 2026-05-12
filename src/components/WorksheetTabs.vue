@@ -1,4 +1,22 @@
 <script setup lang="ts">
+/**
+ * Tab strip rendered below the grid for switching between worksheets.
+ *
+ * The component is fully controlled: the parent owns the active worksheet
+ * and reacts to events to mutate the workbook through the
+ * `useTeamGridDocument` composable.
+ *
+ * Props:
+ * - `grid`: full workbook used to render tabs in `worksheetOrder`.
+ * - `activeWorksheetId`: currently visible worksheet, or `null` if none.
+ * - `readonly`: disables rename/delete affordances and the add button.
+ *
+ * Emits:
+ * - `select(id)`: user clicked a tab.
+ * - `add()`: user clicked the plus button.
+ * - `rename(id)`: user double-clicked a tab to rename it.
+ * - `delete(id)`: user requested deletion of a tab.
+ */
 import Button from "primevue/button";
 import type { TeamGridDocumentV1, WorksheetId } from "@/lib/teamgridDocument";
 

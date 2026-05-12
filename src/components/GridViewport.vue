@@ -1,4 +1,34 @@
 <script setup lang="ts">
+/**
+ * Spreadsheet grid renderer.
+ *
+ * Responsibilities:
+ * - Render rows/columns from the supplied {@link GridProjection}.
+ * - Manage in-cell editing (double-click or start typing to enter edit
+ *   mode, Enter to commit, Escape to cancel).
+ * - Maintain rectangular range selections driven by mouse drag.
+ * - Forward header clicks so the parent can switch to row/column selection.
+ *
+ * The component does not own document state; it operates on a `worksheet`
+ * prop and emits semantic events that the parent translates into
+ * {@link TeamGridOperation}s via `useTeamGridDocument.updateGrid`.
+ *
+ * Props:
+ * - `worksheet`: persisted worksheet to render.
+ * - `projection`: derived view of the worksheet (visible rows/columns plus
+ *   `A1` address lookups).
+ * - `selectedCellId`: id of the currently active cell or `null`.
+ * - `selectedRange`: rectangular range selection, when one is active.
+ * - `highlightedCellIds`: cells highlighted because the formula bar is
+ *   picking references; rendered with a translucent overlay.
+ * - `readonly`: disables editing.
+ * - `locale`: BCP-47 locale for number/date formatting.
+ *
+ * Emits:
+ * - `select(cell, address)`: cell click.
+ * - `select-range(range)`: drag selection completed.
+ * - `commit(cell, rawValue)`: user pressed Enter or blurred a cell edit.
+ */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   formatCellValue,
@@ -9,6 +39,7 @@ import { evaluateFormula } from "@/lib/formulas";
 import { getCell, getCellAddress, type GridProjection } from "@/lib/gridProjection";
 import type { Cell, CellId, ColumnId, RowId, Worksheet } from "@/lib/teamgridDocument";
 
+/** Inclusive rectangular cell range, addressed by stable cell ids. */
 export interface CellSelectionRange {
   startCellId: CellId;
   endCellId: CellId;

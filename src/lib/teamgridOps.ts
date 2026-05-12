@@ -1,3 +1,14 @@
+/**
+ * Semantic operation types for Teamgrid edits and a serializer that converts
+ * them into Automerge-friendly JSON patches via the App SDK.
+ *
+ * The UI never mutates SDK payloads directly. It records intent as a
+ * {@link TeamGridOperation} batch and lets {@link serializeTeamGridOperations}
+ * turn that batch into a path-scoped {@link MindooDBAppJsonPatch}. This keeps
+ * concurrent edits cleanly mergeable: two users editing different cells
+ * produce patches that touch disjoint stable-ID paths, so Automerge can
+ * combine them without either edit clobbering the other.
+ */
 import type { MindooDBAppJsonPatch, MindooDBAppUpdateDocumentInput } from "mindoodb-app-sdk";
 
 import type {
@@ -12,6 +23,22 @@ import type {
   WorksheetId,
 } from "@/lib/teamgridDocument";
 
+/**
+ * One semantic edit recorded by the UI. The shapes are intentionally close to
+ * the persisted schema so the serializer can map them to JSON patch
+ * operations without re-deriving anything.
+ *
+ * Variants:
+ * - `setCell` writes one cell (value, formula, and style).
+ * - `setCellsStyle` rewrites style on a contiguous selection while keeping
+ *   each cell's value/formula intact.
+ * - `insertRow` / `insertColumn` add a new ordered slot.
+ * - `tombstoneRow` / `tombstoneColumn` / `tombstoneWorksheet` mark an entity
+ *   deleted without physically removing it, so formulas can still report
+ *   `#REF!` instead of losing identity.
+ * - `addWorksheet`, `renameWorksheet` handle workbook-level changes.
+ * - `setDocumentProperties` writes the top-level `subject` and `tags` fields.
+ */
 export type TeamGridOperation =
   | { type: "setCell"; worksheetId: WorksheetId; cell: Cell }
   | { type: "setCellsStyle"; worksheetId: WorksheetId; cells: Cell[]; style: CellStyle }
@@ -22,7 +49,7 @@ export type TeamGridOperation =
   | { type: "addWorksheet"; worksheet: Worksheet; index: number }
   | { type: "renameWorksheet"; worksheetId: WorksheetId; title: string }
   | { type: "tombstoneWorksheet"; worksheetId: WorksheetId; deletedAt: string }
-  | { type: "setWorkbookTitle"; subject: string; title: string };
+  | { type: "setDocumentProperties"; subject: string; tags: string[] };
 
 /**
  * Convert Teamgrid semantic operations into App SDK JSON patches.
@@ -75,23 +102,26 @@ export function serializeTeamGridOperations(
       case "tombstoneWorksheet":
         pushSet(json, [...worksheetPath(operation.worksheetId), "deletedAt"], operation.deletedAt);
         break;
-      case "setWorkbookTitle":
+      case "setDocumentProperties":
         pushSet(json, ["subject"], operation.subject);
-        pushSet(json, ["teamgrid", "workbook", "title"], operation.title);
+        pushSet(json, ["tags"], operation.tags);
         break;
     }
   }
   return { json };
 }
 
+/** Type-narrowed predicate for a non-empty operation batch. */
 export function hasTeamGridOperations(operations: TeamGridOperation[]) {
   return operations.length > 0;
 }
 
+/** Path inside the persisted document that points at one worksheet's record. */
 function worksheetPath(worksheetId: WorksheetId) {
   return ["teamgrid", "workbook", "worksheetsById", worksheetId];
 }
 
+/** Path inside the persisted document that points at one cell's record. */
 function cellPath(worksheetId: WorksheetId, cellId: CellId) {
   return [...worksheetPath(worksheetId), "cellsById", cellId];
 }

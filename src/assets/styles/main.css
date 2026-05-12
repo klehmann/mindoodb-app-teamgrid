@@ -162,6 +162,34 @@ select {
   padding: 0.5rem 0.75rem;
 }
 
+.toolbar__document-title {
+  position: absolute;
+  left: 50%;
+  max-width: min(32rem, 36vw);
+  transform: translateX(-50%);
+  padding: 0.42rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar__document-title:hover:not(:disabled),
+.toolbar__document-title:focus-visible {
+  border-color: var(--border-strong);
+  background: rgb(212 160 23 / 0.12);
+}
+
+.toolbar__document-title:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 @media (max-width: 960px) {
   .toolbar__menubar.p-menubar-mobile .p-menubar-root-list {
     position: absolute;
@@ -175,6 +203,12 @@ select {
     border-radius: 0.9rem;
     background: var(--bg-elevated);
     box-shadow: var(--shadow);
+  }
+
+  .toolbar__document-title {
+    position: static;
+    max-width: 14rem;
+    transform: none;
   }
 }
 
@@ -339,15 +373,76 @@ button.toolbar__status-badge {
   color: var(--text);
 }
 
+.native-input--textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
 .open-dialog {
   display: grid;
   gap: 1rem;
+}
+
+.open-dialog__browser {
+  min-height: 22rem;
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 1.4fr);
+  gap: 0.8rem;
+}
+
+.open-dialog__tree {
+  max-height: 24rem;
+  overflow: auto;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: rgb(255 255 255 / 0.025);
+}
+
+.tag-tree-list {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-tree-list .tag-tree-list {
+  margin-left: 0.8rem;
+  padding-left: 0.55rem;
+  border-left: 1px solid var(--border);
+}
+
+.tag-tree-list__button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tag-tree-list__button:hover,
+.tag-tree-list__button--selected {
+  border-color: var(--border-strong);
+  background: rgb(212 160 23 / 0.12);
+}
+
+.tag-tree-list__button small {
+  color: var(--muted);
 }
 
 .document-list {
   max-height: 22rem;
   overflow: auto;
   display: grid;
+  align-content: start;
   gap: 0.45rem;
 }
 
@@ -371,4 +466,26 @@ button.toolbar__status-badge {
 
 .document-row small {
   color: var(--muted);
+}
+
+.document-list__empty,
+.properties-dialog__hint {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.properties-dialog {
+  display: grid;
+  gap: 1rem;
+}
+
+.properties-dialog code {
+  color: var(--formula-text);
+}
+
+@media (max-width: 720px) {
+  .open-dialog__browser {
+    grid-template-columns: 1fr;
+  }
 }

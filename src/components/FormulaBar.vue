@@ -1,4 +1,25 @@
 <script setup lang="ts">
+/**
+ * Excel-style formula bar with content assist for the registered functions.
+ *
+ * The component is a controlled input: the parent owns the draft string via
+ * `v-model:modelValue` and decides what to do when the user commits or
+ * cancels. The bar emits an explicit `begin-edit` event the first time the
+ * user starts typing, which the parent uses to enter "formula picking" mode
+ * (clicks on grid cells append `A1` references into the draft).
+ *
+ * Props:
+ * - `modelValue`: current draft text (with or without leading `=`).
+ * - `activeAddress`: address label shown to the left of the input.
+ * - `readonly`: disables editing and the commit/cancel buttons.
+ * - `errorMessage` (optional): error string surfaced below the bar.
+ *
+ * Emits:
+ * - `update:modelValue(value)`: standard `v-model` write.
+ * - `begin-edit()`: first non-trivial edit in the current selection.
+ * - `commit(value)`: user pressed Enter or clicked the check icon.
+ * - `cancel()`: user pressed Escape or clicked the x icon.
+ */
 import { computed, ref, watch } from "vue";
 import Button from "primevue/button";
 import { FUNCTION_REGISTRY, suggestFunctions, type FunctionDefinition } from "@/lib/formulas";

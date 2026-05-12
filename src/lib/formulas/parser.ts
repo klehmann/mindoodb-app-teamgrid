@@ -1,7 +1,35 @@
+/**
+ * Recursive-descent parser for Teamgrid formulas.
+ *
+ * Grammar (informal, top-down, lowest to highest precedence):
+ *
+ * ```
+ * expression  := additive
+ * additive    := multiplicative (("+" | "-") multiplicative)*
+ * multiplicative := primary (("*" | "/") primary)*
+ * primary     := number
+ *              | string
+ *              | functionCall
+ *              | cellOrRange
+ *              | "(" expression ")"
+ * functionCall := IDENT "(" (expression ("," expression)*)? ")"
+ * cellOrRange  := IDENT (":" IDENT)?
+ * ```
+ *
+ * Identifiers that match `A1` syntax become cell or range nodes resolved
+ * against the current {@link GridProjection}. Identifiers followed by `(`
+ * become function calls validated against the {@link FUNCTION_REGISTRY}.
+ *
+ * The parser returns either a {@link ParsedFormula} with the AST and the
+ * collected stable-ID references, or a {@link FormulaParseError} that the
+ * UI can surface as a `#VALUE!` cell error. Throwing is contained inside
+ * the parser; callers never see exceptions.
+ */
 import { parseCellAddress, type GridProjection } from "@/lib/gridProjection";
 import type { FormulaErrorCode, FormulaReference, WorksheetId } from "@/lib/teamgridDocument";
 import { FUNCTION_REGISTRY } from "@/lib/formulas/functionRegistry";
 
+/** AST node produced by the parser. Discriminated by the `kind` field. */
 export type FormulaNode =
   | { kind: "number"; value: number }
   | { kind: "string"; value: string }
@@ -10,12 +38,17 @@ export type FormulaNode =
   | { kind: "function"; name: string; args: FormulaNode[] }
   | { kind: "binary"; operator: "+" | "-" | "*" | "/"; left: FormulaNode; right: FormulaNode };
 
+/**
+ * Successful parse result. `source` is canonicalized to always start with `=`
+ * so it round-trips back into the formula bar.
+ */
 export interface ParsedFormula {
   source: string;
   ast: FormulaNode;
   references: FormulaReference[];
 }
 
+/** Returned instead of an AST when the source is malformed or unsupported. */
 export interface FormulaParseError {
   code: FormulaErrorCode;
   message: string;
@@ -30,6 +63,15 @@ type Token =
   | { kind: "comma"; value: "," }
   | { kind: "eof"; value: "" };
 
+/**
+ * Parse a formula string into an AST and stable-ID reference list.
+ *
+ * Accepts both `=SUM(A1:A3)` and `SUM(A1:A3)` shapes. The result's `source`
+ * is normalized to start with `=`.
+ *
+ * Errors are returned as values (`FormulaParseError`) rather than thrown,
+ * which keeps the formula bar's reactivity straightforward.
+ */
 export function parseFormula(source: string, worksheetId: WorksheetId, projection: GridProjection): ParsedFormula | FormulaParseError {
   try {
     const parser = new FormulaParser(tokenize(source.startsWith("=") ? source.slice(1) : source), worksheetId, projection);

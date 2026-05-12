@@ -1,14 +1,46 @@
+/**
+ * Tree-walking evaluator for Teamgrid formulas.
+ *
+ * Parses the source through {@link parseFormula} and then recurses over the
+ * resulting AST. Each node returns a {@link FormulaRuntimeValue}, which is a
+ * superset of {@link CellValue} that also carries error codes so the first
+ * error short-circuits its enclosing function call.
+ *
+ * Cycle detection
+ * ---------------
+ * When a `cell` node references another cell that itself contains a formula,
+ * the evaluator recurses into that formula. The `stack` set tracks which
+ * cell ids are currently being evaluated, so a self-referential or
+ * mutually-recursive formula yields `#CYCLE!` instead of blowing the JS
+ * call stack.
+ *
+ * Range handling
+ * --------------
+ * Ranges flatten to an array of cell values. Functions decide whether they
+ * want to consume a range (`SUM`, `AVERAGE`, ...) or treat it as a scalar.
+ * Top-level ranges outside of function arguments are uncommon in
+ * spreadsheets and currently produce a placeholder runtime string; functions
+ * receive ranges as expanded arguments via {@link evaluateNode}'s `flatMap`.
+ */
 import { getCell, type GridProjection } from "@/lib/gridProjection";
 import type { CellValue, FormulaErrorCode, FormulaReference, FormulaResult, Worksheet } from "@/lib/teamgridDocument";
 import { FUNCTION_REGISTRY, type FormulaRuntimeValue } from "@/lib/formulas/functionRegistry";
 import { type FormulaNode, parseFormula } from "@/lib/formulas/parser";
 
+/** Outcome of evaluating one cell's formula. */
 export interface EvaluatedFormula {
   result: FormulaResult;
   references: FormulaReference[];
   errorMessage?: string;
 }
 
+/**
+ * Parse and evaluate a formula source string against a worksheet snapshot.
+ *
+ * Returns both the resolved {@link FormulaResult} and the collected
+ * {@link FormulaReference}s. Callers persist the references so the
+ * dependency graph can later recompute dependents efficiently.
+ */
 export function evaluateFormula(source: string, worksheet: Worksheet, projection: GridProjection): EvaluatedFormula {
   const parsed = parseFormula(source, worksheet.id, projection);
   if ("code" in parsed) {

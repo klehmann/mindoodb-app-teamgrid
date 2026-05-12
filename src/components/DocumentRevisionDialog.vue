@@ -1,4 +1,25 @@
 <script setup lang="ts">
+/**
+ * Modal dialog that lists historical revisions of the current document.
+ *
+ * The dialog is presentational; the parent provides the entries list (loaded
+ * via `MindooDBAppDocument.history()`), shows a loading state while the
+ * request is in flight, and decides what to do when the user picks an
+ * entry. The current document's revision id, when known, is rendered with
+ * a special "Current revision" chip.
+ *
+ * Props:
+ * - `visible`: standard `v-model:visible` flag.
+ * - `entries`: history entries returned by the SDK.
+ * - `loading`: show a loader while history is being fetched.
+ * - `errorMessage`: error string returned by the history fetch, if any.
+ * - `currentRevisionId`: id of the revision currently open in the editor.
+ *
+ * Emits:
+ * - `update:visible(value)`: standard `v-model:visible` write.
+ * - `select(revisionId)`: user confirmed switching to a historical revision.
+ * - `cancel()`: user dismissed the dialog without picking a revision.
+ */
 import { computed, ref, watch } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";

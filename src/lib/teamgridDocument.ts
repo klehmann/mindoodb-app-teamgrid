@@ -15,6 +15,7 @@ export type VerticalAlign = "top" | "middle" | "bottom";
 
 export interface TeamGridDocumentEnvelope {
   subject: string;
+  tags: string[];
   form: typeof TEAMGRID_DOCUMENT_FORM;
   kind: typeof TEAMGRID_DOCUMENT_KIND;
   teamgrid: TeamGridDocumentV1;
@@ -40,7 +41,6 @@ export interface TeamGridSettings {
 
 export interface Workbook {
   id: WorkbookId;
-  title: string;
   worksheetOrder: WorksheetId[];
   worksheetsById: Record<WorksheetId, Worksheet>;
 }
@@ -133,20 +133,20 @@ export interface NamedExpression {
   reference: FormulaReference;
 }
 
-export function createTeamGridDocument(title = "Untitled spreadsheet"): TeamGridDocumentEnvelope {
+export function createTeamGridDocument(title = "Untitled spreadsheet", tags: string[] = []): TeamGridDocumentEnvelope {
   const worksheetId = createId("sheet");
   const rowOrder = Array.from({ length: 24 }, () => createId("row"));
   const columnOrder = Array.from({ length: 12 }, () => createId("col"));
 
   return {
     subject: title,
+    tags: normalizeTags(tags),
     form: TEAMGRID_DOCUMENT_FORM,
     kind: TEAMGRID_DOCUMENT_KIND,
     teamgrid: {
       schemaVersion: TEAMGRID_SCHEMA_VERSION,
       workbook: {
         id: createId("book"),
-        title,
         worksheetOrder: [worksheetId],
         worksheetsById: {
           [worksheetId]: {
@@ -170,9 +170,15 @@ export function createTeamGridDocument(title = "Untitled spreadsheet"): TeamGrid
 
 export function migrateTeamGridDocument(data: Record<string, unknown> | null | undefined): TeamGridDocumentEnvelope {
   if (isTeamGridEnvelope(data)) {
-    return data;
+    return {
+      subject: readSubject(data) || "Untitled spreadsheet",
+      tags: readTags(data),
+      form: TEAMGRID_DOCUMENT_FORM,
+      kind: TEAMGRID_DOCUMENT_KIND,
+      teamgrid: cloneTeamGridDocument(data.teamgrid),
+    };
   }
-  return createTeamGridDocument(readSubject(data) || "Untitled spreadsheet");
+  return createTeamGridDocument(readSubject(data) || "Untitled spreadsheet", readTags(data));
 }
 
 export function isTeamGridEnvelope(data: unknown): data is TeamGridDocumentEnvelope {
@@ -218,11 +224,43 @@ export function createEmptyCell(rowId: RowId, columnId: ColumnId): Cell {
 }
 
 export function cloneTeamGridDocument(document: TeamGridDocumentV1): TeamGridDocumentV1 {
-  return JSON.parse(JSON.stringify(document)) as TeamGridDocumentV1;
+  const clone = JSON.parse(JSON.stringify(document)) as TeamGridDocumentV1 & {
+    workbook: Workbook & { title?: string };
+  };
+  delete clone.workbook.title;
+  return clone;
 }
 
 export function readSubject(data: Record<string, unknown> | null | undefined) {
   return typeof data?.subject === "string" ? data.subject : "";
+}
+
+export function readTags(data: Record<string, unknown> | null | undefined) {
+  return normalizeTags(data?.tags);
+}
+
+/**
+ * Tags are platform-level document metadata. Keeping normalization here makes
+ * storage, properties editing, and Open dialog categorization agree exactly.
+ */
+export function normalizeTags(input: unknown) {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const value of input) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    const tag = value.trim();
+    if (!tag || seen.has(tag)) {
+      continue;
+    }
+    seen.add(tag);
+    tags.push(tag);
+  }
+  return tags;
 }
 
 export function createId(prefix: string) {
