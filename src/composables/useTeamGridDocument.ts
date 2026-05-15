@@ -62,6 +62,18 @@ import {
   type TeamGridDocumentV1,
 } from "@/lib/teamgridDocument";
 
+interface OpenSpreadsheetSession {
+  id: string;
+  databaseId: string;
+  database: MindooDBAppDatabase;
+  documentId: string;
+  document: MindooDBAppDocument;
+  envelope: TeamGridDocumentEnvelope;
+  pendingOps: TeamGridOperation[];
+  pendingOpsBaseHeads: string[];
+  isDirty: boolean;
+}
+
 /**
  * Construct the Teamgrid document composable.
  *
@@ -84,12 +96,15 @@ export function useTeamGridDocument() {
   const hostUiPreferences = ref<MindooDBAppUiPreferences>({ iosMultitaskingOptimized: false });
   const launchTimeTravelDate = ref<number | null>(null);
   const status = ref("Connecting to Haven...");
+  const lastErrorMessage = ref<string | null>(null);
   const isDirty = ref(false);
   const revisionEntries = ref<MindooDBAppDocumentHistoryEntry[]>([]);
   const revisionLoading = ref(false);
   const revisionErrorMessage = ref<string | null>(null);
   const pendingOps = ref<TeamGridOperation[]>([]);
   const pendingOpsBaseHeads = ref<string[]>([]);
+  const openSpreadsheetSessions = ref<OpenSpreadsheetSession[]>([]);
+  const activeSpreadsheetSessionId = ref("");
 
   let cleanupTheme: (() => void) | null = null;
   let cleanupUiPreferences: (() => void) | null = null;
@@ -125,6 +140,14 @@ export function useTeamGridDocument() {
   const timeTravelDateLabel = computed(() =>
     launchTimeTravelDate.value == null ? "" : new Date(launchTimeTravelDate.value).toLocaleString(),
   );
+  const openSessions = computed(() => openSpreadsheetSessions.value.map((session) => ({
+    id: session.id,
+    documentId: session.documentId,
+    databaseId: session.databaseId,
+    title: session.envelope.subject || session.documentId,
+    isActive: session.id === activeSpreadsheetSessionId.value,
+    isDirty: session.id === activeSpreadsheetSessionId.value ? isDirty.value : session.isDirty,
+  })));
 
   /**
    * Connect to the Haven host bridge once Vue mounts the consuming component.
@@ -156,7 +179,7 @@ export function useTeamGridDocument() {
         ?? "";
       status.value = "Connected. Choose File / New or File / Open.";
     } catch (error) {
-      status.value = readError(error);
+      showError(error);
     }
   });
 
@@ -221,7 +244,7 @@ export function useTeamGridDocument() {
    * action remains useful even when the user only has read access to the
    * primary database.
    */
-  async function createNewDocument() {
+  async function createNewDocument(envelopeOverride?: TeamGridDocumentEnvelope) {
     try {
       const targetDatabaseInfo = selectedDatabaseInfo.value?.capabilities.includes("create")
         ? selectedDatabaseInfo.value
@@ -231,15 +254,19 @@ export function useTeamGridDocument() {
       }
       selectedDatabaseId.value = targetDatabaseInfo.id;
       const database = await openDatabaseById(targetDatabaseInfo.id);
-      const envelope = createTeamGridDocument("Untitled spreadsheet");
+      const envelope = envelopeOverride ?? createTeamGridDocument("Untitled spreadsheet");
       const document = await database.documents.create({
         set: envelope as unknown as Record<string, unknown>,
       });
       loadDocument(database, targetDatabaseInfo.id, document);
       status.value = `Created ${document.id}.`;
     } catch (error) {
-      status.value = readError(error);
+      showError(error);
     }
+  }
+
+  async function createDocumentFromEnvelope(envelope: TeamGridDocumentEnvelope) {
+    await createNewDocument(envelope);
   }
 
   /** Open an existing document by id from the currently selected database. */
@@ -254,7 +281,7 @@ export function useTeamGridDocument() {
       loadDocument(database, databaseId, document);
       status.value = `Opened ${document.id}.`;
     } catch (error) {
-      status.value = readError(error);
+      showError(error);
     }
   }
 
@@ -278,7 +305,7 @@ export function useTeamGridDocument() {
       loadDocument(currentDatabase.value, currentDatabaseId.value, document);
       status.value = "Reloaded the current spreadsheet.";
     } catch (error) {
-      status.value = readError(error);
+      showError(error);
     }
   }
 
@@ -323,10 +350,12 @@ export function useTeamGridDocument() {
       );
       const returnedEnvelope = migrateTeamGridDocument(updated.data);
       loadDocument(currentDatabase.value, currentDatabaseId.value, updated);
+      isDirty.value = false;
+      snapshotActiveSession();
       const reconciled = JSON.stringify(returnedEnvelope) !== JSON.stringify(optimisticEnvelope);
       status.value = reconciled ? "Saved and merged concurrent changes." : "Saved.";
     } catch (error) {
-      status.value = readError(error);
+      showError(error);
     }
   }
 
@@ -342,14 +371,18 @@ export function useTeamGridDocument() {
     }
     try {
       const deletedId = currentDocument.value.id;
+      const deletedSessionId = activeSpreadsheetSessionId.value;
       await currentDatabase.value.documents.delete(deletedId);
-      currentDocument.value = null;
-      currentEnvelope.value = null;
-      viewingHistoricalSnapshot.value = null;
-      isDirty.value = false;
+      openSpreadsheetSessions.value = openSpreadsheetSessions.value.filter((session) => session.id !== deletedSessionId);
+      const nextSession = openSpreadsheetSessions.value[0] ?? null;
+      if (nextSession) {
+        activateSession(nextSession);
+      } else {
+        clearActiveDocumentState();
+      }
       status.value = `Deleted ${deletedId}.`;
     } catch (error) {
-      status.value = readError(error);
+      showError(error);
     }
   }
 
@@ -404,7 +437,7 @@ export function useTeamGridDocument() {
       isDirty.value = false;
       status.value = "Opened historical revision read-only.";
     } catch (error) {
-      status.value = readError(error);
+      showError(error);
     }
   }
 
@@ -460,6 +493,7 @@ export function useTeamGridDocument() {
     }
     currentEnvelope.value = nextEnvelope;
     isDirty.value = true;
+    snapshotActiveSession();
   }
 
   /**
@@ -470,14 +504,111 @@ export function useTeamGridDocument() {
    * local edits before invoking this.
    */
   function loadDocument(database: MindooDBAppDatabase, databaseId: string, document: MindooDBAppDocument) {
-    currentDatabase.value = database;
-    currentDatabaseId.value = databaseId;
-    currentDocument.value = document;
-    currentEnvelope.value = migrateTeamGridDocument(document.data);
+    snapshotActiveSession();
+    const id = createSessionId(databaseId, document.id);
+    const session: OpenSpreadsheetSession = {
+      id,
+      databaseId,
+      database,
+      documentId: document.id,
+      document,
+      envelope: migrateTeamGridDocument(document.data),
+      pendingOps: [],
+      pendingOpsBaseHeads: [],
+      isDirty: false,
+    };
+    const existingIndex = openSpreadsheetSessions.value.findIndex((candidate) => candidate.id === id);
+    if (existingIndex >= 0) {
+      openSpreadsheetSessions.value.splice(existingIndex, 1, session);
+    } else {
+      openSpreadsheetSessions.value.push(session);
+    }
+    activateSession(session);
+  }
+
+  function switchToOpenSession(sessionId: string) {
+    snapshotActiveSession();
+    const session = openSpreadsheetSessions.value.find((candidate) => candidate.id === sessionId);
+    if (!session) {
+      status.value = "That spreadsheet window is no longer open.";
+      return;
+    }
+    activateSession(session);
+    status.value = `Switched to ${session.envelope.subject || session.documentId}.`;
+  }
+
+  function closeOpenSession(sessionId: string) {
+    snapshotActiveSession();
+    const session = openSpreadsheetSessions.value.find((candidate) => candidate.id === sessionId);
+    if (!session) {
+      return;
+    }
+    if (session.isDirty) {
+      status.value = "Save the spreadsheet before closing its window.";
+      return;
+    }
+    openSpreadsheetSessions.value = openSpreadsheetSessions.value.filter((candidate) => candidate.id !== sessionId);
+    if (activeSpreadsheetSessionId.value === sessionId) {
+      const nextSession = openSpreadsheetSessions.value[0] ?? null;
+      if (nextSession) {
+        activateSession(nextSession);
+      } else {
+        clearActiveDocumentState();
+      }
+    }
+  }
+
+  function activateSession(session: OpenSpreadsheetSession) {
+    activeSpreadsheetSessionId.value = session.id;
+    currentDatabase.value = session.database;
+    currentDatabaseId.value = session.databaseId;
+    currentDocument.value = session.document;
+    currentEnvelope.value = session.envelope;
+    viewingHistoricalSnapshot.value = null;
+    pendingOps.value = [...session.pendingOps];
+    pendingOpsBaseHeads.value = [...session.pendingOpsBaseHeads];
+    isDirty.value = session.isDirty;
+  }
+
+  function snapshotActiveSession() {
+    const session = openSpreadsheetSessions.value.find((candidate) => candidate.id === activeSpreadsheetSessionId.value);
+    if (!session || !currentDocument.value || !currentEnvelope.value) {
+      return;
+    }
+    if (currentDatabase.value) {
+      session.database = currentDatabase.value;
+    }
+    session.document = currentDocument.value;
+    session.envelope = currentEnvelope.value;
+    session.pendingOps = [...pendingOps.value];
+    session.pendingOpsBaseHeads = [...pendingOpsBaseHeads.value];
+    session.isDirty = isDirty.value;
+  }
+
+  function clearActiveDocumentState() {
+    activeSpreadsheetSessionId.value = "";
+    currentDatabase.value = null;
+    currentDatabaseId.value = "";
+    currentDocument.value = null;
+    currentEnvelope.value = null;
     viewingHistoricalSnapshot.value = null;
     pendingOps.value = [];
     pendingOpsBaseHeads.value = [];
     isDirty.value = false;
+  }
+
+  function createSessionId(databaseId: string, documentId: string) {
+    return `${databaseId}:${documentId}`;
+  }
+
+  function clearLastError() {
+    lastErrorMessage.value = null;
+  }
+
+  function showError(error: unknown) {
+    const message = readError(error);
+    status.value = message;
+    lastErrorMessage.value = message;
   }
 
   return {
@@ -489,12 +620,15 @@ export function useTeamGridDocument() {
     currentRuntime,
     hostUiPreferences,
     status,
+    lastErrorMessage,
     isDirty,
     revisionEntries,
     revisionLoading,
     revisionErrorMessage,
     pendingOps,
     pendingOpsBaseHeads,
+    openSessions,
+    activeSpreadsheetSessionId,
     readableDatabases,
     selectedDatabaseInfo,
     currentDatabaseInfo,
@@ -514,7 +648,10 @@ export function useTeamGridDocument() {
     refreshDocuments,
     createViewNavigator,
     createNewDocument,
+    createDocumentFromEnvelope,
     openDocument,
+    switchToOpenSession,
+    closeOpenSession,
     refreshCurrentDocument,
     saveDocument,
     deleteCurrentDocument,
@@ -522,6 +659,7 @@ export function useTeamGridDocument() {
     loadHistoricalRevision,
     returnToCurrent,
     updateGrid,
+    clearLastError,
   };
 }
 

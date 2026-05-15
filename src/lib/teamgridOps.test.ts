@@ -28,6 +28,26 @@ describe("teamgrid operation serialization", () => {
     });
   });
 
+  it("removes undefined properties from JSON patch values", () => {
+    const patch = serializeTeamGridOperations([{
+      type: "setCell",
+      worksheetId: "sheet_1",
+      cell: {
+        id: "row_1:col_1",
+        rowId: "row_1",
+        columnId: "col_1",
+        value: { kind: "number", value: 42, format: undefined },
+      },
+    }]);
+
+    expect(patch.json?.set?.[0]?.value).toEqual({
+      id: "row_1:col_1",
+      rowId: "row_1",
+      columnId: "col_1",
+      value: { kind: "number", value: 42 },
+    });
+  });
+
   it("serializes row insertion as metadata plus order-list insert", () => {
     expect(serializeTeamGridOperations([{
       type: "insertRow",

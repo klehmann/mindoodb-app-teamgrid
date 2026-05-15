@@ -195,10 +195,9 @@ select {
 }
 
 .toolbar__document-title {
-  position: absolute;
-  left: 50%;
+  position: relative;
+  flex: 0 1 auto;
   max-width: min(32rem, 36vw);
-  transform: translateX(-50%);
   padding: 0.22rem 0.75rem;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -242,9 +241,7 @@ select {
   }
 
   .toolbar__document-title {
-    position: static;
     max-width: 14rem;
-    transform: none;
   }
 }
 

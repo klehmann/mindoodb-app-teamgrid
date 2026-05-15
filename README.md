@@ -7,13 +7,13 @@ The app intentionally favors clear architecture over feature completeness. It is
 ## Development
 
 ```sh
-npm install
-npm run dev -w mindoodb-app-teamgrid
-npm run test -w mindoodb-app-teamgrid
-npm run build -w mindoodb-app-teamgrid
+pnpm install
+pnpm --filter mindoodb-app-teamgrid dev
+pnpm --filter mindoodb-app-teamgrid test
+pnpm --filter mindoodb-app-teamgrid build
 ```
 
-Use `npm run dev:local -w mindoodb-app-teamgrid` when you want Vite aliases to point at local MindooDB and App SDK source packages.
+Use `pnpm --filter mindoodb-app-teamgrid dev:local` when you want Vite aliases to point at local MindooDB and App SDK source packages.
 
 ## Haven Capabilities
 

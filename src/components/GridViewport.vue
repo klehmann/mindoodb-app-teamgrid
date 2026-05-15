@@ -213,6 +213,19 @@ function commitEditFromBlur(cell: Cell) {
   commitEdit(cell);
 }
 
+function flushPendingEdit() {
+  const editingCell = findEditingCell();
+  if (!editingCell) {
+    return false;
+  }
+  suppressNextBlurCommit = true;
+  commitEdit(editingCell);
+  queueMicrotask(() => {
+    suppressNextBlurCommit = false;
+  });
+  return true;
+}
+
 function cellStyle(cell: Cell) {
   const mergedStyle = mergeCellStyle(props.worksheet.rowsById[cell.rowId], props.worksheet.columnsById[cell.columnId], cell);
   return {
@@ -518,7 +531,7 @@ function handleViewportKeydown(event: KeyboardEvent) {
   }
 }
 
-defineExpose({ applyFormulaAssistSuggestion });
+defineExpose({ applyFormulaAssistSuggestion, flushPendingEdit });
 </script>
 
 <template>

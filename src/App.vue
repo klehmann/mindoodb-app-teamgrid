@@ -34,7 +34,7 @@
  * straight to the envelope; they always travel through `updateGrid` so
  * they participate in the granular-save / `baseHeads` machinery.
  */
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import Button from "primevue/button";
 import ContextMenu from "primevue/contextmenu";
 import Dialog from "primevue/dialog";
@@ -62,6 +62,7 @@ import { evaluateFormula, parseFormula, type FunctionDefinition } from "@/lib/fo
 import { createCellId, createId, getFirstVisibleWorksheet, normalizeTags, type Cell, type CellStyle, type WorksheetId } from "@/lib/teamgridDocument";
 import { getCell, projectWorksheet } from "@/lib/gridProjection";
 import type { TeamGridOperation } from "@/lib/teamgridOps";
+import { importTeamGridWorkbookBuffer } from "@/lib/xlsx/importWorkbook";
 import { writeTeamGridExcelBuffer } from "@/lib/xlsx/exportWorkbook";
 import {
   ALL_SPREADSHEETS_NODE_KEY,
@@ -103,12 +104,14 @@ const app = useTeamGridDocument();
 const cellContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
 const formulaBarComponent = ref<InstanceType<typeof FormulaBar> | null>(null);
 const gridViewportComponent = ref<InstanceType<typeof GridViewport> | null>(null);
+const xlsxImportInput = ref<HTMLInputElement | null>(null);
 
 const openDialogVisible = ref(false);
 const propertiesDialogVisible = ref(false);
 const deleteDialogVisible = ref(false);
 const revisionDialogVisible = ref(false);
 const renameDialogVisible = ref(false);
+const errorDialogVisible = ref(false);
 const renameTargetId = ref<WorksheetId | null>(null);
 const renameDraft = ref("");
 const selectedOpenDocId = ref("");
@@ -132,6 +135,7 @@ const formulaAssistEditor = ref<FormulaAssistEditor>("formulaBar");
 const formulaAssistAnchor = ref<HTMLElement | null>(null);
 const formulaAssistDraft = ref("");
 const formulaAssistCaretPos = ref(0);
+const saveInFlight = ref(false);
 const clipboardSourceRange = ref<ClipboardRange | null>(null);
 const internalClipboard = ref<SerializedClipboardPayload | null>(null);
 const propertiesTitleDraft = ref("");
@@ -248,6 +252,15 @@ const statusBadgeLabel = computed(() => {
   return `Current · ${app.isDirty.value ? "Unsaved" : "Saved"}`;
 });
 
+watch(
+  () => app.lastErrorMessage.value,
+  (message) => {
+    if (message) {
+      errorDialogVisible.value = true;
+    }
+  },
+);
+
 /**
  * Cell ids that the grid should overlay while the user is composing a
  * formula in the formula bar. Each parsed reference contributes one or more
@@ -303,7 +316,8 @@ const menuItems = computed<MenuItem[]>(() => [
       { label: "New", icon: "pi pi-file-plus", disabled: !app.canCreate.value, command: () => void app.createNewDocument() },
       { label: "Open", icon: "pi pi-folder-open", command: () => void openFileDialog() },
       { separator: true },
-      { label: "Save", icon: "pi pi-save", disabled: !app.canSave.value, command: () => void app.saveDocument() },
+      { label: "Save", icon: "pi pi-save", disabled: !app.canSave.value || saveInFlight.value, command: () => void saveCurrentDocument() },
+      { label: "Import XLSX...", icon: "pi pi-upload", disabled: !app.canCreate.value, command: () => xlsxImportInput.value?.click() },
       { label: "Export XLSX", icon: "pi pi-download", disabled: !app.activeGrid.value, command: () => void exportCurrentWorkbook() },
       { label: "Delete", icon: "pi pi-trash", disabled: !app.canDelete.value, command: () => { deleteDialogVisible.value = true; } },
     ],
@@ -335,6 +349,24 @@ const menuItems = computed<MenuItem[]>(() => [
     items: [
       { label: "Browse revisions", icon: "pi pi-history", disabled: !app.currentCanBrowseHistory.value || !app.currentDocument.value, command: () => void openRevisionDialog() },
       { label: "Return to current", icon: "pi pi-refresh", disabled: !app.isViewingHistorical.value, command: app.returnToCurrent },
+    ],
+  },
+  {
+    label: "Window",
+    items: [
+      ...app.openSessions.value.map((session) => ({
+        label: `${session.isActive ? "✓ " : ""}${session.title}${session.isDirty ? " *" : ""}`,
+        icon: session.isActive ? "pi pi-check" : "pi pi-window-maximize",
+        disabled: session.isActive,
+        command: () => app.switchToOpenSession(session.id),
+      })),
+      ...(app.openSessions.value.length > 0 ? [{ separator: true } satisfies MenuItem] : []),
+      {
+        label: "Close current spreadsheet",
+        icon: "pi pi-times",
+        disabled: !app.currentDocument.value,
+        command: () => app.activeSpreadsheetSessionId.value && app.closeOpenSession(app.activeSpreadsheetSessionId.value),
+      },
     ],
   },
 ]);
@@ -433,7 +465,7 @@ async function openFileDialog() {
     await rebuildOpenNavigator();
     openDialogVisible.value = true;
   } catch (error) {
-    app.status.value = readError(error);
+    showAppError(error);
   }
 }
 
@@ -449,7 +481,24 @@ async function exportCurrentWorkbook() {
     downloadBlob(buffer, filename);
     app.status.value = `Exported ${filename}`;
   } catch (error) {
-    app.status.value = readError(error);
+    showAppError(error);
+  }
+}
+
+async function importXlsxFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) {
+    return;
+  }
+  try {
+    const title = file.name.replace(/\.xlsx$/i, "") || "Imported spreadsheet";
+    const envelope = await importTeamGridWorkbookBuffer(await file.arrayBuffer(), title);
+    await app.createDocumentFromEnvelope(envelope);
+    app.status.value = `Imported ${file.name}.`;
+  } catch (error) {
+    showAppError(error);
   }
 }
 
@@ -468,7 +517,7 @@ async function handleOpenDatabaseChange() {
       ? previousDocumentId
       : openDialogDocuments.value[0]?.id ?? "";
   } catch (error) {
-    app.status.value = readError(error);
+    showAppError(error);
   }
 }
 
@@ -560,6 +609,17 @@ async function disposeOpenNavigator() {
 /** Normalize an unknown thrown value into a status-bar string. */
 function readError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function showAppError(error: unknown) {
+  const message = readError(error);
+  app.status.value = message;
+  app.lastErrorMessage.value = message;
+}
+
+function dismissErrorDialog() {
+  errorDialogVisible.value = false;
+  app.clearLastError();
 }
 
 /** Trigger a browser download for generated export content. */
@@ -1169,6 +1229,21 @@ function handleInlineEditState(payload: { editing: boolean; draft: string }) {
   }
 }
 
+async function saveCurrentDocument() {
+  if (saveInFlight.value) {
+    return;
+  }
+  if (gridViewportComponent.value?.flushPendingEdit()) {
+    await nextTick();
+  }
+  saveInFlight.value = true;
+  try {
+    await app.saveDocument();
+  } finally {
+    saveInFlight.value = false;
+  }
+}
+
 /** Commit the formula bar to the selected cell and leave formula-edit mode. */
 function commitFormulaBar(value: string) {
   if (!selectedCell.value) {
@@ -1476,6 +1551,13 @@ function patchSelectedStyle(style: CellStyle) {
 
 <template>
   <main class="teamgrid-shell">
+    <input
+      ref="xlsxImportInput"
+      type="file"
+      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      hidden
+      @change="importXlsxFile"
+    >
     <header class="toolbar glass-card" :class="{ 'toolbar--ios-multitasking': app.hostUiPreferences.value.iosMultitaskingOptimized }">
       <div class="toolbar__leading">
         <span class="toolbar__title">TeamGrid</span>
@@ -1486,7 +1568,7 @@ function patchSelectedStyle(style: CellStyle) {
           rounded
           severity="secondary"
           :aria-label="app.isViewingHistorical.value ? 'Return to current version' : 'Refresh spreadsheet'"
-          :disabled="!app.canRefresh.value"
+          :disabled="!app.canRefresh.value || saveInFlight"
           @click="app.isViewingHistorical.value ? app.returnToCurrent() : app.refreshCurrentDocument()"
         />
       </div>
@@ -1615,13 +1697,26 @@ function patchSelectedStyle(style: CellStyle) {
         <h1>Collaborative spreadsheets</h1>
         <p>Create a new spreadsheet or open an existing one. Edit cells, write formulas, organize your work across multiple sheet tabs, and see your teammates' changes in real time.</p>
         <div class="empty-state__actions">
-          <Button label="New spreadsheet" icon="pi pi-file-plus" :disabled="!app.canCreate.value" @click="app.createNewDocument" />
+          <Button label="New spreadsheet" icon="pi pi-file-plus" :disabled="!app.canCreate.value" @click="() => app.createNewDocument()" />
           <Button label="Open spreadsheet" icon="pi pi-folder-open" severity="secondary" @click="openFileDialog" />
         </div>
       </section>
     </section>
 
     <footer class="status-line">{{ statusLineText }}</footer>
+
+    <Dialog
+      v-model:visible="errorDialogVisible"
+      modal
+      header="Something went wrong"
+      :style="{ width: '32rem', maxWidth: '96vw' }"
+      @hide="app.clearLastError"
+    >
+      <p>{{ app.lastErrorMessage.value }}</p>
+      <template #footer>
+        <Button label="OK" icon="pi pi-check" @click="dismissErrorDialog" />
+      </template>
+    </Dialog>
 
     <FormulaAssistPanel
       v-model:visible="formulaAssistOpen"

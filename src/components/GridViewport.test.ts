@@ -30,6 +30,20 @@ describe("GridViewport inline editing", () => {
     expect(wrapper.emitted("commit")).toBeUndefined();
     expect((wrapper.find("input.grid-cell__editor").element as HTMLInputElement).value).toBe("=B1");
   });
+
+  it("flushes an active inline edit for toolbar save actions", async () => {
+    const { wrapper, firstCellId } = mountGrid();
+
+    await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "a" });
+    await wrapper.find("input.grid-cell__editor").setValue("saved draft");
+
+    expect((wrapper.vm as unknown as { flushPendingEdit: () => boolean }).flushPendingEdit()).toBe(true);
+
+    expect(wrapper.emitted("commit")).toHaveLength(1);
+    expect(wrapper.emitted("commit")![0][1]).toBe("saved draft");
+    await nextTick();
+    expect(wrapper.find("input.grid-cell__editor").exists()).toBe(false);
+  });
 });
 
 describe("GridViewport cell context menu", () => {

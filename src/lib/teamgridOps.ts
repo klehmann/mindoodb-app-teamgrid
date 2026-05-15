@@ -128,10 +128,17 @@ function cellPath(worksheetId: WorksheetId, cellId: CellId) {
 
 function pushSet(json: MindooDBAppJsonPatch, path: Array<string | number>, value: unknown) {
   json.set ??= [];
-  json.set.push({ path, value });
+  json.set.push({ path, value: toJsonPatchValue(value) });
 }
 
 function pushListInsert(json: MindooDBAppJsonPatch, path: Array<string | number>, index: number, values: unknown[]) {
   json.listInsert ??= [];
-  json.listInsert.push({ path, index, values });
+  json.listInsert.push({ path, index, values: values.map(toJsonPatchValue) });
+}
+
+function toJsonPatchValue(value: unknown) {
+  if (value === undefined) {
+    return null;
+  }
+  return JSON.parse(JSON.stringify(value)) as unknown;
 }

@@ -45,7 +45,9 @@ export function coerceInputToCellValue(input: string, preferredKind?: ColumnMeta
   if (preferredKind === "number" || /^-?\d+(\.\d+)?$/.test(trimmed)) {
     const value = Number(trimmed);
     if (Number.isFinite(value)) {
-      return { kind: "number", value, format: preferredKind === "number" ? "general" : undefined };
+      return preferredKind === "number"
+        ? { kind: "number", value, format: "general" }
+        : { kind: "number", value };
     }
   }
   return { kind: "string", text: input };
