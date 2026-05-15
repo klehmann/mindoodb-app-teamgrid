@@ -27,11 +27,11 @@ importers:
         specifier: ^4.4.0
         version: 4.4.0
       mindoodb-app-sdk:
-        specifier: 0.0.16
-        version: 0.0.16
+        specifier: 0.0.17
+        version: 0.0.17
       mindoodb-view-language:
-        specifier: 0.0.11
-        version: 0.0.11
+        specifier: 0.0.12
+        version: 0.0.12
       primeicons:
         specifier: ^7.0.0
         version: 7.0.0
@@ -1244,11 +1244,13 @@ packages:
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
 
-  mindoodb-app-sdk@0.0.16:
-    resolution: {integrity: sha512-P4R97e5eNqhEW7maCPqa99IQtSSsrc9GFwyCtmJWE2nw7vs/eH05L3TVZeyM5d+a48AwyyPeCAL8vtEsSHT0Dw==}
+  mindoodb-app-sdk@0.0.17:
+    resolution: {integrity: sha512-+wfqiceiHMGBrSIMIXXRI/TA0oeF9JcJznvdMsDVUPC+Wkt0CRvd0/7fB2nny0tCYzRlzP5aK3JDnAhS/T29iA==}
+    engines: {node: '>=22.13.0'}
 
-  mindoodb-view-language@0.0.11:
-    resolution: {integrity: sha512-2vMFbuUgTo0axwZVae8NIYHqF7tcSNoeZ7j1O32ljqW4fJH0YE9iVq/AwxjhHdcswIDW0d+Dr4X/qz3zNo7zwA==}
+  mindoodb-view-language@0.0.12:
+    resolution: {integrity: sha512-hM1OUKWCGHgtO+hRZS+HT06NysifZJuZb532AhcN1GkUkpTzs9Qd07vKpRw0N78SMcQKRjJ/SmtJzRaidkVvww==}
+    engines: {node: '>=22.13.0'}
 
   miniflare@4.20260508.0:
     resolution: {integrity: sha512-h3aG+PA8jEH76V4ZtBAbs3g7kjMfHJUF8hPvxeeajLTKwir+G+dqfBODg5yF9MT29LqrZKCRQRqzfHPWX4kCIg==}
@@ -2780,11 +2782,11 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mindoodb-app-sdk@0.0.16:
+  mindoodb-app-sdk@0.0.17:
     dependencies:
-      mindoodb-view-language: 0.0.11
+      mindoodb-view-language: 0.0.12
 
-  mindoodb-view-language@0.0.11: {}
+  mindoodb-view-language@0.0.12: {}
 
   miniflare@4.20260508.0:
     dependencies:
