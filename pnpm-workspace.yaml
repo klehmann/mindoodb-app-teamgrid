@@ -1,0 +1,15 @@
+# pnpm 11 blocks all dependency build scripts by default. Each package
+# that legitimately needs to run install/postinstall scripts must be
+# listed here with `true`. Add an entry whenever a new transitive dep
+# with a build step shows up in a `pnpm install` warning.
+#
+# Note: this file mirrors the `allowBuilds` block in the parent
+# workspace yaml (../pnpm-workspace.yaml). The parent yaml is not seen
+# by Cloudflare Pages because only this directory is checked out there,
+# so the allowlist must live locally to keep the CI build working.
+# Keep both files in sync when adding new entries.
+allowBuilds:
+  "@swc/core": true
+  esbuild: true
+  sharp: true
+  workerd: true
