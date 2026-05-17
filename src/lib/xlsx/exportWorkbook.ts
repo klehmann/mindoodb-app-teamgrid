@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 
 import { mergeCellStyle } from "@/lib/cellFormatting";
+import { DEFAULT_ROW_HEIGHT } from "@/lib/gridDimensions";
 import { getCell, projectWorksheet } from "@/lib/gridProjection";
 import type {
   Cell,
@@ -63,9 +64,7 @@ function appendWorksheet(workbook: ExcelJS.Workbook, teamgridWorksheet: Workshee
 
   projection.rows.forEach((row) => {
     const excelRow = worksheet.getRow(row.index + 1);
-    if (row.height != null) {
-      excelRow.height = pixelsToPoints(row.height);
-    }
+    excelRow.height = pixelsToPoints(row.height ?? DEFAULT_ROW_HEIGHT);
 
     projection.columns.forEach((column) => {
       const cell = getCell(teamgridWorksheet, row.id, column.id);
@@ -248,7 +247,7 @@ function stripCssFontFallbacks(fontFamily: string) {
 }
 
 function pixelsToExcelWidth(pixels: number) {
-  return Math.max(1, Math.round((pixels / 7) * 100) / 100);
+  return Math.max(1, Math.round(((pixels - 5) / 7) * 100) / 100);
 }
 
 function pixelsToPoints(pixels: number) {

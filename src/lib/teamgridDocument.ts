@@ -1,3 +1,5 @@
+import { DEFAULT_COLUMN_WIDTH } from "@/lib/gridDimensions";
+
 export const TEAMGRID_DOCUMENT_KIND = "mindoodb.teamgrid";
 export const TEAMGRID_DOCUMENT_FORM = "teamgrid";
 export const TEAMGRID_SCHEMA_VERSION = 1;
@@ -155,7 +157,7 @@ export function createTeamGridDocument(title = "Untitled spreadsheet", tags: str
             rowOrder,
             columnOrder,
             rowsById: Object.fromEntries(rowOrder.map((id) => [id, { id }] satisfies [RowId, RowMeta])),
-            columnsById: Object.fromEntries(columnOrder.map((id) => [id, { id, width: 120 }] satisfies [ColumnId, ColumnMeta])),
+            columnsById: Object.fromEntries(columnOrder.map((id) => [id, { id, width: DEFAULT_COLUMN_WIDTH }] satisfies [ColumnId, ColumnMeta])),
             cellsById: {},
           },
         },

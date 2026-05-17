@@ -194,6 +194,10 @@ select {
   padding: 0.5rem 0.75rem;
 }
 
+.toolbar__mobile-save {
+  display: none;
+}
+
 .toolbar__document-title {
   position: relative;
   flex: 0 1 auto;
@@ -238,6 +242,10 @@ select {
     border-radius: 0.9rem;
     background: var(--bg-elevated);
     box-shadow: var(--shadow);
+  }
+
+  .toolbar__mobile-save {
+    display: inline-flex;
   }
 
   .toolbar__document-title {

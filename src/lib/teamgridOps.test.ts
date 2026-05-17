@@ -96,6 +96,36 @@ describe("teamgrid operation serialization", () => {
     }]);
   });
 
+  it("serializes column width and row height changes by stable ID", () => {
+    expect(serializeTeamGridOperations([
+      {
+        type: "setColumnWidth",
+        worksheetId: "sheet_1",
+        columnId: "col_1",
+        width: 180,
+      },
+      {
+        type: "setRowHeight",
+        worksheetId: "sheet_1",
+        rowId: "row_1",
+        height: 44,
+      },
+    ])).toEqual({
+      json: {
+        set: [
+          {
+            path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "columnsById", "col_1", "width"],
+            value: 180,
+          },
+          {
+            path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "rowsById", "row_1", "height"],
+            value: 44,
+          },
+        ],
+      },
+    });
+  });
+
   it("serializes document properties as top-level metadata patches", () => {
     expect(serializeTeamGridOperations([{
       type: "setDocumentProperties",

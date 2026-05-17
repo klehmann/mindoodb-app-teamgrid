@@ -14,6 +14,7 @@ describe("Teamgrid XLSX export", () => {
     expect(worksheet).toBeDefined();
     expect(worksheet!.getColumn(1).width).toBeCloseTo(20, 2);
     expect(worksheet!.getRow(1).height).toBe(24);
+    expect(worksheet!.getRow(2).height).toBe(24);
 
     expect(worksheet!.getCell("A1").value).toBe(12);
     expect(worksheet!.getCell("A1").numFmt).toBe("$#,##0.00");
@@ -66,7 +67,7 @@ function createExportFixture() {
   worksheet.title = "Budget/Plan*2026";
   worksheet.rowsById[row1].height = 32;
   worksheet.rowsById[row1].defaultStyle = { bold: true, verticalAlign: "bottom" };
-  worksheet.columnsById[columnA].width = 140;
+  worksheet.columnsById[columnA].width = 145;
   worksheet.columnsById[columnA].defaultStyle = { backgroundColor: "#111827", horizontalAlign: "center" };
 
   worksheet.cellsById[createCellId(row1, columnA)] = {

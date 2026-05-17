@@ -26,6 +26,7 @@ import {
   type RowId,
   type Worksheet,
 } from "@/lib/teamgridDocument";
+import { DEFAULT_COLUMN_WIDTH } from "@/lib/gridDimensions";
 
 /** One column slot in the projected grid (after dedupe and tombstone filtering). */
 export interface VisibleColumn {
@@ -78,7 +79,7 @@ export function projectWorksheet(worksheet: Worksheet): GridProjection {
       id,
       index,
       label: columnIndexToLabel(index),
-      width: worksheet.columnsById[id]?.width ?? 120,
+      width: worksheet.columnsById[id]?.width ?? DEFAULT_COLUMN_WIDTH,
     }));
 
   const rowIndexById = new Map(rows.map((row) => [row.id, row.index] as const));

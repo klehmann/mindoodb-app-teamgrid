@@ -128,15 +128,73 @@ describe("GridViewport keyboard selection", () => {
   });
 });
 
-function mountGrid() {
+describe("GridViewport resizing", () => {
+  it("emits column and row resize events after pointer release", async () => {
+    const { wrapper, firstColumn, firstRow } = mountGrid();
+
+    wrapper.find(".grid-resize-handle--column").element.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 120 }));
+    window.dispatchEvent(new MouseEvent("pointermove", { clientX: 185 }));
+    window.dispatchEvent(new MouseEvent("pointerup"));
+    await nextTick();
+
+    expect(wrapper.emitted("resize-column")).toEqual([[{ columnId: firstColumn.id, width: 185 }]]);
+
+    wrapper.find(".grid-resize-handle--row").element.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientY: 32 }));
+    window.dispatchEvent(new MouseEvent("pointermove", { clientY: 50 }));
+    window.dispatchEvent(new MouseEvent("pointerup"));
+    await nextTick();
+
+    expect(wrapper.emitted("resize-row")).toEqual([[{ rowId: firstRow.id, height: 50 }]]);
+  });
+
+  it("does not render resize handles in read-only mode", () => {
+    const { wrapper } = mountGrid({ readonly: true });
+
+    expect(wrapper.find(".grid-resize-handle--column").exists()).toBe(false);
+    expect(wrapper.find(".grid-resize-handle--row").exists()).toBe(false);
+    expect(wrapper.emitted("resize-column")).toBeUndefined();
+    expect(wrapper.emitted("resize-row")).toBeUndefined();
+  });
+});
+
+describe("GridViewport text overflow", () => {
+  it("lets text overflow across empty cells and stops before the next content cell", () => {
+    const { wrapper, firstCellId } = mountGrid(({ worksheet, firstRow, firstColumn, thirdColumn }) => {
+      worksheet.cellsById[createCellId(firstRow.id, firstColumn.id)] = {
+        id: createCellId(firstRow.id, firstColumn.id),
+        rowId: firstRow.id,
+        columnId: firstColumn.id,
+        value: { kind: "string", text: "A long value that should overflow" },
+      };
+      worksheet.cellsById[createCellId(firstRow.id, thirdColumn.id)] = {
+        id: createCellId(firstRow.id, thirdColumn.id),
+        rowId: firstRow.id,
+        columnId: thirdColumn.id,
+        value: { kind: "string", text: "stop" },
+      };
+    });
+
+    expect(wrapper.find(`[data-test-cell-id="${firstCellId}"] .grid-cell__value`).attributes("style")).toContain("width: 240px");
+  });
+});
+
+function mountGrid(
+  configureOrOptions?: MountGridOptions | ((context: MountGridConfigureContext) => void),
+) {
   const document = createTeamGridDocument().teamgrid;
   const worksheet = document.workbook.worksheetsById[document.workbook.worksheetOrder[0]];
+  const initialProjection = projectWorksheet(worksheet);
+  const firstRow = initialProjection.rows[0];
+  const secondRow = initialProjection.rows[1];
+  const firstColumn = initialProjection.columns[0];
+  const secondColumn = initialProjection.columns[1];
+  const thirdColumn = initialProjection.columns[2];
+  const options = typeof configureOrOptions === "function" ? {} : configureOrOptions ?? {};
+  const configure = typeof configureOrOptions === "function" ? configureOrOptions : configureOrOptions?.configure;
+
+  configure?.({ worksheet, firstRow, secondRow, firstColumn, secondColumn, thirdColumn });
+
   const projection = projectWorksheet(worksheet);
-  const firstRow = projection.rows[0];
-  const secondRow = projection.rows[1];
-  const firstColumn = projection.columns[0];
-  const secondColumn = projection.columns[1];
-  const thirdColumn = projection.columns[2];
   const firstCellId = createCellId(firstRow.id, firstColumn.id);
   const secondCellId = createCellId(firstRow.id, secondColumn.id);
   const thirdCellId = createCellId(firstRow.id, thirdColumn.id);
@@ -149,7 +207,7 @@ function mountGrid() {
       selectedRange: { startCellId: firstCellId, endCellId: firstCellId },
       clipboardRange: null,
       highlightedCellIds: [],
-      readonly: false,
+      readonly: options.readonly ?? false,
       locale: "en-US",
     },
     attachTo: documentBody(),
@@ -164,7 +222,21 @@ function mountGrid() {
     }
   });
 
-  return { wrapper, firstCellId, secondCellId, thirdCellId, secondRowSecondCellId };
+  return { wrapper, worksheet, firstRow, secondRow, firstColumn, secondColumn, thirdColumn, firstCellId, secondCellId, thirdCellId, secondRowSecondCellId };
+}
+
+interface MountGridOptions {
+  readonly?: boolean;
+  configure?: (context: MountGridConfigureContext) => void;
+}
+
+interface MountGridConfigureContext {
+  worksheet: ReturnType<typeof createTeamGridDocument>["teamgrid"]["workbook"]["worksheetsById"][string];
+  firstRow: ReturnType<typeof projectWorksheet>["rows"][number];
+  secondRow: ReturnType<typeof projectWorksheet>["rows"][number];
+  firstColumn: ReturnType<typeof projectWorksheet>["columns"][number];
+  secondColumn: ReturnType<typeof projectWorksheet>["columns"][number];
+  thirdColumn: ReturnType<typeof projectWorksheet>["columns"][number];
 }
 
 function documentBody() {

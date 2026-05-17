@@ -59,7 +59,8 @@ import {
   type SerializedClipboardPayload,
 } from "@/lib/clipboard";
 import { evaluateFormula, parseFormula, type FunctionDefinition } from "@/lib/formulas";
-import { createCellId, createId, getFirstVisibleWorksheet, normalizeTags, type Cell, type CellStyle, type WorksheetId } from "@/lib/teamgridDocument";
+import { DEFAULT_COLUMN_WIDTH } from "@/lib/gridDimensions";
+import { createCellId, createId, getFirstVisibleWorksheet, normalizeTags, type Cell, type CellStyle, type ColumnId, type RowId, type WorksheetId } from "@/lib/teamgridDocument";
 import { getCell, projectWorksheet } from "@/lib/gridProjection";
 import type { TeamGridOperation } from "@/lib/teamgridOps";
 import { importTeamGridWorkbookBuffer } from "@/lib/xlsx/importWorkbook";
@@ -329,7 +330,9 @@ const menuItems = computed<MenuItem[]>(() => [
       { label: "Cut", icon: "pi pi-file-export", shortcut: "⌘X", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => void copySelectionFromMenu("cut") },
       { label: "Paste", icon: "pi pi-clipboard", shortcut: "⌘V", disabled: app.gridReadOnly.value || (!internalClipboard.value && !navigator.clipboard), command: () => void pasteFromMenu() },
       { separator: true },
+      { label: "Insert row above", icon: "pi pi-arrow-up", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertRow("before") },
       { label: "Insert row below", icon: "pi pi-arrow-down", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertRow("after") },
+      { label: "Insert column left", icon: "pi pi-arrow-left", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertColumn("before") },
       { label: "Insert column right", icon: "pi pi-arrow-right", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertColumn("after") },
       { separator: true },
       { label: "Delete row", icon: "pi pi-minus", disabled: app.gridReadOnly.value || !selectedCell.value, command: deleteSelectedRow },
@@ -389,6 +392,31 @@ const cellContextMenuItems = computed<MenuItem[]>(() => [
     icon: "pi pi-clipboard",
     disabled: app.gridReadOnly.value || (!internalClipboard.value && !navigator.clipboard),
     command: () => void pasteFromMenu(),
+  },
+  { separator: true },
+  {
+    label: "Insert row above",
+    icon: "pi pi-arrow-up",
+    disabled: app.gridReadOnly.value || !selectedCell.value,
+    command: () => insertRow("before"),
+  },
+  {
+    label: "Insert row below",
+    icon: "pi pi-arrow-down",
+    disabled: app.gridReadOnly.value || !selectedCell.value,
+    command: () => insertRow("after"),
+  },
+  {
+    label: "Insert column left",
+    icon: "pi pi-arrow-left",
+    disabled: app.gridReadOnly.value || !selectedCell.value,
+    command: () => insertColumn("before"),
+  },
+  {
+    label: "Insert column right",
+    icon: "pi pi-arrow-right",
+    disabled: app.gridReadOnly.value || !selectedCell.value,
+    command: () => insertColumn("after"),
   },
 ]);
 
@@ -1024,7 +1052,7 @@ function ensureGridSize(worksheet: NonNullable<typeof activeWorksheet.value>, mi
   }
   while (projectWorksheet(worksheet).columns.length < minCols) {
     const columnId = createId("col");
-    const column = { id: columnId, width: 120 };
+    const column = { id: columnId, width: DEFAULT_COLUMN_WIDTH };
     worksheet.columnsById[columnId] = column;
     worksheet.columnOrder.push(columnId);
     operations.push({ type: "insertColumn", worksheetId: worksheet.id, columnId, column, index: worksheet.columnOrder.length - 1 });
@@ -1371,7 +1399,7 @@ function addWorksheet() {
       rowOrder,
       columnOrder,
       rowsById: Object.fromEntries(rowOrder.map((id) => [id, { id }])),
-      columnsById: Object.fromEntries(columnOrder.map((id) => [id, { id, width: 120 }])),
+      columnsById: Object.fromEntries(columnOrder.map((id) => [id, { id, width: DEFAULT_COLUMN_WIDTH }])),
       cellsById: {},
     };
     grid.workbook.worksheetOrder.push(worksheetId);
@@ -1485,7 +1513,7 @@ function insertColumn(position: "before" | "after") {
     const columnId = createId("col");
     const selectedIndex = worksheet.columnOrder.indexOf(selectedCell.value!.columnId);
     const index = position === "before" ? selectedIndex : selectedIndex + 1;
-    const column = { id: columnId, width: 120 };
+    const column = { id: columnId, width: DEFAULT_COLUMN_WIDTH };
     worksheet.columnsById[columnId] = column;
     worksheet.columnOrder.splice(index, 0, columnId);
     return [{ type: "insertColumn", worksheetId: worksheet.id, columnId, column, index }];
@@ -1515,6 +1543,34 @@ function deleteSelectedColumn() {
     const deletedAt = new Date().toISOString();
     worksheet.columnsById[selectedCell.value!.columnId].deletedAt = deletedAt;
     return [{ type: "tombstoneColumn", worksheetId: worksheet.id, columnId: selectedCell.value!.columnId, deletedAt }];
+  });
+}
+
+/** Commit a released header drag into the local dirty document. */
+function resizeColumn(payload: { columnId: ColumnId; width: number }) {
+  if (!activeWorksheet.value || app.gridReadOnly.value) return;
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const column = worksheet.columnsById[payload.columnId];
+    if (!column || column.width === payload.width) {
+      return [];
+    }
+    column.width = payload.width;
+    return [{ type: "setColumnWidth", worksheetId: worksheet.id, columnId: payload.columnId, width: payload.width }];
+  });
+}
+
+/** Commit a released row-header drag into the local dirty document. */
+function resizeRow(payload: { rowId: RowId; height: number }) {
+  if (!activeWorksheet.value || app.gridReadOnly.value) return;
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const row = worksheet.rowsById[payload.rowId];
+    if (!row || row.height === payload.height) {
+      return [];
+    }
+    row.height = payload.height;
+    return [{ type: "setRowHeight", worksheetId: worksheet.id, rowId: payload.rowId, height: payload.height }];
   });
 }
 
@@ -1562,6 +1618,16 @@ function patchSelectedStyle(style: CellStyle) {
       <div class="toolbar__leading">
         <span class="toolbar__title">TeamGrid</span>
         <Menubar :model="menuItems" class="toolbar__menubar" />
+        <Button
+          icon="pi pi-save"
+          class="toolbar__mobile-save"
+          text
+          rounded
+          severity="secondary"
+          aria-label="Save spreadsheet"
+          :disabled="!app.canSave.value || saveInFlight"
+          @click="void saveCurrentDocument()"
+        />
         <Button
           :icon="app.isViewingHistorical.value ? 'pi pi-history' : 'pi pi-refresh'"
           text
@@ -1681,6 +1747,8 @@ function patchSelectedStyle(style: CellStyle) {
           @clipboard-cut="handleGridClipboardCut"
           @clipboard-paste="handleGridClipboardPaste"
           @clipboard-clear="clearClipboardMarquee"
+          @resize-column="resizeColumn"
+          @resize-row="resizeRow"
         />
         <WorksheetTabs
           :grid="app.activeGrid.value"

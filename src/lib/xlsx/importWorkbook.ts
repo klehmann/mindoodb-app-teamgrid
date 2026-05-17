@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 
 import { formulaResultToCellValue } from "@/lib/cellFormatting";
 import { evaluateFormula, parseFormula } from "@/lib/formulas";
+import { DEFAULT_COLUMN_WIDTH } from "@/lib/gridDimensions";
 import { projectWorksheet } from "@/lib/gridProjection";
 import {
   createCellId,
@@ -112,7 +113,7 @@ function importRowMeta(row: ExcelJS.Row, id: RowId): RowMeta {
 function importColumnMeta(column: ExcelJS.Column, id: ColumnId): ColumnMeta {
   return {
     id,
-    width: column.width == null ? 120 : excelWidthToPixels(column.width),
+    width: column.width == null ? DEFAULT_COLUMN_WIDTH : excelWidthToPixels(column.width),
   };
 }
 
@@ -367,7 +368,7 @@ function mapImportedDateFormat(numFmt: string | undefined) {
 }
 
 function excelWidthToPixels(width: number) {
-  return Math.max(1, Math.round(width * 7));
+  return Math.max(1, Math.round(width * 7 + 5));
 }
 
 function pointsToPixels(points: number) {

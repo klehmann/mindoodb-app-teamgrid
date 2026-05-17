@@ -46,7 +46,7 @@ describe("Teamgrid XLSX import", () => {
     expect(envelope.teamgrid.workbook.worksheetOrder).toHaveLength(2);
     expect(firstWorksheet.title).toBe("Budget Plan");
     expect(secondWorksheet.title).toBe("Second Sheet");
-    expect(firstWorksheet.columnsById[projection.columns[0].id].width).toBe(140);
+    expect(firstWorksheet.columnsById[projection.columns[0].id].width).toBe(145);
     expect(firstWorksheet.rowsById[projection.rows[0].id].height).toBe(32);
     expect(cellA1.value).toEqual({ kind: "number", value: 12, format: "currency" });
     expect(cellA1.style).toMatchObject({
