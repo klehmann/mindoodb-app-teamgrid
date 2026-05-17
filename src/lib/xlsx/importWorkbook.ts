@@ -1,6 +1,10 @@
 import ExcelJS from "exceljs";
 
-import { formulaResultToCellValue } from "@/lib/cellFormatting";
+import {
+  formulaResultToCellValue,
+  inferCurrencyCodeFromExcelNumFmt,
+  inferNumberFormatFromExcelNumFmt,
+} from "@/lib/cellFormatting";
 import { evaluateFormula, parseFormula } from "@/lib/formulas";
 import { DEFAULT_COLUMN_WIDTH } from "@/lib/gridDimensions";
 import { projectWorksheet } from "@/lib/gridProjection";
@@ -189,16 +193,22 @@ function excelValueToCellValue(value: ExcelJS.CellValue | undefined, numFmt?: st
     return { kind: "empty" };
   }
   if (value instanceof Date) {
-    return { kind: "date", isoDate: value.toISOString(), format: mapImportedDateFormat(numFmt) };
+    return { kind: "date", isoDate: value.toISOString(), format: mapImportedDateFormat(numFmt), excelNumFmt: numFmt };
   }
   if (typeof value === "number") {
-    return { kind: "number", value, format: mapImportedNumberFormat(numFmt) };
+    return {
+      kind: "number",
+      value,
+      format: inferNumberFormatFromExcelNumFmt(numFmt),
+      currencyCode: inferCurrencyCodeFromExcelNumFmt(numFmt),
+      excelNumFmt: numFmt,
+    };
   }
   if (typeof value === "boolean") {
     return { kind: "string", text: value ? "TRUE" : "FALSE" };
   }
   if (typeof value === "string") {
-    return { kind: "string", text: value };
+    return numFmt === "@" ? { kind: "string", text: value, excelNumFmt: numFmt } : { kind: "string", text: value };
   }
   if (isErrorValue(value)) {
     return { kind: "string", text: value.error };
@@ -335,25 +345,6 @@ function isSupportedHorizontalAlign(value: string): value is NonNullable<CellSty
 
 function isSupportedVerticalAlign(value: string): value is NonNullable<CellStyle["verticalAlign"]> {
   return value === "top" || value === "middle" || value === "bottom";
-}
-
-function mapImportedNumberFormat(numFmt: string | undefined) {
-  if (!numFmt) {
-    return undefined;
-  }
-  if (/%/.test(numFmt)) {
-    return "percent" as const;
-  }
-  if (/[$€£¥]/.test(numFmt)) {
-    return "currency" as const;
-  }
-  if (/0\.0+/.test(numFmt)) {
-    return "decimal" as const;
-  }
-  if (/^0$|#,##0/.test(numFmt)) {
-    return "integer" as const;
-  }
-  return "general" as const;
 }
 
 function mapImportedDateFormat(numFmt: string | undefined) {

@@ -28,6 +28,10 @@ describe("Teamgrid XLSX import", () => {
       vertical: "bottom",
     };
     worksheet.getCell("B1").value = { formula: "A1*2", result: 24 };
+    worksheet.getCell("C1").value = 7;
+    worksheet.getCell("C1").numFmt = "€#,##0.00";
+    worksheet.getCell("D1").value = 1.2345;
+    worksheet.getCell("D1").numFmt = "0.0000";
     worksheet.getCell("A2").value = "ready";
     worksheet.getCell("B2").value = new Date("2026-05-12T00:00:00.000Z");
     worksheet.getCell("B2").numFmt = "mmm d, yyyy";
@@ -39,6 +43,8 @@ describe("Teamgrid XLSX import", () => {
     const projection = projectWorksheet(firstWorksheet);
     const cellA1 = getCell(firstWorksheet, projection.rows[0].id, projection.columns[0].id);
     const cellB1 = getCell(firstWorksheet, projection.rows[0].id, projection.columns[1].id);
+    const cellC1 = getCell(firstWorksheet, projection.rows[0].id, projection.columns[2].id);
+    const cellD1 = getCell(firstWorksheet, projection.rows[0].id, projection.columns[3].id);
     const cellA2 = getCell(firstWorksheet, projection.rows[1].id, projection.columns[0].id);
     const cellB2 = getCell(firstWorksheet, projection.rows[1].id, projection.columns[1].id);
 
@@ -48,7 +54,7 @@ describe("Teamgrid XLSX import", () => {
     expect(secondWorksheet.title).toBe("Second Sheet");
     expect(firstWorksheet.columnsById[projection.columns[0].id].width).toBe(145);
     expect(firstWorksheet.rowsById[projection.rows[0].id].height).toBe(32);
-    expect(cellA1.value).toEqual({ kind: "number", value: 12, format: "currency" });
+    expect(cellA1.value).toEqual({ kind: "number", value: 12, format: "currency", currencyCode: "USD", excelNumFmt: "$#,##0.00" });
     expect(cellA1.style).toMatchObject({
       fontFamily: "Inter",
       fontSize: 16,
@@ -63,8 +69,10 @@ describe("Teamgrid XLSX import", () => {
       cached: { kind: "number", value: 24 },
     });
     expect(cellB1.value).toEqual({ kind: "number", value: 24 });
+    expect(cellC1.value).toEqual({ kind: "number", value: 7, format: "currency", currencyCode: "EUR", excelNumFmt: "€#,##0.00" });
+    expect(cellD1.value).toEqual({ kind: "number", value: 1.2345, format: "decimal", excelNumFmt: "0.0000" });
     expect(cellA2.value).toEqual({ kind: "string", text: "ready" });
-    expect(cellB2.value).toMatchObject({ kind: "date", format: "date" });
+    expect(cellB2.value).toMatchObject({ kind: "date", format: "date", excelNumFmt: "mmm d, yyyy" });
   });
 
   it("keeps unsupported formulas as cached values instead of broken formulas", () => {

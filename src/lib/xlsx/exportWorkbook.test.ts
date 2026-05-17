@@ -19,6 +19,10 @@ describe("Teamgrid XLSX export", () => {
     expect(worksheet!.getCell("A1").value).toBe(12);
     expect(worksheet!.getCell("A1").numFmt).toBe("$#,##0.00");
     expect(worksheet!.getCell("B1").value).toEqual({ formula: "A1*2", result: 24 });
+    expect(worksheet!.getCell("C1").value).toBe(7);
+    expect(worksheet!.getCell("C1").numFmt).toBe("€#,##0.00");
+    expect(worksheet!.getCell("D1").value).toBe(1.2345);
+    expect(worksheet!.getCell("D1").numFmt).toBe("0.0000");
     expect(worksheet!.getCell("A2").value).toBe("ready");
     expect(worksheet!.getCell("B2").value).toBeInstanceOf(Date);
     expect(worksheet!.getCell("B2").numFmt).toBe("mmm d, yyyy");
@@ -62,7 +66,7 @@ function createExportFixture() {
   const worksheet = firstVisibleWorksheet(document);
   const deletedWorksheet = cloneWorksheet(worksheet, "sheet_deleted");
   const [row1, row2] = worksheet.rowOrder;
-  const [columnA, columnB] = worksheet.columnOrder;
+  const [columnA, columnB, columnC, columnD] = worksheet.columnOrder;
 
   worksheet.title = "Budget/Plan*2026";
   worksheet.rowsById[row1].height = 32;
@@ -88,6 +92,18 @@ function createExportFixture() {
       references: [{ kind: "cell", worksheetId: worksheet.id, rowId: row1, columnId: columnA }],
       cached: { kind: "number", value: 24 },
     },
+  };
+  worksheet.cellsById[createCellId(row1, columnC)] = {
+    id: createCellId(row1, columnC),
+    rowId: row1,
+    columnId: columnC,
+    value: { kind: "number", value: 7, format: "currency", currencyCode: "EUR" },
+  };
+  worksheet.cellsById[createCellId(row1, columnD)] = {
+    id: createCellId(row1, columnD),
+    rowId: row1,
+    columnId: columnD,
+    value: { kind: "number", value: 1.2345, format: "decimal", excelNumFmt: "0.0000" },
   };
   worksheet.cellsById[createCellId(row2, columnA)] = {
     id: createCellId(row2, columnA),

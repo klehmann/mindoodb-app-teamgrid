@@ -12,6 +12,7 @@ export type CellId = string;
 
 export type NumberFormat = "general" | "integer" | "decimal" | "currency" | "percent";
 export type DateFormat = "date" | "dateTime" | "time";
+export type CurrencyCode = "EUR" | "USD";
 export type HorizontalAlign = "left" | "center" | "right";
 export type VerticalAlign = "top" | "middle" | "bottom";
 
@@ -84,9 +85,9 @@ export interface Cell {
 
 export type CellValue =
   | { kind: "empty" }
-  | { kind: "string"; text: string }
-  | { kind: "number"; value: number; format?: NumberFormat }
-  | { kind: "date"; isoDate: string; format?: DateFormat };
+  | { kind: "string"; text: string; excelNumFmt?: string }
+  | { kind: "number"; value: number; format?: NumberFormat; currencyCode?: CurrencyCode; excelNumFmt?: string }
+  | { kind: "date"; isoDate: string; format?: DateFormat; excelNumFmt?: string };
 
 export interface CellStyle {
   textColor?: string;

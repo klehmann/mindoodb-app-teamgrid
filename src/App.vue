@@ -49,7 +49,7 @@ import GridViewport from "@/components/GridViewport.vue";
 import TagTreeList from "@/components/TagTreeList.vue";
 import WorksheetTabs from "@/components/WorksheetTabs.vue";
 import { useTeamGridDocument, readDocumentSummaryLabel } from "@/composables/useTeamGridDocument";
-import { coerceInputToCellValue, formatCellValue, formulaResultToCellValue } from "@/lib/cellFormatting";
+import { applyCellFormat, coerceInputToCellValue, formatCellValue, formulaResultToCellValue, preserveCompatibleCellValueFormat, type CellFormatKind, type CellFormatRequest } from "@/lib/cellFormatting";
 import {
   decodePayload,
   rewriteFormulaSource,
@@ -60,7 +60,7 @@ import {
 } from "@/lib/clipboard";
 import { evaluateFormula, parseFormula, type FunctionDefinition } from "@/lib/formulas";
 import { DEFAULT_COLUMN_WIDTH } from "@/lib/gridDimensions";
-import { createCellId, createId, getFirstVisibleWorksheet, normalizeTags, type Cell, type CellStyle, type ColumnId, type RowId, type WorksheetId } from "@/lib/teamgridDocument";
+import { createCellId, createId, getFirstVisibleWorksheet, normalizeTags, type Cell, type CellStyle, type ColumnId, type CurrencyCode, type RowId, type WorksheetId } from "@/lib/teamgridDocument";
 import { getCell, projectWorksheet } from "@/lib/gridProjection";
 import type { TeamGridOperation } from "@/lib/teamgridOps";
 import { importTeamGridWorkbookBuffer } from "@/lib/xlsx/importWorkbook";
@@ -113,8 +113,12 @@ const deleteDialogVisible = ref(false);
 const revisionDialogVisible = ref(false);
 const renameDialogVisible = ref(false);
 const errorDialogVisible = ref(false);
+const formatDialogVisible = ref(false);
 const renameTargetId = ref<WorksheetId | null>(null);
 const renameDraft = ref("");
+const formatDialogKind = ref<CellFormatKind>("general");
+const formatDialogCurrency = ref<CurrencyCode>("USD");
+const formatDialogCustomNumFmt = ref("");
 const selectedOpenDocId = ref("");
 const selectedOpenCategoryKey = ref(ALL_SPREADSHEETS_NODE_KEY);
 const openCategoryNodes = ref<OpenCategoryNode[]>([]);
@@ -345,6 +349,8 @@ const menuItems = computed<MenuItem[]>(() => [
       { label: "Bold", icon: "pi pi-bold", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => patchSelectedStyle({ bold: !selectedCell.value?.style?.bold }) },
       { label: "Italic", icon: "pi pi-italic", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => patchSelectedStyle({ italic: !selectedCell.value?.style?.italic }) },
       { label: "Underline", icon: "pi pi-underline", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => patchSelectedStyle({ underline: !selectedCell.value?.style?.underline }) },
+      { separator: true },
+      { label: "Format cells...", icon: "pi pi-sliders-h", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => openCellFormatDialog(selectedRange.value) },
     ],
   },
   {
@@ -392,6 +398,13 @@ const cellContextMenuItems = computed<MenuItem[]>(() => [
     icon: "pi pi-clipboard",
     disabled: app.gridReadOnly.value || (!internalClipboard.value && !navigator.clipboard),
     command: () => void pasteFromMenu(),
+  },
+  { separator: true },
+  {
+    label: "Format cells...",
+    icon: "pi pi-sliders-h",
+    disabled: app.gridReadOnly.value || !cellContextRange.value,
+    command: () => openCellFormatDialog(cellContextRange.value),
   },
   { separator: true },
   {
@@ -737,6 +750,73 @@ function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: 
   }
   cellContextRange.value = payload.range;
   cellContextMenu.value?.show(payload.event);
+}
+
+/** Open the Excel-like value-format dialog for the active selection. */
+function openCellFormatDialog(range: CellSelectionRange | null) {
+  const targetRange = range ?? (selectedCell.value ? { startCellId: selectedCell.value.id, endCellId: selectedCell.value.id } : null);
+  if (app.gridReadOnly.value || !targetRange) {
+    return;
+  }
+  selectedRange.value = targetRange;
+  seedFormatDialogFromCell(selectedCell.value);
+  formatDialogVisible.value = true;
+}
+
+function seedFormatDialogFromCell(cell: Cell | null) {
+  const value = cell?.value;
+  const excelNumFmt = value && "excelNumFmt" in value ? value.excelNumFmt : undefined;
+  formatDialogKind.value = excelNumFmt && isCustomExcelNumFmt(excelNumFmt)
+    ? "custom"
+    : value?.kind === "string"
+      ? "text"
+      : value?.kind === "number"
+        ? (value.format ?? "general")
+        : "general";
+  formatDialogCurrency.value = value?.kind === "number" && value.currencyCode ? value.currencyCode : "USD";
+  formatDialogCustomNumFmt.value = value?.kind === "number" || value?.kind === "date" || value?.kind === "string"
+    ? excelNumFmt ?? ""
+    : "";
+}
+
+function isCustomExcelNumFmt(numFmt: string) {
+  return !new Set(["@", "0", "0.00", "0.00%", "$#,##0.00", "€#,##0.00"]).has(numFmt);
+}
+
+function currentCellFormatRequest(): CellFormatRequest {
+  if (formatDialogKind.value === "currency") {
+    return { kind: "currency", currencyCode: formatDialogCurrency.value };
+  }
+  if (formatDialogKind.value === "custom") {
+    return { kind: "custom", excelNumFmt: formatDialogCustomNumFmt.value };
+  }
+  return { kind: formatDialogKind.value };
+}
+
+/** Apply the chosen value format to every selected cell through granular cell patches. */
+function applySelectedCellFormat() {
+  if (!activeWorksheet.value || app.gridReadOnly.value || selectedCells.value.length === 0) {
+    formatDialogVisible.value = false;
+    return;
+  }
+  const request = currentCellFormatRequest();
+  const cellsToFormat = selectedCells.value;
+  const locale = app.activeGrid.value?.settings.locale ?? "en-US";
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const operations: TeamGridOperation[] = [];
+    for (const cell of cellsToFormat) {
+      const existing = worksheet.cellsById[cell.id] ?? cell;
+      const formatted = applyCellFormat(existing, request, locale);
+      if (formatted === existing) {
+        continue;
+      }
+      worksheet.cellsById[formatted.id] = formatted;
+      operations.push({ type: "setCell", worksheetId: worksheet.id, cell: formatted });
+    }
+    return operations;
+  });
+  formatDialogVisible.value = false;
 }
 
 /** Grid-emitted `copy` event: serialize the selection into the clipboard. */
@@ -1359,7 +1439,10 @@ function commitCell(cell: Cell, rawValue: string) {
     const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
     const targetCell: Cell = {
       ...cell,
-      value: coerceInputToCellValue(rawValue, worksheet.columnsById[cell.columnId]?.defaultValueKind),
+      value: preserveCompatibleCellValueFormat(
+        coerceInputToCellValue(rawValue, worksheet.columnsById[cell.columnId]?.defaultValueKind),
+        cell.value,
+      ),
       formula: undefined,
     };
     if (rawValue.trim().startsWith("=")) {
@@ -1371,7 +1454,7 @@ function commitCell(cell: Cell, rawValue: string) {
         cached: evaluated.result,
         error: evaluated.result.kind === "error" ? evaluated.result.code : undefined,
       };
-      targetCell.value = formulaResultToCellValue(evaluated.result);
+      targetCell.value = preserveCompatibleCellValueFormat(formulaResultToCellValue(evaluated.result), cell.value);
       formulaError.value = evaluated.errorMessage ?? null;
     } else {
       formulaError.value = null;
@@ -1714,6 +1797,15 @@ function patchSelectedStyle(style: CellStyle) {
           >
             U
           </button>
+          <span class="format-toolbar__divider" aria-hidden="true" />
+          <button
+            type="button"
+            class="format-toolbar__value-button"
+            :disabled="app.gridReadOnly.value || !hasSelection"
+            @click="openCellFormatDialog(selectedRange)"
+          >
+            Format cells
+          </button>
         </div>
 
         <FormulaBar
@@ -1772,6 +1864,46 @@ function patchSelectedStyle(style: CellStyle) {
     </section>
 
     <footer class="status-line">{{ statusLineText }}</footer>
+
+    <Dialog v-model:visible="formatDialogVisible" modal header="Format cells" :style="{ width: '32rem', maxWidth: '96vw' }">
+      <div class="cell-format-dialog">
+        <label class="field">
+          Format
+          <select v-model="formatDialogKind" class="native-input">
+            <option value="text">Text</option>
+            <option value="general">Standard</option>
+            <option value="integer">Integer</option>
+            <option value="decimal">Decimal</option>
+            <option value="percent">Percent</option>
+            <option value="currency">Currency</option>
+            <option value="custom">Custom Excel format</option>
+          </select>
+        </label>
+        <label v-if="formatDialogKind === 'currency'" class="field">
+          Currency
+          <select v-model="formatDialogCurrency" class="native-input">
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </label>
+        <label v-if="formatDialogKind === 'custom'" class="field">
+          Excel number format
+          <input
+            v-model="formatDialogCustomNumFmt"
+            class="native-input"
+            type="text"
+            autocomplete="off"
+            placeholder="$#,##0.00;[Red]-$#,##0.00"
+            @keyup.enter="applySelectedCellFormat"
+          >
+        </label>
+        <p class="cell-format-dialog__hint">Formatting is applied to the current selection. Numeric-looking text is converted for number, percent, and currency formats; incompatible values are left unchanged.</p>
+      </div>
+      <template #footer>
+        <Button label="Cancel" text @click="formatDialogVisible = false" />
+        <Button label="Apply" icon="pi pi-check" :disabled="app.gridReadOnly.value || (formatDialogKind === 'custom' && !formatDialogCustomNumFmt.trim())" @click="applySelectedCellFormat" />
+      </template>
+    </Dialog>
 
     <Dialog
       v-model:visible="errorDialogVisible"

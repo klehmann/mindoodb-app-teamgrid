@@ -12,6 +12,7 @@ import type {
   NumberFormat,
   TeamGridDocumentV1,
   Worksheet,
+  CurrencyCode,
 } from "@/lib/teamgridDocument";
 
 const INVALID_SHEET_NAME_CHARACTERS = /[\\/*?:[\]]/g;
@@ -189,25 +190,29 @@ function applyExcelStyle(cell: ExcelJS.Cell, style: CellStyle) {
 }
 
 function applyExcelNumberFormat(cell: ExcelJS.Cell, value: CellValue) {
+  if (value.kind === "string" && value.excelNumFmt) {
+    cell.numFmt = value.excelNumFmt;
+    return;
+  }
   if (value.kind === "number") {
-    const numberFormat = mapNumberFormat(value.format);
+    const numberFormat = value.excelNumFmt ?? mapNumberFormat(value.format, value.currencyCode);
     if (numberFormat) {
       cell.numFmt = numberFormat;
     }
   }
   if (value.kind === "date") {
-    cell.numFmt = mapDateFormat(value.format);
+    cell.numFmt = value.excelNumFmt ?? mapDateFormat(value.format);
   }
 }
 
-function mapNumberFormat(format: NumberFormat | undefined) {
+function mapNumberFormat(format: NumberFormat | undefined, currencyCode: CurrencyCode | undefined) {
   switch (format) {
     case "integer":
       return "0";
     case "decimal":
       return "0.00";
     case "currency":
-      return "$#,##0.00";
+      return currencyCode === "EUR" ? "€#,##0.00" : "$#,##0.00";
     case "percent":
       return "0.00%";
     default:

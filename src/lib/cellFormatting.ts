@@ -15,7 +15,7 @@
  *   default, and cell override in that order so bulk formatting on a column
  *   does not require rewriting every cell.
  */
-import type { Cell, CellStyle, CellValue, ColumnMeta, FormulaResult, NumberFormat, RowMeta } from "@/lib/teamgridDocument";
+import type { Cell, CellStyle, CellValue, ColumnMeta, CurrencyCode, FormulaResult, NumberFormat, RowMeta } from "@/lib/teamgridDocument";
 
 /** Fallbacks used when neither the column, row, nor cell specifies a value. */
 export const DEFAULT_CELL_STYLE: Required<Pick<CellStyle, "fontFamily" | "fontSize" | "horizontalAlign" | "verticalAlign">> = {
@@ -24,6 +24,16 @@ export const DEFAULT_CELL_STYLE: Required<Pick<CellStyle, "fontFamily" | "fontSi
   horizontalAlign: "left",
   verticalAlign: "middle",
 };
+
+export type CellFormatKind = "text" | "general" | "integer" | "decimal" | "percent" | "currency" | "custom";
+
+export interface CellFormatRequest {
+  kind: CellFormatKind;
+  currencyCode?: CurrencyCode;
+  excelNumFmt?: string;
+}
+
+const DEFAULT_CURRENCY_CODE: CurrencyCode = "USD";
 
 /**
  * Convert a raw text edit into a typed {@link CellValue}.
@@ -35,6 +45,10 @@ export function coerceInputToCellValue(input: string, preferredKind?: ColumnMeta
   const trimmed = input.trim();
   if (trimmed === "") {
     return { kind: "empty" };
+  }
+  const currencyValue = parseCurrencyInput(trimmed);
+  if (currencyValue) {
+    return currencyValue;
   }
   if (preferredKind === "date") {
     const timestamp = Date.parse(trimmed);
@@ -53,6 +67,25 @@ export function coerceInputToCellValue(input: string, preferredKind?: ColumnMeta
   return { kind: "string", text: input };
 }
 
+function parseCurrencyInput(input: string): CellValue | null {
+  const currencyCode = inferCurrencyCodeFromExcelNumFmt(input);
+  if (!currencyCode) {
+    return null;
+  }
+  const numericText = input.replace(/[€$]/g, "").trim();
+  const value = parseLocalizedNumberText(numericText);
+  if (value == null) {
+    return null;
+  }
+  return {
+    kind: "number",
+    value,
+    format: "currency",
+    currencyCode,
+    excelNumFmt: defaultExcelNumFmtForRequest({ kind: "currency", currencyCode }),
+  };
+}
+
 /** Project a formula evaluation result into the cell-value shape used for caching. */
 export function formulaResultToCellValue(result: FormulaResult): CellValue {
   switch (result.kind) {
@@ -65,6 +98,31 @@ export function formulaResultToCellValue(result: FormulaResult): CellValue {
     default:
       return { kind: "empty" };
   }
+}
+
+export function preserveCompatibleCellValueFormat(nextValue: CellValue, previousValue: CellValue): CellValue {
+  if (nextValue.kind === "number" && previousValue.kind === "number") {
+    return {
+      ...nextValue,
+      format: previousValue.format,
+      currencyCode: previousValue.currencyCode,
+      excelNumFmt: previousValue.excelNumFmt,
+    };
+  }
+  if (nextValue.kind === "date" && previousValue.kind === "date") {
+    return {
+      ...nextValue,
+      format: previousValue.format,
+      excelNumFmt: previousValue.excelNumFmt,
+    };
+  }
+  if (nextValue.kind === "string" && previousValue.kind === "string" && previousValue.excelNumFmt) {
+    return {
+      ...nextValue,
+      excelNumFmt: previousValue.excelNumFmt,
+    };
+  }
+  return nextValue;
 }
 
 /**
@@ -81,7 +139,7 @@ export function formatCellValue(value: CellValue, locale = "en-US") {
     case "string":
       return value.text;
     case "number":
-      return formatNumber(value.value, value.format, locale);
+      return formatNumber(value.value, value.format, locale, value.currencyCode);
     case "date":
       return formatDate(value.isoDate, value.format, locale);
   }
@@ -120,14 +178,194 @@ export function mergeCellStyle(row: RowMeta | undefined, column: ColumnMeta | un
   };
 }
 
-function formatNumber(value: number, format: NumberFormat | undefined, locale: string) {
+export function applyCellFormat(cell: Cell, request: CellFormatRequest, locale = "en-US"): Cell {
+  const nextValue = applyFormatToCellValue(cell.value, request, locale, Boolean(cell.formula));
+  return nextValue === cell.value ? cell : { ...cell, value: nextValue };
+}
+
+export function inferNumberFormatFromExcelNumFmt(numFmt: string | undefined): NumberFormat | undefined {
+  if (!numFmt) {
+    return undefined;
+  }
+  if (/%/.test(numFmt)) {
+    return "percent";
+  }
+  if (/[$€£¥]|\[\$-[^\]]+\]|\[\$[A-Z]{3}/i.test(numFmt)) {
+    return "currency";
+  }
+  if (/0\.0+/.test(numFmt)) {
+    return "decimal";
+  }
+  if (/^0$|#,##0/.test(numFmt)) {
+    return "integer";
+  }
+  return "general";
+}
+
+export function inferCurrencyCodeFromExcelNumFmt(numFmt: string | undefined): CurrencyCode | undefined {
+  if (!numFmt) {
+    return undefined;
+  }
+  if (/\bEUR\b|€|\[\$EUR/i.test(numFmt)) {
+    return "EUR";
+  }
+  if (/\bUSD\b|\$|\[\$USD/i.test(numFmt)) {
+    return "USD";
+  }
+  return undefined;
+}
+
+export function defaultExcelNumFmtForRequest(request: CellFormatRequest) {
+  switch (request.kind) {
+    case "text":
+      return "@";
+    case "integer":
+      return "0";
+    case "decimal":
+      return "0.00";
+    case "percent":
+      return "0.00%";
+    case "currency":
+      return request.currencyCode === "EUR" ? "€#,##0.00" : "$#,##0.00";
+    case "custom":
+      return request.excelNumFmt?.trim() || undefined;
+    default:
+      return undefined;
+  }
+}
+
+function applyFormatToCellValue(value: CellValue, request: CellFormatRequest, locale: string, preservesFormula: boolean): CellValue {
+  if (request.kind === "text") {
+    if (preservesFormula) {
+      return value.kind === "string" ? { ...value, excelNumFmt: "@" } : value;
+    }
+    return valueToTextCellValue(value, locale);
+  }
+
+  if (value.kind === "date") {
+    if (request.kind === "custom") {
+      const excelNumFmt = defaultExcelNumFmtForRequest(request);
+      return excelNumFmt ? { ...value, excelNumFmt } : value;
+    }
+    return value;
+  }
+
+  const numberValue = readNumberForFormat(value, request.kind);
+  if (numberValue == null) {
+    return value;
+  }
+
+  if (request.kind === "currency") {
+    const currencyCode = request.currencyCode ?? DEFAULT_CURRENCY_CODE;
+    return {
+      kind: "number",
+      value: numberValue,
+      format: "currency",
+      currencyCode,
+      excelNumFmt: defaultExcelNumFmtForRequest({ kind: "currency", currencyCode }),
+    };
+  }
+
+  if (request.kind === "custom") {
+    const excelNumFmt = defaultExcelNumFmtForRequest(request);
+    return {
+      kind: "number",
+      value: numberValue,
+      format: inferNumberFormatFromExcelNumFmt(excelNumFmt),
+      currencyCode: inferCurrencyCodeFromExcelNumFmt(excelNumFmt),
+      excelNumFmt,
+    };
+  }
+
+  return {
+    kind: "number",
+    value: numberValue,
+    format: request.kind,
+    excelNumFmt: defaultExcelNumFmtForRequest(request),
+  };
+}
+
+function valueToTextCellValue(value: CellValue, locale: string): CellValue {
+  switch (value.kind) {
+    case "empty":
+      return { kind: "string", text: "", excelNumFmt: "@" };
+    case "string":
+      return { ...value, excelNumFmt: "@" };
+    case "number":
+      return { kind: "string", text: String(value.value), excelNumFmt: "@" };
+    case "date":
+      return { kind: "string", text: formatCellValue(value, locale), excelNumFmt: "@" };
+  }
+}
+
+function readNumberForFormat(value: CellValue, kind: Exclude<CellFormatKind, "text">) {
+  if (value.kind === "number") {
+    return value.value;
+  }
+  if (value.kind !== "string") {
+    return null;
+  }
+  return parseNumberLikeText(value.text, kind === "percent");
+}
+
+function parseNumberLikeText(text: string, percentFormat: boolean) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const hasPercent = trimmed.includes("%");
+  const numericText = trimmed
+    .replace(/[€$£¥]/g, "")
+    .replace(/%/g, "")
+    .trim();
+  const parsed = parseLocalizedNumberText(numericText);
+  if (parsed == null) {
+    return null;
+  }
+  return hasPercent && percentFormat ? parsed / 100 : parsed;
+}
+
+function parseLocalizedNumberText(text: string) {
+  const compact = text.replace(/\s/g, "");
+  const decimalSeparator = inferDecimalSeparator(compact);
+  const normalized = compact
+    .replace(/[.,]/g, (separator) => separator === decimalSeparator ? "." : "")
+    .replace(/'/g, "");
+  if (!/^-?\d+(\.\d+)?$/.test(normalized)) {
+    return null;
+  }
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function inferDecimalSeparator(text: string) {
+  const lastComma = text.lastIndexOf(",");
+  const lastDot = text.lastIndexOf(".");
+  if (lastComma >= 0 && lastDot >= 0) {
+    return lastComma > lastDot ? "," : ".";
+  }
+  if (lastComma >= 0) {
+    return shouldTreatSingleSeparatorAsDecimal(text, lastComma) ? "," : "";
+  }
+  if (lastDot >= 0) {
+    return shouldTreatSingleSeparatorAsDecimal(text, lastDot) ? "." : "";
+  }
+  return "";
+}
+
+function shouldTreatSingleSeparatorAsDecimal(text: string, separatorIndex: number) {
+  const digitsAfterSeparator = text.length - separatorIndex - 1;
+  return digitsAfterSeparator > 0 && digitsAfterSeparator <= 2;
+}
+
+function formatNumber(value: number, format: NumberFormat | undefined, locale: string, currencyCode: CurrencyCode = DEFAULT_CURRENCY_CODE) {
   switch (format) {
     case "integer":
       return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
     case "decimal":
       return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
     case "currency":
-      return new Intl.NumberFormat(locale, { style: "currency", currency: "USD" }).format(value);
+      return new Intl.NumberFormat(locale, { style: "currency", currency: currencyCode }).format(value);
     case "percent":
       return new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 2 }).format(value);
     default:

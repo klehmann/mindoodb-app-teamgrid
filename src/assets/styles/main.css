@@ -371,6 +371,26 @@ button.toolbar__status-badge:focus-visible {
   color: var(--text);
 }
 
+.format-toolbar__value-button {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.04);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.format-toolbar__value-button:hover:not(:disabled),
+.format-toolbar__value-button:focus-visible {
+  border-color: var(--border-strong);
+  background: rgb(212 160 23 / 0.12);
+}
+
+.format-toolbar__value-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .empty-state {
   margin: auto;
   max-width: 36rem;
@@ -517,13 +537,15 @@ button.toolbar__status-badge:focus-visible {
 }
 
 .document-list__empty,
-.properties-dialog__hint {
+.properties-dialog__hint,
+.cell-format-dialog__hint {
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
 }
 
-.properties-dialog {
+.properties-dialog,
+.cell-format-dialog {
   display: grid;
   gap: 1rem;
 }
