@@ -77,6 +77,21 @@ describe("useTeamGridDocument open sessions", () => {
     wrapper.unmount();
   });
 
+  it("creates new spreadsheet documents with the teamgrid form marker", async () => {
+    const wrapper = mountHarness();
+    await flushPromises();
+    const app = wrapper.vm.app;
+
+    await app.createNewDocument();
+
+    expect(fakeDatabase.documents.create).toHaveBeenCalledWith({
+      set: expect.objectContaining({
+        form: "teamgrid",
+      }),
+    });
+    wrapper.unmount();
+  });
+
   it("surfaces save failures as user-visible errors", async () => {
     const wrapper = mountHarness();
     await flushPromises();
