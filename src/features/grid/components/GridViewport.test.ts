@@ -632,6 +632,19 @@ describe("GridViewport text overflow", () => {
 
     expect(wrapper.find(`[data-test-cell-id="${firstCellId}"] .grid-cell__value`).attributes("style")).toContain("width: 240px");
   });
+
+  it("keeps right-aligned numbers inside their own cell", () => {
+    const { wrapper, firstCellId } = mountGrid(({ worksheet, firstRow, firstColumn }) => {
+      worksheet.cellsById[createCellId(firstRow.id, firstColumn.id)] = {
+        id: createCellId(firstRow.id, firstColumn.id),
+        rowId: firstRow.id,
+        columnId: firstColumn.id,
+        value: { kind: "number", value: 30 },
+      };
+    });
+
+    expect(wrapper.find(`[data-test-cell-id="${firstCellId}"] .grid-cell__value`).attributes("style")).toContain("width: 120px");
+  });
 });
 
 function mountGrid(

@@ -306,7 +306,7 @@ function cellDisplayStyle(cell: Cell): CSSProperties {
   // is deterministic. Non-wrapping cells keep the Excel-style "spill
   // into the empty neighbour" behaviour driven by `cellOverflowWidth`.
   const ownWidth = props.worksheet.columnsById[cell.columnId]?.width ?? MIN_COLUMN_WIDTH;
-  const width = wrap ? ownWidth : cellOverflowWidth(cell.rowId, cell.columnId);
+  const width = wrap || resolvedHorizontal !== "left" ? ownWidth : cellOverflowWidth(cell.rowId, cell.columnId);
   return {
     width: `${width}px`,
     justifyContent: horizontalFlexAlignment(resolvedHorizontal),
