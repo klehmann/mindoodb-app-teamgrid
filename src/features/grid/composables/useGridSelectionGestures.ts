@@ -35,6 +35,12 @@ export interface UseGridSelectionGesturesOptions {
   projection: Readonly<Ref<GridProjection>>;
   selectedCellId: Readonly<Ref<string | null>>;
   selectedRange: Readonly<Ref<CellSelectionRange | null>>;
+  /**
+   * Disjoint ranges accumulated by Ctrl/Meta+click multi-selection.
+   * Included in {@link selectedRangeIds} so the viewport highlights
+   * cells from every range, not just the primary one.
+   */
+  additionalRanges: Readonly<Ref<CellSelectionRange[]>>;
   readonly: Readonly<Ref<boolean>>;
   editingCellId: Readonly<Ref<string | null>>;
   editDraft: Readonly<Ref<string>>;
@@ -44,15 +50,35 @@ export interface UseGridSelectionGesturesOptions {
   startEditing: (rowId: RowId, columnId: ColumnId, initialValue?: string) => Promise<void> | void;
   onSelect: (cell: Cell, address: string) => void;
   onSelectRange: (range: CellSelectionRange) => void;
+  /** Push a range onto the disjoint extra-selection list (Ctrl/Meta+click). */
+  onAddRange: (range: CellSelectionRange) => void;
+  /** Drop all extra Ctrl/Meta+click ranges (default click, keyboard nav, etc.). */
+  onClearAdditionalRanges: () => void;
   onCellContext: (payload: { event: MouseEvent; cell: Cell; address: string; range: CellSelectionRange }) => void;
 }
 
 export function useGridSelectionGestures(options: UseGridSelectionGesturesOptions) {
   const draggingRangeStart = ref<CellId | null>(null);
 
-  const selectedRangeIds = computed(() => new Set(options.selectedRange.value
-    ? getRangeCellIds(options.selectedRange.value)
-    : []));
+  /**
+   * Union of cell ids covered by the primary selection range and every
+   * disjoint Ctrl/Meta+click range. Drives cell highlighting in the
+   * viewport so multi-selections look the same as single ranges.
+   */
+  const selectedRangeIds = computed(() => {
+    const ids = new Set<CellId>();
+    if (options.selectedRange.value) {
+      for (const id of getRangeCellIds(options.selectedRange.value)) {
+        ids.add(id);
+      }
+    }
+    for (const range of options.additionalRanges.value) {
+      for (const id of getRangeCellIds(range)) {
+        ids.add(id);
+      }
+    }
+    return ids;
+  });
 
   function selectCellByCoordinates(rowId: RowId, columnId: ColumnId) {
     const cell = getCell(options.worksheet.value, rowId, columnId);
@@ -65,14 +91,25 @@ export function useGridSelectionGestures(options: UseGridSelectionGesturesOption
   }
 
   /**
-   * Mousedown on a cell. Three branches matter:
+   * Mousedown on a cell. Five branches matter:
    *
    * 1. Formula picking - if we're mid-edit and the draft starts with
    *    `=`, treat the click as "pick this cell as a reference" instead
    *    of a selection change.
    * 2. Mid-edit, non-formula click - commit the in-flight edit first,
    *    then start a fresh range selection on the clicked cell.
-   * 3. Default - start a new range anchored on the clicked cell.
+   * 3. Shift+click - extend the existing range from its current anchor
+   *    (the start of the live range, or the active cell if none) to
+   *    the clicked cell. The active cell follows the click, mirroring
+   *    the shift+arrow keyboard gesture. Disjoint Ctrl/Meta+click
+   *    ranges accumulated so far are preserved.
+   * 4. Ctrl/Meta+click - push the current primary range onto the
+   *    disjoint extra-range list, then start a new single-cell primary
+   *    range at the clicked cell. A subsequent drag (mouseenter) only
+   *    extends the new primary, leaving the older sub-ranges alone, so
+   *    the user can paint several non-contiguous rectangles.
+   * 5. Default - drop any disjoint sub-ranges and start a new primary
+   *    range anchored on the clicked cell.
    */
   function startRangeSelection(event: MouseEvent, rowId: RowId, columnId: ColumnId) {
     if (event.button !== 0) {
@@ -86,6 +123,21 @@ export function useGridSelectionGestures(options: UseGridSelectionGesturesOption
       }
       options.commitEditingExternally();
     }
+    if (event.shiftKey && options.selectedCellId.value) {
+      const anchorId = options.selectedRange.value?.startCellId ?? options.selectedCellId.value;
+      draggingRangeStart.value = anchorId;
+      options.onSelectRange({ startCellId: anchorId, endCellId: cell.id });
+      handleCellClick(event, rowId, columnId);
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && options.selectedRange.value && options.selectedCellId.value) {
+      options.onAddRange(options.selectedRange.value);
+      draggingRangeStart.value = cell.id;
+      options.onSelectRange({ startCellId: cell.id, endCellId: cell.id });
+      handleCellClick(event, rowId, columnId);
+      return;
+    }
+    options.onClearAdditionalRanges();
     draggingRangeStart.value = cell.id;
     options.onSelectRange({ startCellId: cell.id, endCellId: cell.id });
     handleCellClick(event, rowId, columnId);
@@ -114,6 +166,7 @@ export function useGridSelectionGestures(options: UseGridSelectionGesturesOption
     const lastColumn = options.projection.value.columns[options.projection.value.columns.length - 1];
     const firstCell = getCell(options.worksheet.value, rowId, firstColumn.id);
     const lastCell = getCell(options.worksheet.value, rowId, lastColumn.id);
+    options.onClearAdditionalRanges();
     options.onSelect(firstCell, getCellAddress(options.projection.value, firstCell.rowId, firstCell.columnId));
     options.onSelectRange({ startCellId: firstCell.id, endCellId: lastCell.id });
   }
@@ -126,6 +179,7 @@ export function useGridSelectionGestures(options: UseGridSelectionGesturesOption
     const lastRow = options.projection.value.rows[options.projection.value.rows.length - 1];
     const firstCell = getCell(options.worksheet.value, firstRow.id, columnId);
     const lastCell = getCell(options.worksheet.value, lastRow.id, columnId);
+    options.onClearAdditionalRanges();
     options.onSelect(firstCell, getCellAddress(options.projection.value, firstCell.rowId, firstCell.columnId));
     options.onSelectRange({ startCellId: firstCell.id, endCellId: lastCell.id });
   }
@@ -228,6 +282,11 @@ export function useGridSelectionGestures(options: UseGridSelectionGesturesOption
     const range = event.shiftKey
       ? { startCellId: options.selectedRange.value?.startCellId ?? createCellId(rowId, columnId), endCellId: targetCell.id }
       : { startCellId: targetCell.id, endCellId: targetCell.id };
+    // Arrow-key navigation (with or without Shift) collapses the
+    // selection to a single contiguous rectangle, matching Excel /
+    // Sheets behaviour where keyboard motion ends a Ctrl+click
+    // multi-selection.
+    options.onClearAdditionalRanges();
     options.onSelect(targetCell, getCellAddress(options.projection.value, targetRow.id, targetColumn.id));
     options.onSelectRange(range);
     void focusCell(targetCell.id);

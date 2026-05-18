@@ -72,20 +72,30 @@ export interface GridClipboardRange {
   endCol: number;
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   worksheet: Worksheet;
   projection: GridProjection;
   selectedCellId: string | null;
   selectedRange: CellSelectionRange | null;
+  /**
+   * Disjoint extra ranges accumulated by Ctrl/Meta+click multi-selection.
+   * Defaults to an empty array so consumers that do not (yet) plumb the
+   * multi-range state through still work unchanged.
+   */
+  additionalRanges?: CellSelectionRange[];
   clipboardRange: GridClipboardRange | null;
   highlightedCellIds: string[];
   readonly: boolean;
   locale: string;
-}>();
+}>(), {
+  additionalRanges: () => [],
+});
 
 const emit = defineEmits<{
   select: [cell: Cell, address: string];
   "select-range": [range: CellSelectionRange];
+  "add-range": [range: CellSelectionRange];
+  "clear-additional-ranges": [];
   commit: [cell: Cell, rawValue: string];
   "request-help": [payload: { anchorEl: HTMLElement; draft: string; caretPos: number }];
   "edit-state": [payload: { editing: boolean; draft: string }];
@@ -106,6 +116,7 @@ const worksheetRef = toRef(props, "worksheet");
 const projectionRef = toRef(props, "projection");
 const selectedCellIdRef = toRef(props, "selectedCellId");
 const selectedRangeRef = toRef(props, "selectedRange");
+const additionalRangesRef = toRef(props, "additionalRanges");
 const localeRef = toRef(props, "locale");
 const readonlyRef = toRef(props, "readonly");
 
@@ -151,6 +162,7 @@ const {
   projection: projectionRef,
   selectedCellId: selectedCellIdRef,
   selectedRange: selectedRangeRef,
+  additionalRanges: additionalRangesRef,
   readonly: readonlyRef,
   editingCellId,
   editDraft,
@@ -160,6 +172,8 @@ const {
   startEditing,
   onSelect: (cell, address) => emit("select", cell, address),
   onSelectRange: (range) => emit("select-range", range),
+  onAddRange: (range) => emit("add-range", range),
+  onClearAdditionalRanges: () => emit("clear-additional-ranges"),
   onCellContext: (payload) => emit("cell-context", payload),
 });
 

@@ -2,14 +2,21 @@
  * Selection state for the spreadsheet grid.
  *
  * Owns the single "active cell" (`selectedCellId`) and the optional
- * rectangular `selectedRange` used by multi-cell actions like Copy or
- * Format. Selection is addressed by stable cell ids; visible `A1`-style
- * addresses are derived from the current {@link GridProjection} on the fly.
+ * primary rectangular `selectedRange` used by multi-cell actions like
+ * Copy or Format, plus an array of disjoint `additionalRanges` produced
+ * by Ctrl/Meta+click multi-selection. Selection is addressed by stable
+ * cell ids; visible `A1`-style addresses are derived from the current
+ * {@link GridProjection} on the fly.
+ *
+ * `selectedCells` returns the deduplicated union of cells across the
+ * primary and additional ranges, so style/format operations that iterate
+ * the selection naturally cover the whole multi-range selection.
  *
  * The composable also guarantees the selection stays valid as the
  * underlying worksheet changes: when the active worksheet or its projection
  * is replaced, the selection is either kept (if it still maps to a visible
- * cell) or snapped to the top-left cell of the new projection.
+ * cell) or snapped to the top-left cell of the new projection, and the
+ * additional ranges are dropped because their cells may no longer exist.
  */
 import { computed, ref, watch, type Ref } from "vue";
 import { createCellId, type Cell, type Worksheet } from "@/features/document/lib/teamgridDocument";
@@ -30,7 +37,28 @@ export function useSelection(options: UseSelectionOptions) {
   const { activeWorksheet, projection } = options;
   const selectedCellId = ref<string | null>(null);
   const selectedRange = ref<CellSelectionRange | null>(null);
+  /**
+   * Extra disjoint ranges produced by Ctrl/Meta+click multi-selection.
+   * The primary `selectedRange` always owns the active cell; everything
+   * else lives here so callers that only care about the active rectangle
+   * (e.g. clipboard) keep working unchanged.
+   */
+  const additionalRanges = ref<CellSelectionRange[]>([]);
   const selectedCellAddress = ref("");
+
+  /**
+   * Primary range followed by additional ranges. Used by anything that
+   * needs to iterate every selected rectangle (highlighting, format
+   * dialog application, etc.).
+   */
+  const allSelectedRanges = computed<CellSelectionRange[]>(() => {
+    const ranges: CellSelectionRange[] = [];
+    if (selectedRange.value) {
+      ranges.push(selectedRange.value);
+    }
+    ranges.push(...additionalRanges.value);
+    return ranges;
+  });
 
   /**
    * Persisted cell record for {@link selectedCellId}. Returns `null` when
@@ -53,8 +81,30 @@ export function useSelection(options: UseSelectionOptions) {
     return activeWorksheet.value.cellsById[selectedCellId.value] ?? null;
   });
 
-  /** All cells covered by the current selection, or the single active cell. */
-  const selectedCells = computed(() => cellsForRange(selectedRange.value).map(({ cell }) => cell));
+  /**
+   * All cells covered by the current selection.
+   *
+   * Returns the deduplicated union of cells across the primary range and
+   * any additional Ctrl/Meta+click ranges. Falls back to the single
+   * active cell when no range is set.
+   */
+  const selectedCells = computed(() => {
+    if (allSelectedRanges.value.length === 0) {
+      return cellsForRange(null).map(({ cell }) => cell);
+    }
+    const seenIds = new Set<string>();
+    const cells: Cell[] = [];
+    for (const range of allSelectedRanges.value) {
+      for (const { cell } of cellsForRange(range)) {
+        if (seenIds.has(cell.id)) {
+          continue;
+        }
+        seenIds.add(cell.id);
+        cells.push(cell);
+      }
+    }
+    return cells;
+  });
 
   /** Convenience flag used to gate selection-dependent menu commands. */
   const hasSelection = computed(() => selectedCells.value.length > 0);
@@ -124,10 +174,23 @@ export function useSelection(options: UseSelectionOptions) {
       if (!activeWorksheet.value || !projection.value) {
         selectedCellId.value = null;
         selectedRange.value = null;
+        additionalRanges.value = [];
         selectedCellAddress.value = "";
         return;
       }
       if (selectedCellId.value && findCellCoordinates(selectedCellId.value)) {
+        // Selection still maps to a visible cell; just prune any extra
+        // Ctrl/Meta+click sub-ranges whose endpoints no longer resolve
+        // (e.g. their row or column was deleted). Surviving sub-ranges
+        // are kept so a row-insert from a collaborator does not wipe
+        // the user's multi-selection.
+        if (additionalRanges.value.length > 0) {
+          const pruned = additionalRanges.value.filter((range) =>
+            findCellCoordinates(range.startCellId) && findCellCoordinates(range.endCellId));
+          if (pruned.length !== additionalRanges.value.length) {
+            additionalRanges.value = pruned;
+          }
+        }
         return;
       }
       const firstRow = projection.value.rows[0];
@@ -135,12 +198,14 @@ export function useSelection(options: UseSelectionOptions) {
       if (!firstRow || !firstColumn) {
         selectedCellId.value = null;
         selectedRange.value = null;
+        additionalRanges.value = [];
         selectedCellAddress.value = "";
         return;
       }
       const cell = getCell(activeWorksheet.value, firstRow.id, firstColumn.id);
       selectedCellId.value = cell.id;
       selectedRange.value = { startCellId: cell.id, endCellId: cell.id };
+      additionalRanges.value = [];
       selectedCellAddress.value = projection.value.cellAddressById.get(cell.id) ?? "";
     },
   );
@@ -148,6 +213,8 @@ export function useSelection(options: UseSelectionOptions) {
   return {
     selectedCellId,
     selectedRange,
+    additionalRanges,
+    allSelectedRanges,
     selectedCellAddress,
     selectedCell,
     selectedCells,

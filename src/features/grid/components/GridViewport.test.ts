@@ -79,6 +79,92 @@ describe("GridViewport cell context menu", () => {
   });
 });
 
+describe("GridViewport mouse range selection", () => {
+  it("extends the selection from the active cell when shift+clicking another cell", async () => {
+    const { wrapper, firstCellId, secondRowSecondCellId } = mountGrid();
+
+    await wrapper.find(`[data-test-cell-id="${secondRowSecondCellId}"]`).trigger("mousedown", { button: 0, shiftKey: true });
+
+    expect(wrapper.emitted("select")!.at(-1)?.[0]).toMatchObject({ id: secondRowSecondCellId });
+    expect(wrapper.emitted("select-range")!.at(-1)?.[0]).toEqual({
+      startCellId: firstCellId,
+      endCellId: secondRowSecondCellId,
+    });
+  });
+
+  it("keeps the original range anchor when shift+clicking after an existing range", async () => {
+    const { wrapper, firstCellId, secondCellId, secondRowSecondCellId } = mountGrid();
+    await wrapper.setProps({
+      selectedCellId: secondCellId,
+      selectedRange: { startCellId: firstCellId, endCellId: secondCellId },
+    });
+
+    await wrapper.find(`[data-test-cell-id="${secondRowSecondCellId}"]`).trigger("mousedown", { button: 0, shiftKey: true });
+
+    expect(wrapper.emitted("select-range")!.at(-1)?.[0]).toEqual({
+      startCellId: firstCellId,
+      endCellId: secondRowSecondCellId,
+    });
+  });
+
+  it("pushes the prior range onto additional ranges when ctrl+clicking another cell", async () => {
+    const { wrapper, firstCellId, secondRowSecondCellId } = mountGrid();
+
+    await wrapper.find(`[data-test-cell-id="${secondRowSecondCellId}"]`).trigger("mousedown", { button: 0, ctrlKey: true });
+
+    expect(wrapper.emitted("add-range")!.at(-1)?.[0]).toEqual({
+      startCellId: firstCellId,
+      endCellId: firstCellId,
+    });
+    expect(wrapper.emitted("select")!.at(-1)?.[0]).toMatchObject({ id: secondRowSecondCellId });
+    expect(wrapper.emitted("select-range")!.at(-1)?.[0]).toEqual({
+      startCellId: secondRowSecondCellId,
+      endCellId: secondRowSecondCellId,
+    });
+    expect(wrapper.emitted("clear-additional-ranges")).toBeUndefined();
+  });
+
+  it("treats meta+click the same as ctrl+click for macOS users", async () => {
+    const { wrapper, firstCellId, secondRowSecondCellId } = mountGrid();
+
+    await wrapper.find(`[data-test-cell-id="${secondRowSecondCellId}"]`).trigger("mousedown", { button: 0, metaKey: true });
+
+    expect(wrapper.emitted("add-range")!.at(-1)?.[0]).toEqual({
+      startCellId: firstCellId,
+      endCellId: firstCellId,
+    });
+    expect(wrapper.emitted("select-range")!.at(-1)?.[0]).toEqual({
+      startCellId: secondRowSecondCellId,
+      endCellId: secondRowSecondCellId,
+    });
+  });
+
+  it("highlights cells in additional ranges alongside the primary range", async () => {
+    const { wrapper, firstCellId, secondRowSecondCellId } = mountGrid();
+
+    await wrapper.setProps({
+      additionalRanges: [{ startCellId: firstCellId, endCellId: firstCellId }],
+      selectedCellId: secondRowSecondCellId,
+      selectedRange: { startCellId: secondRowSecondCellId, endCellId: secondRowSecondCellId },
+    });
+
+    expect(wrapper.find(`[data-test-cell-id="${firstCellId}"]`).classes()).toContain("grid-cell--range-selected");
+    expect(wrapper.find(`[data-test-cell-id="${secondRowSecondCellId}"]`).classes()).toContain("grid-cell--range-selected");
+  });
+
+  it("clears the additional ranges on a plain click", async () => {
+    const { wrapper, firstCellId, secondCellId } = mountGrid();
+    await wrapper.setProps({
+      additionalRanges: [{ startCellId: firstCellId, endCellId: firstCellId }],
+    });
+
+    await wrapper.find(`[data-test-cell-id="${secondCellId}"]`).trigger("mousedown", { button: 0 });
+
+    expect(wrapper.emitted("clear-additional-ranges")).toHaveLength(1);
+    expect(wrapper.emitted("add-range")).toBeUndefined();
+  });
+});
+
 describe("GridViewport keyboard selection", () => {
   it("moves the selected cell with arrow keys", async () => {
     const { wrapper, firstCellId, secondCellId } = mountGrid();

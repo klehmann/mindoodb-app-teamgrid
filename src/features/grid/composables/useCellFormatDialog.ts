@@ -59,13 +59,19 @@ export interface UseCellFormatDialogOptions {
   activeWorksheet: Readonly<Ref<Worksheet | null>>;
   selectedCell: Readonly<Ref<Cell | null>>;
   selectedRange: Ref<CellSelectionRange | null>;
+  /**
+   * Primary range followed by any disjoint Ctrl/Meta+click ranges. Used
+   * to apply formats across every sub-rectangle while keeping border
+   * presets (outline / inside) anchored to each sub-rectangle's bounds.
+   */
+  allSelectedRanges: Readonly<Ref<CellSelectionRange[]>>;
   selectedCells: Readonly<Ref<Cell[]>>;
   cellsForRange: (range: CellSelectionRange | null) => CellsWithCoordinates[];
   boundsForRange: (range: CellSelectionRange | null) => RangeBounds | null;
 }
 
 export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
-  const { app, activeWorksheet, selectedCell, selectedRange, selectedCells, cellsForRange, boundsForRange } = options;
+  const { app, activeWorksheet, selectedCell, selectedRange, allSelectedRanges, selectedCells, cellsForRange, boundsForRange } = options;
 
   const formatDialogVisible = ref(false);
   const formatDialogTab = ref<FormatDialogTab>("cellType");
@@ -140,34 +146,48 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
     return { kind: formatDialogKind.value };
   }
 
-  /** Apply the chosen value and style format to every selected cell. */
+  /**
+   * Apply the chosen value and style format to every selected cell.
+   *
+   * Iterates each sub-range (primary + any Ctrl/Meta+click extras)
+   * separately so border presets like "Outline" or "Inside" anchor to
+   * each rectangle's bounds. Cells that appear in more than one
+   * sub-range are formatted only once.
+   */
   function applySelectedCellFormat() {
     if (!activeWorksheet.value || app.gridReadOnly.value || selectedCells.value.length === 0) {
       formatDialogVisible.value = false;
       return;
     }
     const request = currentCellFormatRequest();
-    const range = selectedRange.value;
-    const cellsToFormat = cellsForRange(range);
+    const rangesToFormat = currentRanges();
     const locale = app.activeGrid.value?.settings.locale ?? "en-US";
     app.updateGrid((grid) => {
       const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
       const operations: TeamGridOperation[] = [];
       const patchedCells: Cell[] = [];
-      const bounds = boundsForRange(range);
-      for (const { cell, rowIndex, columnIndex } of cellsToFormat) {
-        const existing = worksheet.cellsById[cell.id] ?? cell;
-        const formatted = applyCellFormat(existing, request, locale);
-        const stylePatch = formatDialogStylePatchForCell(rowIndex, columnIndex, bounds);
-        const nextStyle = applyCellStylePatch(formatted.style, stylePatch);
-        const nextCell: Cell = { ...formatted };
-        if (nextStyle) {
-          nextCell.style = nextStyle;
-        } else {
-          delete nextCell.style;
+      const patchedCellIds = new Set<string>();
+      for (const subRange of rangesToFormat) {
+        const cellsToFormat = cellsForRange(subRange);
+        const bounds = boundsForRange(subRange);
+        for (const { cell, rowIndex, columnIndex } of cellsToFormat) {
+          if (patchedCellIds.has(cell.id)) {
+            continue;
+          }
+          patchedCellIds.add(cell.id);
+          const existing = worksheet.cellsById[cell.id] ?? cell;
+          const formatted = applyCellFormat(existing, request, locale);
+          const stylePatch = formatDialogStylePatchForCell(rowIndex, columnIndex, bounds);
+          const nextStyle = applyCellStylePatch(formatted.style, stylePatch);
+          const nextCell: Cell = { ...formatted };
+          if (nextStyle) {
+            nextCell.style = nextStyle;
+          } else {
+            delete nextCell.style;
+          }
+          worksheet.cellsById[nextCell.id] = nextCell;
+          patchedCells.push(nextCell);
         }
-        worksheet.cellsById[nextCell.id] = nextCell;
-        patchedCells.push(nextCell);
       }
       operations.push({ type: "setCellsStyle", worksheetId: worksheet.id, cells: patchedCells, style: {} });
       return operations;
@@ -176,7 +196,23 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
   }
 
   /**
-   * Apply a partial style patch to every cell in the current selection.
+   * Resolve which ranges the current dialog should touch. Falls back to
+   * the active cell when nothing is selected so toolbar-driven patches
+   * still affect at least one cell.
+   */
+  function currentRanges(): CellSelectionRange[] {
+    if (allSelectedRanges.value.length > 0) {
+      return allSelectedRanges.value;
+    }
+    if (selectedCell.value) {
+      return [{ startCellId: selectedCell.value.id, endCellId: selectedCell.value.id }];
+    }
+    return [];
+  }
+
+  /**
+   * Apply a partial style patch to every cell in the current selection,
+   * including any Ctrl/Meta+click extra ranges.
    *
    * The patch is shallow-merged onto each cell so callers can, for example,
    * change only `fontWeight` without losing previously set `backgroundColor`.
@@ -185,13 +221,30 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
    * compact and Automerge sees one logical edit per selection.
    */
   function patchSelectedStyle(style: CellStylePatch) {
-    patchCellsStyle(selectedRange.value, style);
+    if (!activeWorksheet.value || app.gridReadOnly.value) return;
+    const rangesToPatch = currentRanges();
+    if (rangesToPatch.length === 0) return;
+    const seenIds = new Set<string>();
+    const cellsToPatch: Cell[] = [];
+    for (const subRange of rangesToPatch) {
+      for (const { cell } of cellsForRange(subRange)) {
+        if (seenIds.has(cell.id)) continue;
+        seenIds.add(cell.id);
+        cellsToPatch.push(cell);
+      }
+    }
+    if (cellsToPatch.length === 0) return;
+    runStylePatch(cellsToPatch, style);
   }
 
   function patchCellsStyle(range: CellSelectionRange | null, style: CellStylePatch) {
     if (!activeWorksheet.value || app.gridReadOnly.value) return;
     const cellsToPatch = cellsForRange(range).map(({ cell }) => cell);
     if (cellsToPatch.length === 0) return;
+    runStylePatch(cellsToPatch, style);
+  }
+
+  function runStylePatch(cellsToPatch: Cell[], style: CellStylePatch) {
     app.updateGrid((grid) => {
       const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
       const patchedCells: Cell[] = [];

@@ -116,6 +116,8 @@ const locale = computed(() => app.activeGrid.value?.settings.locale);
 const {
   selectedCellId,
   selectedRange,
+  additionalRanges,
+  allSelectedRanges,
   selectedCellAddress,
   selectedCell,
   selectedCells,
@@ -180,6 +182,7 @@ const formatDialog = useCellFormatDialog({
   activeWorksheet,
   selectedCell,
   selectedRange,
+  allSelectedRanges,
   selectedCells,
   cellsForRange,
   boundsForRange,
@@ -457,7 +460,15 @@ function handleRevisionSelect(revisionId: string) {
  * The branch matters: while the user is actively editing a formula that
  * starts with `=`, clicking another cell appends its address to the draft
  * (Excel-style formula picking). Otherwise it leaves formula-edit mode
- * and makes the clicked cell the new selection.
+ * and makes the clicked cell the new active cell.
+ *
+ * The selection range is **not** touched here. Every gesture path in
+ * `useGridSelectionGestures` emits a `select-range` alongside its
+ * `select`, so by the time we get here the range is already correct
+ * (e.g. `A:F` for shift+click, `{F,F}` for a plain click, the same
+ * multi-cell range from before when keyboard-edit starts). Clobbering
+ * the range to `{cell, cell}` here would silently collapse a freshly
+ * extended shift+click range.
  */
 function selectCell(cell: Cell, address: string) {
   if (
@@ -473,7 +484,6 @@ function selectCell(cell: Cell, address: string) {
   formulaEditing.value = false;
   formulaAssistOpen.value = false;
   selectedCellId.value = cell.id;
-  selectedRange.value = { startCellId: cell.id, endCellId: cell.id };
   selectedCellAddress.value = address;
 }
 
@@ -491,6 +501,29 @@ function selectRange(range: CellSelectionRange) {
   selectedRange.value = range;
 }
 
+/**
+ * Append a Ctrl/Meta+click sub-range to the disjoint extra-selection
+ * list, keeping the primary `selectedRange` free for the freshly clicked
+ * cell. Skipped during formula editing for the same reason as
+ * {@link selectRange}.
+ */
+function addRange(range: CellSelectionRange) {
+  if (formulaEditing.value) {
+    return;
+  }
+  additionalRanges.value = [...additionalRanges.value, range];
+}
+
+/** Drop every Ctrl/Meta+click sub-range; the primary range stays untouched. */
+function clearAdditionalRanges() {
+  if (formulaEditing.value) {
+    return;
+  }
+  if (additionalRanges.value.length > 0) {
+    additionalRanges.value = [];
+  }
+}
+
 /** Open the cell context menu, preserving an existing range when right-clicked inside it. */
 function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: string; range: CellSelectionRange }) {
   if (!selectedRange.value || selectedRange.value.startCellId !== payload.range.startCellId || selectedRange.value.endCellId !== payload.range.endCellId) {
@@ -499,6 +532,7 @@ function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: 
     selectedCellId.value = payload.cell.id;
     selectedCellAddress.value = payload.address;
     selectedRange.value = payload.range;
+    additionalRanges.value = [];
   }
   cellContextRange.value = payload.range;
   cellContextMenu.value?.show(payload.event);
@@ -739,12 +773,15 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
           :projection="projection"
           :selected-cell-id="selectedCellId"
           :selected-range="selectedRange"
+          :additional-ranges="additionalRanges"
           :clipboard-range="clipboardSourceRange"
           :highlighted-cell-ids="highlightedCellIds"
           :readonly="app.gridReadOnly.value"
           :locale="app.activeGrid.value.settings.locale"
           @select="selectCell"
           @select-range="selectRange"
+          @add-range="addRange"
+          @clear-additional-ranges="clearAdditionalRanges"
           @commit="commitCell"
           @cell-context="openCellContextMenu"
           @request-help="openFormulaAssist('inlineCell', $event)"
