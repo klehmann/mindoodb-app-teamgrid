@@ -26,6 +26,8 @@ describe("Teamgrid XLSX import", () => {
     worksheet.getCell("A1").alignment = {
       horizontal: "center",
       vertical: "bottom",
+      wrapText: true,
+      indent: 3,
     };
     worksheet.getCell("A1").border = {
       top: { style: "thin", color: { argb: "FFEEF2FF" } },
@@ -67,6 +69,8 @@ describe("Teamgrid XLSX import", () => {
       backgroundColor: "#111827",
       horizontalAlign: "center",
       verticalAlign: "bottom",
+      wrapText: true,
+      indent: 3,
       borders: {
         top: { style: "thin", color: "#eef2ff" },
         bottom: { style: "double", color: "#111827" },

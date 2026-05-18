@@ -80,12 +80,19 @@ const {
   formatDialogBorderStyle,
   formatDialogBorderColor,
   formatDialogBorders,
+  formatDialogHorizontalAlign,
+  formatDialogVerticalAlign,
+  formatDialogIndent,
+  formatDialogWrapText,
   applySelectedCellFormat,
   updateCustomBordersFromLineSelection,
   toggleFormatDialogBorder,
   setFormatDialogBorderPreset,
   currentDialogBorderCss,
 } = props.controller;
+
+/** Indent applies only when horizontal alignment is Left or Right. */
+const indentEnabled = computed(() => formatDialogHorizontalAlign.value === "left" || formatDialogHorizontalAlign.value === "right");
 
 /**
  * Two-way bridge between the editable size Select (which can hold a string
@@ -111,6 +118,7 @@ const fontSizeModel = computed<number | string>({
     <div class="cell-format-dialog">
       <div class="cell-format-dialog__tabs" role="tablist" aria-label="Format cells sections">
         <button type="button" :class="{ 'cell-format-dialog__tab--active': formatDialogTab === 'cellType' }" @click="formatDialogTab = 'cellType'">Cell type</button>
+        <button type="button" :class="{ 'cell-format-dialog__tab--active': formatDialogTab === 'alignment' }" @click="formatDialogTab = 'alignment'">Alignment</button>
         <button type="button" :class="{ 'cell-format-dialog__tab--active': formatDialogTab === 'font' }" @click="formatDialogTab = 'font'">Font</button>
         <button type="button" :class="{ 'cell-format-dialog__tab--active': formatDialogTab === 'fill' }" @click="formatDialogTab = 'fill'">Fill</button>
         <button type="button" :class="{ 'cell-format-dialog__tab--active': formatDialogTab === 'border' }" @click="formatDialogTab = 'border'">Border</button>
@@ -148,6 +156,42 @@ const fontSizeModel = computed<number | string>({
           >
         </label>
         <p class="cell-format-dialog__hint">Numeric-looking text is converted for number, percent, and currency formats; incompatible values are left unchanged.</p>
+      </section>
+
+      <section v-else-if="formatDialogTab === 'alignment'" class="cell-format-dialog__panel cell-format-dialog__grid">
+        <label class="field">
+          Horizontal alignment
+          <select v-model="formatDialogHorizontalAlign" class="native-input">
+            <option value="general">General</option>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+          </select>
+        </label>
+        <label class="field">
+          Vertical alignment
+          <select v-model="formatDialogVerticalAlign" class="native-input">
+            <option value="top">Top</option>
+            <option value="middle">Middle</option>
+            <option value="bottom">Bottom</option>
+          </select>
+        </label>
+        <label class="field">
+          Indent
+          <input
+            v-model.number="formatDialogIndent"
+            class="native-input"
+            type="number"
+            min="0"
+            max="15"
+            step="1"
+            :disabled="!indentEnabled"
+          >
+        </label>
+        <div class="cell-format-dialog__checks">
+          <label><input v-model="formatDialogWrapText" type="checkbox"> Wrap text</label>
+        </div>
+        <p class="cell-format-dialog__hint">"General" right-aligns numbers and dates and left-aligns text, the same way Excel's default does. Indent only applies to Left or Right alignment. Wrap text shows multi-line content (Alt+Enter) and long values on multiple lines within the cell instead of letting them spill into empty neighbours.</p>
       </section>
 
       <section v-else-if="formatDialogTab === 'font'" class="cell-format-dialog__panel cell-format-dialog__grid">
@@ -258,6 +302,16 @@ const fontSizeModel = computed<number | string>({
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
+}
+
+/*
+ * When a hint sits inside the auto-fit grid panel (Alignment, Font, Fill)
+ * it would otherwise be slotted into a single grid column. Force it to
+ * span the entire row so the explanatory copy reads naturally below the
+ * controls instead of wrapping into a narrow column.
+ */
+.cell-format-dialog__grid > .cell-format-dialog__hint {
+  grid-column: 1 / -1;
 }
 
 .cell-format-dialog__tabs {

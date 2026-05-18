@@ -41,6 +41,8 @@ describe("Teamgrid XLSX export", () => {
     expect(worksheet!.getCell("A1").alignment).toMatchObject({
       horizontal: "center",
       vertical: "bottom",
+      wrapText: true,
+      indent: 2,
     });
     expect(worksheet!.getCell("A1").border).toMatchObject({
       top: { style: "thin", color: { argb: "FFEEF2FF" } },
@@ -86,6 +88,8 @@ function createExportFixture() {
     style: {
       textColor: "#eef2ff",
       fontSize: 16,
+      wrapText: true,
+      indent: 2,
       borders: {
         top: { style: "thin", color: "#eef2ff" },
         bottom: { style: "double", color: "#111827" },

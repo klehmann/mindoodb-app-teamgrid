@@ -12,14 +12,14 @@ describe("GridViewport inline editing", () => {
     const { wrapper, firstCellId, secondCellId } = mountGrid();
 
     await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "a" });
-    expect(wrapper.find("input.grid-cell__editor").exists()).toBe(true);
+    expect(wrapper.find("textarea.grid-cell__editor").exists()).toBe(true);
 
     await wrapper.find(`[data-test-cell-id="${secondCellId}"]`).trigger("mousedown", { button: 0 });
 
     expect(wrapper.emitted("commit")).toHaveLength(1);
     expect(wrapper.emitted("commit")![0][1]).toBe("a");
     expect(wrapper.emitted("select")!.at(-1)?.[0]).toMatchObject({ id: secondCellId });
-    expect(wrapper.find("input.grid-cell__editor").exists()).toBe(false);
+    expect(wrapper.find("textarea.grid-cell__editor").exists()).toBe(false);
   });
 
   it("keeps formula picking active when clicking another cell during formula edit", async () => {
@@ -29,21 +29,21 @@ describe("GridViewport inline editing", () => {
     await wrapper.find(`[data-test-cell-id="${secondCellId}"]`).trigger("mousedown", { button: 0 });
 
     expect(wrapper.emitted("commit")).toBeUndefined();
-    expect((wrapper.find("input.grid-cell__editor").element as HTMLInputElement).value).toBe("=B1");
+    expect((wrapper.find("textarea.grid-cell__editor").element as HTMLTextAreaElement).value).toBe("=B1");
   });
 
   it("flushes an active inline edit for toolbar save actions", async () => {
     const { wrapper, firstCellId } = mountGrid();
 
     await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "a" });
-    await wrapper.find("input.grid-cell__editor").setValue("saved draft");
+    await wrapper.find("textarea.grid-cell__editor").setValue("saved draft");
 
     expect((wrapper.vm as unknown as { flushPendingEdit: () => boolean }).flushPendingEdit()).toBe(true);
 
     expect(wrapper.emitted("commit")).toHaveLength(1);
     expect(wrapper.emitted("commit")![0][1]).toBe("saved draft");
     await nextTick();
-    expect(wrapper.find("input.grid-cell__editor").exists()).toBe(false);
+    expect(wrapper.find("textarea.grid-cell__editor").exists()).toBe(false);
   });
 });
 
@@ -408,7 +408,7 @@ describe("GridViewport editor navigation", () => {
     const { wrapper, firstCellId, secondRowFirstCellId } = mountGrid();
 
     await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "a" });
-    const input = wrapper.find("input.grid-cell__editor");
+    const input = wrapper.find("textarea.grid-cell__editor");
     await input.setValue("entered");
     await input.trigger("keydown", { key: "Enter" });
 
@@ -425,7 +425,7 @@ describe("GridViewport editor navigation", () => {
     const { wrapper, firstCellId, secondCellId } = mountGrid();
 
     await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "a" });
-    const input = wrapper.find("input.grid-cell__editor");
+    const input = wrapper.find("textarea.grid-cell__editor");
     await input.setValue("tabbed");
     await input.trigger("keydown", { key: "Tab" });
 
@@ -446,7 +446,7 @@ describe("GridViewport editor navigation", () => {
     });
 
     await wrapper.find(`[data-test-cell-id="${secondRowFirstCellId}"]`).trigger("keydown", { key: "a" });
-    const input = wrapper.find("input.grid-cell__editor");
+    const input = wrapper.find("textarea.grid-cell__editor");
     await input.setValue("shift-enter");
     await input.trigger("keydown", { key: "Enter", shiftKey: true });
 
@@ -462,12 +462,52 @@ describe("GridViewport editor navigation", () => {
     });
 
     await wrapper.find(`[data-test-cell-id="${secondCellId}"]`).trigger("keydown", { key: "a" });
-    const input = wrapper.find("input.grid-cell__editor");
+    const input = wrapper.find("textarea.grid-cell__editor");
     await input.setValue("shift-tab");
     await input.trigger("keydown", { key: "Tab", shiftKey: true });
 
     expect(wrapper.emitted("commit")![0][1]).toBe("shift-tab");
     expect(wrapper.emitted("select")!.at(-1)?.[0]).toMatchObject({ id: firstCellId });
+  });
+
+  it("inserts a newline at the caret on Alt+Enter without committing", async () => {
+    const { wrapper, firstCellId } = mountGrid();
+
+    await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "a" });
+    const input = wrapper.find("textarea.grid-cell__editor");
+    await input.setValue("Line 1");
+
+    const inputEl = input.element as HTMLTextAreaElement;
+    inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+    await input.trigger("keydown", { key: "Enter", altKey: true });
+
+    expect(wrapper.emitted("commit")).toBeUndefined();
+    expect(wrapper.find("textarea.grid-cell__editor").exists()).toBe(true);
+    await input.setValue(`${(input.element as HTMLTextAreaElement).value}Line 2`);
+
+    await input.trigger("keydown", { key: "Enter" });
+    expect(wrapper.emitted("commit")).toHaveLength(1);
+    expect(wrapper.emitted("commit")![0][1]).toBe("Line 1\nLine 2");
+  });
+
+  it("does not commit or block caret placement when clicking inside the active editor", async () => {
+    const { wrapper, firstCellId } = mountGrid();
+
+    await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "a" });
+    const input = wrapper.find("textarea.grid-cell__editor");
+    await input.setValue("hello world");
+
+    // Mousedowns originating from the textarea (target === textarea, not
+    // the parent <td>) must not be intercepted by the cell's range
+    // selection handler. Otherwise the browser's default caret /
+    // text-selection behaviour on the textarea is preventDefault-ed and
+    // the user cannot click inside the editor to reposition the caret.
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 });
+    (input.element as HTMLTextAreaElement).dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(wrapper.emitted("commit")).toBeUndefined();
+    expect(wrapper.find("textarea.grid-cell__editor").exists()).toBe(true);
   });
 });
 

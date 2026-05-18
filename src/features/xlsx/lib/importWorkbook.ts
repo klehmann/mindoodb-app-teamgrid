@@ -277,6 +277,12 @@ function excelStyleToCellStyle(cell: ExcelJS.Cell): CellStyle | undefined {
   if (cell.alignment?.vertical && isSupportedVerticalAlign(cell.alignment.vertical)) {
     style.verticalAlign = cell.alignment.vertical === "middle" ? "middle" : cell.alignment.vertical;
   }
+  if (cell.alignment?.wrapText) {
+    style.wrapText = true;
+  }
+  if (typeof cell.alignment?.indent === "number" && cell.alignment.indent > 0) {
+    style.indent = Math.min(15, Math.max(0, Math.round(cell.alignment.indent)));
+  }
   const borders = readBorders(cell.border);
   if (borders) {
     style.borders = borders;

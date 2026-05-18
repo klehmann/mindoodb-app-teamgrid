@@ -37,8 +37,8 @@
  *   Used by toolbar actions to make sure the user's typing reaches the
  *   document before another operation runs.
  */
-import { computed, toRef } from "vue";
-import { cssFontFamily, mergeCellStyle } from "@/features/grid/lib/cellFormatting";
+import { computed, nextTick, ref, toRef, watch, type CSSProperties } from "vue";
+import { cssFontFamily, effectiveHorizontalAlign, indentPaddingRem, mergeCellStyle } from "@/features/grid/lib/cellFormatting";
 import { getCell, type GridProjection } from "@/features/grid/lib/gridProjection";
 import {
   type Cell,
@@ -57,7 +57,6 @@ import {
 } from "@/features/grid/composables/useColumnRowResize";
 import { useGridClipboardBridge } from "@/features/grid/composables/useGridClipboardBridge";
 import type { CellSelectionRange } from "@/features/grid/composables/useSelection";
-import { ref } from "vue";
 
 /**
  * Coordinate range used to draw the clipboard source marquee ("marching
@@ -209,6 +208,41 @@ const {
 
 const highlighted = computed(() => new Set(props.highlightedCellIds));
 
+/**
+ * Forward keystrokes into the inline editor draft and grow the
+ * textarea to fit its content, so Alt+Enter line breaks expand the
+ * cell vertically the way Excel does instead of being clipped by the
+ * default single-row height.
+ */
+function onEditorInput(event: Event, cell: Cell) {
+  const target = event.target as HTMLTextAreaElement;
+  updateEditDraft(target.value);
+  autoGrowEditor(target);
+  void cell;
+}
+
+/** Resize a textarea so its rendered height matches its content. */
+function autoGrowEditor(target: HTMLTextAreaElement | HTMLInputElement | null) {
+  if (!(target instanceof HTMLTextAreaElement)) {
+    return;
+  }
+  target.style.height = "auto";
+  target.style.height = `${target.scrollHeight}px`;
+}
+
+// When the editor mounts (i.e. the user starts editing) the textarea
+// is initialised with the draft string; we measure its scrollHeight on
+// the next tick so multi-line drafts loaded from a date or formula
+// source open at their natural height instead of a single-row stub.
+watch(editingCellId, async (next) => {
+  if (!next) {
+    return;
+  }
+  await nextTick();
+  const el = Array.isArray(editorInputEl.value) ? editorInputEl.value[0] : editorInputEl.value;
+  autoGrowEditor(el ?? null);
+});
+
 // Style derivation: cell styling cascades row default -> column default
 // -> per-cell override (see `mergeCellStyle`). Keeping that merge here
 // means the grid never has to flatten styles into every cell at write
@@ -216,6 +250,7 @@ const highlighted = computed(() => new Set(props.highlightedCellIds));
 
 function cellStyle(cell: Cell) {
   const mergedStyle = mergeCellStyle(props.worksheet.rowsById[cell.rowId], props.worksheet.columnsById[cell.columnId], cell);
+  const resolvedHorizontal = effectiveHorizontalAlign(cell, mergedStyle.horizontalAlign);
   return {
     color: mergedStyle.textColor,
     backgroundColor: mergedStyle.backgroundColor,
@@ -224,7 +259,7 @@ function cellStyle(cell: Cell) {
     fontWeight: mergedStyle.bold ? "700" : undefined,
     fontStyle: mergedStyle.italic ? "italic" : undefined,
     textDecoration: mergedStyle.underline ? "underline" : undefined,
-    textAlign: mergedStyle.horizontalAlign,
+    textAlign: resolvedHorizontal,
     verticalAlign: mergedStyle.verticalAlign,
   };
 }
@@ -262,12 +297,24 @@ function cssBorder(border: CellBorder | undefined) {
   return `${width} ${lineStyle} ${border.color ?? "currentColor"}`;
 }
 
-function cellDisplayStyle(cell: Cell) {
+function cellDisplayStyle(cell: Cell): CSSProperties {
   const mergedStyle = mergeCellStyle(props.worksheet.rowsById[cell.rowId], props.worksheet.columnsById[cell.columnId], cell);
+  const resolvedHorizontal = effectiveHorizontalAlign(cell, mergedStyle.horizontalAlign);
+  const wrap = Boolean(mergedStyle.wrapText);
+  const indent = indentPaddingRem(mergedStyle.indent);
+  // Wrapping cells need their own column width so the line break point
+  // is deterministic. Non-wrapping cells keep the Excel-style "spill
+  // into the empty neighbour" behaviour driven by `cellOverflowWidth`.
+  const ownWidth = props.worksheet.columnsById[cell.columnId]?.width ?? MIN_COLUMN_WIDTH;
+  const width = wrap ? ownWidth : cellOverflowWidth(cell.rowId, cell.columnId);
   return {
-    width: `${cellOverflowWidth(cell.rowId, cell.columnId)}px`,
-    justifyContent: horizontalFlexAlignment(mergedStyle.horizontalAlign),
+    width: `${width}px`,
+    justifyContent: horizontalFlexAlignment(resolvedHorizontal),
     alignItems: verticalFlexAlignment(mergedStyle.verticalAlign),
+    whiteSpace: wrap ? "pre-wrap" : "pre",
+    wordBreak: wrap ? "break-word" : undefined,
+    paddingLeft: resolvedHorizontal === "left" && indent ? `calc(0.45rem + ${indent}rem)` : undefined,
+    paddingRight: resolvedHorizontal === "right" && indent ? `calc(0.45rem + ${indent}rem)` : undefined,
   };
 }
 
@@ -434,7 +481,7 @@ export type { CellId };
             :style="cellStyle(getCell(worksheet, row.id, column.id))"
             :data-cell-id="getCell(worksheet, row.id, column.id).id"
             tabindex="0"
-            @mousedown.prevent="startRangeSelection($event, row.id, column.id)"
+            @mousedown.self.prevent="startRangeSelection($event, row.id, column.id)"
             @contextmenu.prevent="openCellContextMenu($event, row.id, column.id)"
             @mouseenter="extendRangeSelection(row.id, column.id)"
             @dblclick="startEditing(row.id, column.id)"
@@ -448,16 +495,19 @@ export type { CellId };
               :style="cellBorderOverlayStyle(getCell(worksheet, row.id, column.id), side)"
               aria-hidden="true"
             />
-            <input
+            <textarea
               v-if="editingCellId === getCell(worksheet, row.id, column.id).id"
               ref="editorInputEl"
               v-model="editDraft"
               class="grid-cell__editor"
               autofocus
-              @input="updateEditDraft(($event.target as HTMLInputElement).value)"
+              rows="1"
+              wrap="soft"
+              spellcheck="false"
+              @input="onEditorInput($event, getCell(worksheet, row.id, column.id))"
               @keydown="handleEditorKeydown($event, getCell(worksheet, row.id, column.id))"
               @blur="commitEditFromBlur(getCell(worksheet, row.id, column.id))"
-            >
+            />
             <span
               v-else
               class="grid-cell__value"
@@ -617,16 +667,36 @@ export type { CellId };
 }
 
 .grid-cell__editor {
+  /*
+   * The editor is a `<textarea>` that auto-grows vertically as the user
+   * presses Alt+Enter to insert a newline. We start at exactly one row's
+   * height and let the JS `autoGrowEditor` helper bump `style.height` to
+   * `scrollHeight` so additional lines push the editor downward over the
+   * grid (the cell's `overflow: visible` allows this), the same way
+   * Excel expands the in-cell editor while typing.
+   */
   position: relative;
   z-index: 2;
+  display: block;
   width: 100%;
-  height: 100%;
+  min-height: 100%;
+  margin: 0;
   padding: 0.25rem 0.45rem;
+  overflow: hidden;
   border: 0;
   outline: 0;
-  background: transparent;
+  background: var(--grid-cell-bg);
+  resize: none;
   color: inherit;
   font: inherit;
+  line-height: 1.3;
+  /*
+   * Default to soft-wrap so long single-line drafts wrap into the
+   * editor instead of producing a horizontal scrollbar. Alt+Enter
+   * newlines are honoured because `pre-wrap` preserves explicit `\n`.
+   */
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .grid-cell__value {
@@ -637,7 +707,14 @@ export type { CellId };
   box-sizing: border-box;
   padding: 0.25rem 0.45rem;
   overflow: hidden;
-  white-space: nowrap;
+  /*
+   * Preserve explicit newlines (Alt+Enter) without wrapping on plain
+   * spaces. This matches Excel's "Wrap text: off" behaviour: multi-line
+   * cells show each `\n`-separated segment on its own line as far as
+   * the row height allows, while ordinary long values still spill into
+   * neighbouring empty cells via {@link cellOverflowWidth}.
+   */
+  white-space: pre;
   pointer-events: none;
 }
 

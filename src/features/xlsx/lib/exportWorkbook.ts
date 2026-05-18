@@ -185,11 +185,27 @@ function applyExcelStyle(cell: ExcelJS.Cell, style: CellStyle) {
     };
   }
 
-  if (style.horizontalAlign || style.verticalAlign) {
-    cell.alignment = {
-      horizontal: style.horizontalAlign,
-      vertical: style.verticalAlign,
-    };
+  const hasAlignment = (style.horizontalAlign && style.horizontalAlign !== "general")
+    || style.verticalAlign
+    || style.wrapText
+    || (style.indent != null && style.indent > 0);
+  if (hasAlignment) {
+    const alignment: NonNullable<ExcelJS.Cell["alignment"]> = {};
+    // Excel uses an absent `horizontal` to mean General, so we only
+    // serialise an explicit value when the user picked one.
+    if (style.horizontalAlign && style.horizontalAlign !== "general") {
+      alignment.horizontal = style.horizontalAlign;
+    }
+    if (style.verticalAlign) {
+      alignment.vertical = style.verticalAlign;
+    }
+    if (style.wrapText) {
+      alignment.wrapText = true;
+    }
+    if (style.indent != null && style.indent > 0) {
+      alignment.indent = Math.min(15, Math.max(0, Math.round(style.indent)));
+    }
+    cell.alignment = alignment;
   }
 
   const borders = toExcelBorders(style.borders);

@@ -1,5 +1,5 @@
 /**
- * Inline cell editor — opens an `<input>` over the active cell, mirrors
+ * Inline cell editor — opens a `<textarea>` over the active cell, mirrors
  * its draft into the parent so the formula bar can stay in sync, and
  * handles the various commit / cancel pathways (Enter, blur, Escape,
  * Ctrl+Space for formula assist).
@@ -10,7 +10,9 @@
  *
  * Enter / Tab also advance the active cell (down or right respectively,
  * up / left with Shift) after committing, matching Excel and Google
- * Sheets behavior.
+ * Sheets behavior. Alt+Enter (Option+Enter on macOS) inserts a literal
+ * newline at the caret without committing, matching Excel's multi-line
+ * editing gesture.
  */
 import { nextTick, ref, watch, type Ref } from "vue";
 import { formatCellValue, formatFormulaResult } from "@/features/grid/lib/cellFormatting";
@@ -48,7 +50,14 @@ export interface UseInlineCellEditorOptions {
 export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
   const editingCellId = ref<string | null>(null);
   const editDraft = ref("");
-  const editorInputEl = ref<HTMLInputElement | HTMLInputElement[] | null>(null);
+  /**
+   * Editor DOM element. We render a `<textarea>` so the user can type
+   * multi-line values via Alt+Enter, but the editor is also reachable
+   * from a few legacy code paths that treat the editor as a generic
+   * single-line input — typing the union here keeps both happy.
+   */
+  type EditorElement = HTMLInputElement | HTMLTextAreaElement;
+  const editorInputEl = ref<EditorElement | EditorElement[] | null>(null);
   /**
    * Guard that suppresses one upcoming `blur` commit.
    *
@@ -130,7 +139,7 @@ export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
   ) {
     suppressNextBlurCommit = true;
     commitEdit(cell);
-    (event.currentTarget as HTMLInputElement | null)?.blur();
+    (event.currentTarget as EditorElement | null)?.blur();
     queueMicrotask(() => {
       suppressNextBlurCommit = false;
     });
@@ -204,6 +213,19 @@ export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
       return;
     }
     if (event.key === "Enter" || event.code === "NumpadEnter" || event.keyCode === 13) {
+      if (event.altKey) {
+        // Excel's Alt+Enter (Option+Enter on macOS): insert a literal
+        // newline at the caret without committing. We do the insert
+        // ourselves rather than letting the textarea handle it natively
+        // because the v-model update only fires on `input`, and some
+        // browsers do not synthesize an `input` event for inserted
+        // line breaks when the textarea is inside a contenteditable
+        // ancestor.
+        event.preventDefault();
+        event.stopPropagation();
+        insertNewlineAtCaret();
+        return;
+      }
       // Enter commits and advances one row down (Shift+Enter moves
       // up). Plain Enter without movement only on the last visible
       // row is handled implicitly by the clamping in
@@ -224,6 +246,32 @@ export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
   function updateEditDraft(value: string) {
     editDraft.value = value;
     options.onEditState({ editing: Boolean(editingCellId.value), draft: editDraft.value });
+  }
+
+  /**
+   * Insert a `\n` at the current caret position in the editor input.
+   *
+   * Used by the Alt+Enter handler to produce multi-line cell content
+   * the same way Excel does. Falls back to appending the newline at
+   * the end of the draft when the editor isn't a textarea (e.g. when
+   * the inline editor is mounted as a plain input from a legacy call
+   * site).
+   */
+  async function insertNewlineAtCaret() {
+    const input = getEditorInputEl();
+    const current = editDraft.value;
+    if (input && "selectionStart" in input && input.selectionStart != null && input.selectionEnd != null) {
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const next = `${current.slice(0, start)}\n${current.slice(end)}`;
+      updateEditDraft(next);
+      await nextTick();
+      const refreshed = getEditorInputEl();
+      const caret = start + 1;
+      refreshed?.setSelectionRange?.(caret, caret);
+      return;
+    }
+    updateEditDraft(`${current}\n`);
   }
 
   async function applyFormulaAssistSuggestion(definition: FunctionDefinition) {
@@ -317,8 +365,11 @@ export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
     });
   }
 
-  function getEditorInputEl() {
-    return Array.isArray(editorInputEl.value) ? editorInputEl.value[0] : editorInputEl.value;
+  function getEditorInputEl(): EditorElement | null {
+    if (Array.isArray(editorInputEl.value)) {
+      return editorInputEl.value[0] ?? null;
+    }
+    return editorInputEl.value;
   }
 
   /**

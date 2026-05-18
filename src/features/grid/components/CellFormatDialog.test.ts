@@ -9,7 +9,7 @@ import type { useCellFormatDialog } from "@/features/grid/composables/useCellFor
 function makeController() {
   return {
     formatDialogVisible: ref(true),
-    formatDialogTab: ref<"cellType" | "font" | "fill" | "border">("cellType"),
+    formatDialogTab: ref<"cellType" | "alignment" | "font" | "fill" | "border">("cellType"),
     formatDialogKind: ref("general"),
     formatDialogCurrency: ref("USD"),
     formatDialogCustomNumFmt: ref(""),
@@ -25,6 +25,10 @@ function makeController() {
     formatDialogBorderColor: ref("#111827"),
     formatDialogBorderPreset: ref("custom"),
     formatDialogBorders: ref({}),
+    formatDialogHorizontalAlign: ref("general"),
+    formatDialogVerticalAlign: ref("middle"),
+    formatDialogIndent: ref(0),
+    formatDialogWrapText: ref(false),
     openCellFormatDialog: vi.fn(),
     applySelectedCellFormat: vi.fn(),
     patchSelectedStyle: vi.fn(),
@@ -52,8 +56,11 @@ describe("CellFormatDialog", () => {
     await flushPromises();
 
     const tabs = document.body.querySelectorAll<HTMLButtonElement>(".cell-format-dialog__tabs button");
-    expect(tabs).toHaveLength(4);
+    expect(tabs).toHaveLength(5);
     tabs[1].click();
+    await flushPromises();
+    expect((controller as unknown as { formatDialogTab: { value: string } }).formatDialogTab.value).toBe("alignment");
+    tabs[2].click();
     await flushPromises();
     expect((controller as unknown as { formatDialogTab: { value: string } }).formatDialogTab.value).toBe("font");
 

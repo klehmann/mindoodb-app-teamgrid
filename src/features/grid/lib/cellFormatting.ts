@@ -36,7 +36,7 @@ import type { Cell, CellStyle, CellValue, ColumnMeta, CurrencyCode, FormulaResul
 export const DEFAULT_CELL_STYLE: Required<Pick<CellStyle, "fontFamily" | "fontSize" | "horizontalAlign" | "verticalAlign">> = {
   fontFamily: "Calibri",
   fontSize: 14,
-  horizontalAlign: "left",
+  horizontalAlign: "general",
   verticalAlign: "middle",
 };
 
@@ -75,6 +75,47 @@ export function cssFontFamily(fontFamily: string | undefined): string | undefine
     return trimmed;
   }
   return `'${trimmed}', var(--font-body)`;
+}
+
+/**
+ * Resolve Excel's "General" horizontal alignment into a concrete
+ * direction based on the cell's value (or formula result):
+ *
+ * - text / empty values render left,
+ * - numbers and dates render right,
+ * - formula cells inherit from their cached result kind.
+ *
+ * Explicit `left` / `center` / `right` values are returned unchanged
+ * so user-chosen alignment always wins over the value-driven default.
+ */
+export function effectiveHorizontalAlign(
+  cell: Pick<Cell, "value" | "formula">,
+  align: NonNullable<CellStyle["horizontalAlign"]> | undefined,
+): "left" | "center" | "right" {
+  if (align && align !== "general") {
+    return align;
+  }
+  const resultKind = cell.formula?.cached?.kind;
+  if (resultKind === "number" || resultKind === "date") {
+    return "right";
+  }
+  if (cell.value.kind === "number" || cell.value.kind === "date") {
+    return "right";
+  }
+  return "left";
+}
+
+/**
+ * Excel measures indent in "characters". One indent unit is roughly
+ * three space widths, which is about 0.6rem at our default 14px cell
+ * font size. We clamp to the same 0..15 range Excel exposes so a stray
+ * import never blows out a column.
+ */
+export function indentPaddingRem(indent: number | undefined): number {
+  if (!indent || indent <= 0) {
+    return 0;
+  }
+  return Math.min(15, Math.max(0, indent)) * 0.6;
 }
 
 export type CellFormatKind = "text" | "general" | "integer" | "decimal" | "percent" | "currency" | "custom";

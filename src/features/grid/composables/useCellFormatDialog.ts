@@ -26,6 +26,8 @@ import {
   type CellBorderStyle,
   type CellStyle,
   type CurrencyCode,
+  type HorizontalAlign,
+  type VerticalAlign,
   type Worksheet,
 } from "@/features/document/lib/teamgridDocument";
 import type { TeamGridOperation } from "@/features/document/lib/teamgridOps";
@@ -39,7 +41,7 @@ export type CellStylePatch = Omit<{
 }, "borders"> & {
   borders?: CellBorderPatch | null;
 };
-export type FormatDialogTab = "cellType" | "font" | "fill" | "border";
+export type FormatDialogTab = "cellType" | "alignment" | "font" | "fill" | "border";
 export type BorderPreset = "custom" | "none" | "outline" | "inside" | "all";
 
 interface CellsWithCoordinates {
@@ -91,6 +93,13 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
   const formatDialogBorderColor = ref("#111827");
   const formatDialogBorderPreset = ref<BorderPreset>("custom");
   const formatDialogBorders = ref<CellBorders>({});
+  // Alignment tab — matches Excel's Zellen formatieren > Ausrichtung
+  // pane: horizontal/vertical alignment, indent, and the wrap-text
+  // checkbox under "Textsteuerung".
+  const formatDialogHorizontalAlign = ref<HorizontalAlign>("general");
+  const formatDialogVerticalAlign = ref<VerticalAlign>("middle");
+  const formatDialogIndent = ref(0);
+  const formatDialogWrapText = ref(false);
 
   /** Open the Excel-like value-format dialog for the active selection. */
   function openCellFormatDialog(range: CellSelectionRange | null) {
@@ -131,6 +140,17 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
     formatDialogBorderColor.value = firstBorderColor(style?.borders) ?? "#111827";
     formatDialogBorderPreset.value = "custom";
     formatDialogBorders.value = { ...style?.borders };
+    formatDialogHorizontalAlign.value = style?.horizontalAlign ?? "general";
+    formatDialogVerticalAlign.value = style?.verticalAlign ?? "middle";
+    formatDialogIndent.value = clampIndent(style?.indent);
+    formatDialogWrapText.value = Boolean(style?.wrapText);
+  }
+
+  function clampIndent(value: number | undefined): number {
+    if (!Number.isFinite(value) || value == null || value <= 0) {
+      return 0;
+    }
+    return Math.min(15, Math.max(0, Math.round(value)));
   }
 
   function isCustomExcelNumFmt(numFmt: string) {
@@ -309,6 +329,8 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
 
   function formatDialogStylePatchForCell(rowIndex: number, columnIndex: number, bounds: RangeBounds | null): CellStylePatch {
     const fontFamilyDraft = formatDialogFontFamily.value.trim();
+    const indent = clampIndent(formatDialogIndent.value);
+    const supportsIndent = formatDialogHorizontalAlign.value === "left" || formatDialogHorizontalAlign.value === "right";
     return {
       // Strip any CSS fallback chain a legacy seed or paste might have
       // introduced; the document model stores bare family names so the
@@ -320,6 +342,13 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
       underline: formatDialogUnderline.value,
       textColor: formatDialogTextColor.value,
       backgroundColor: formatDialogFillEnabled.value ? formatDialogFillColor.value : null,
+      // `"general"` is the Excel default; persisting `null` keeps the
+      // stored style minimal so a cell that follows the workbook
+      // default does not carry an explicit alignment override.
+      horizontalAlign: formatDialogHorizontalAlign.value === "general" ? null : formatDialogHorizontalAlign.value,
+      verticalAlign: formatDialogVerticalAlign.value,
+      wrapText: formatDialogWrapText.value ? true : null,
+      indent: supportsIndent && indent > 0 ? indent : null,
       borders: borderPatchForCell(rowIndex, columnIndex, bounds),
     };
   }
@@ -439,6 +468,10 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
     formatDialogBorderColor,
     formatDialogBorderPreset,
     formatDialogBorders,
+    formatDialogHorizontalAlign,
+    formatDialogVerticalAlign,
+    formatDialogIndent,
+    formatDialogWrapText,
     openCellFormatDialog,
     applySelectedCellFormat,
     patchSelectedStyle,

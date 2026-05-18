@@ -20,7 +20,7 @@
  * - `commit(value)`: user pressed Enter or clicked the check icon.
  * - `cancel()`: user pressed Escape or clicked the x icon.
  */
-import { nextTick, ref, watch } from "vue";
+import { nextTick, onMounted, ref, watch } from "vue";
 import Button from "primevue/button";
 import { insertFunctionAtCaret } from "@/features/formulas/lib/assist";
 import type { FunctionDefinition } from "@/features/formulas/lib";
@@ -41,19 +41,34 @@ const emit = defineEmits<{
 }>();
 
 const draft = ref(props.modelValue);
-const inputEl = ref<HTMLInputElement | null>(null);
+const inputEl = ref<HTMLTextAreaElement | null>(null);
 
 watch(
   () => props.modelValue,
   (value) => {
     draft.value = value;
+    void nextTick(() => autoGrowInput());
   },
 );
+
+onMounted(() => {
+  autoGrowInput();
+});
+
+function autoGrowInput() {
+  const el = inputEl.value;
+  if (!el) {
+    return;
+  }
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
 
 function updateDraft(value: string) {
   draft.value = value;
   emit("begin-edit");
   emit("update:modelValue", draft.value);
+  autoGrowInput();
 }
 
 async function applyFormulaAssistSuggestion(definition: FunctionDefinition) {
@@ -92,7 +107,42 @@ function handleKeydown(event: KeyboardEvent) {
     event.preventDefault();
     event.stopPropagation();
     requestHelp();
+    return;
   }
+  if (event.key === "Enter" || event.code === "NumpadEnter" || event.keyCode === 13) {
+    // Alt+Enter / Option+Enter inserts a literal newline so the
+    // formula bar can build multi-line string cells the same way
+    // Excel's formula bar does. Plain Enter still commits.
+    if (event.altKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      void insertNewlineAtCaret();
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    commit();
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    cancel();
+  }
+}
+
+async function insertNewlineAtCaret() {
+  const el = inputEl.value;
+  if (!el) {
+    updateDraft(`${draft.value}\n`);
+    return;
+  }
+  const start = el.selectionStart ?? draft.value.length;
+  const end = el.selectionEnd ?? draft.value.length;
+  const next = `${draft.value.slice(0, start)}\n${draft.value.slice(end)}`;
+  updateDraft(next);
+  await nextTick();
+  inputEl.value?.setSelectionRange(start + 1, start + 1);
 }
 
 defineExpose({ applyFormulaAssistSuggestion });
@@ -101,19 +151,19 @@ defineExpose({ applyFormulaAssistSuggestion });
 <template>
   <section class="formula-bar" aria-label="Formula editor">
     <span class="formula-bar__address">{{ activeAddress || "A1" }}</span>
-    <input
+    <textarea
       ref="inputEl"
       v-model="draft"
       class="formula-bar__input"
-      type="text"
+      rows="1"
+      wrap="soft"
+      spellcheck="false"
       :readonly="readonly"
       placeholder="Enter a value or formula, for example =SUM(A1:B4)"
       @focus="emit('begin-edit')"
-      @input="updateDraft(($event.target as HTMLInputElement).value)"
+      @input="updateDraft(($event.target as HTMLTextAreaElement).value)"
       @keydown="handleKeydown"
-      @keydown.enter.prevent="commit"
-      @keydown.escape.prevent="cancel"
-    >
+    />
     <div class="formula-bar__actions">
       <Button label="fx" text rounded severity="secondary" aria-label="Show formula help" :disabled="readonly" @click="requestHelp" />
       <Button icon="pi pi-times" text rounded severity="secondary" aria-label="Cancel editing" :disabled="readonly" @click="cancel" />
@@ -146,11 +196,26 @@ defineExpose({ applyFormulaAssistSuggestion });
 
 .formula-bar__input {
   width: 100%;
+  min-height: 2.2rem;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 0.65rem;
   background: rgb(255 255 255 / 0.06);
   color: var(--text);
+  /*
+   * The bar is a `<textarea>` so it can hold the multi-line content
+   * Alt+Enter produces, but visually we want it to feel like a normal
+   * single-row input that simply grows downward when wrapping is
+   * needed. `field-sizing: content` covers Chrome/Edge automatically
+   * and the `autoGrowInput` helper handles Safari/Firefox.
+   */
+  field-sizing: content;
+  resize: none;
+  overflow-y: auto;
+  font: inherit;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .formula-bar__actions {

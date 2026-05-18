@@ -13,7 +13,15 @@ export type CellId = string;
 export type NumberFormat = "general" | "integer" | "decimal" | "currency" | "percent";
 export type DateFormat = "date" | "dateTime" | "time";
 export type CurrencyCode = "EUR" | "USD";
-export type HorizontalAlign = "left" | "center" | "right";
+/**
+ * Excel-compatible horizontal alignment options.
+ *
+ * `"general"` defers to the cell value: text-like values render left,
+ * numeric / date / formula-numeric values render right. It is the same
+ * "General" mode Excel uses by default and is the implicit alignment
+ * for any cell that does not specify one.
+ */
+export type HorizontalAlign = "general" | "left" | "center" | "right";
 export type VerticalAlign = "top" | "middle" | "bottom";
 export type CellBorderStyle = "thin" | "medium" | "thick" | "dashed" | "dotted" | "double";
 export type CellBorderSide = "top" | "right" | "bottom" | "left";
@@ -101,6 +109,19 @@ export interface CellStyle {
   underline?: boolean;
   horizontalAlign?: HorizontalAlign;
   verticalAlign?: VerticalAlign;
+  /**
+   * Excel's "Textumbruch" — when `true`, multi-line and
+   * width-overflowing content wraps inside the cell instead of
+   * spilling into the neighbouring empty cells or clipping at the
+   * column edge.
+   */
+  wrapText?: boolean;
+  /**
+   * Excel's "Einzug" — horizontal text indent measured in Excel
+   * indent units (1 unit ≈ one character width). Only applies when
+   * `horizontalAlign` is `"left"` or `"right"`; ignored otherwise.
+   */
+  indent?: number;
   borders?: Partial<Record<CellBorderSide, CellBorder>>;
 }
 
