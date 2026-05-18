@@ -310,7 +310,8 @@ const fontSizeModel = computed<number | string>({
  * span the entire row so the explanatory copy reads naturally below the
  * controls instead of wrapping into a narrow column.
  */
-.cell-format-dialog__grid > .cell-format-dialog__hint {
+.cell-format-dialog__grid > .cell-format-dialog__hint,
+.cell-format-dialog__border > .cell-format-dialog__hint {
   grid-column: 1 / -1;
 }
 
