@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { applyCellFormat, coerceInputToCellValue, formatCellValue, preserveCompatibleCellValueFormat } from "@/lib/cellFormatting";
+import { applyCellFormat, coerceInputToCellValue, formatCellValue, formatFormulaResult, preserveCompatibleCellValueFormat } from "@/lib/cellFormatting";
 import type { Cell } from "@/lib/teamgridDocument";
 
 describe("cell formatting", () => {
   it("formats stored currencies with the selected currency code", () => {
     expect(formatCellValue({ kind: "number", value: 12, format: "currency", currencyCode: "EUR" }, "en-US")).toBe("€12.00");
     expect(formatCellValue({ kind: "number", value: 12, format: "currency", currencyCode: "USD" }, "en-US")).toBe("$12.00");
+    expect(formatCellValue({ kind: "number", value: 1234, format: "currency", currencyCode: "EUR" }, "en-US")).toBe("€1234.00");
+  });
+
+  it("formats numeric formula results with the cell display format", () => {
+    expect(formatFormulaResult(
+      { kind: "number", value: 1234 },
+      "en-US",
+      { kind: "number", value: 0, format: "currency", currencyCode: "EUR" },
+    )).toBe("€1234.00");
   });
 
   it("coerces numeric-looking text when applying numeric formats", () => {
@@ -17,7 +26,7 @@ describe("cell formatting", () => {
       value: 1234.5,
       format: "currency",
       currencyCode: "EUR",
-      excelNumFmt: "€#,##0.00",
+      excelNumFmt: "€0.00",
     });
   });
 
@@ -27,21 +36,21 @@ describe("cell formatting", () => {
       value: 50,
       format: "currency",
       currencyCode: "EUR",
-      excelNumFmt: "€#,##0.00",
+      excelNumFmt: "€0.00",
     });
     expect(coerceInputToCellValue("50,95 €")).toEqual({
       kind: "number",
       value: 50.95,
       format: "currency",
       currencyCode: "EUR",
-      excelNumFmt: "€#,##0.00",
+      excelNumFmt: "€0.00",
     });
     expect(coerceInputToCellValue("50 $")).toEqual({
       kind: "number",
       value: 50,
       format: "currency",
       currencyCode: "USD",
-      excelNumFmt: "$#,##0.00",
+      excelNumFmt: "$0.00",
     });
   });
 
@@ -79,13 +88,13 @@ describe("cell formatting", () => {
   it("preserves compatible number formatting when a cell value changes", () => {
     expect(preserveCompatibleCellValueFormat(
       { kind: "number", value: 50 },
-      { kind: "number", value: 12, format: "currency", currencyCode: "EUR", excelNumFmt: "€#,##0.00" },
+      { kind: "number", value: 12, format: "currency", currencyCode: "EUR", excelNumFmt: "€0.00" },
     )).toEqual({
       kind: "number",
       value: 50,
       format: "currency",
       currencyCode: "EUR",
-      excelNumFmt: "€#,##0.00",
+      excelNumFmt: "€0.00",
     });
   });
 });

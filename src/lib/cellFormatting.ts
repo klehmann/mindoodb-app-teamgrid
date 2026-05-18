@@ -146,14 +146,19 @@ export function formatCellValue(value: CellValue, locale = "en-US") {
 }
 
 /** Same as {@link formatCellValue}, but also renders formula error codes. */
-export function formatFormulaResult(result: FormulaResult, locale = "en-US") {
+export function formatFormulaResult(result: FormulaResult, locale = "en-US", displayValue?: CellValue) {
   switch (result.kind) {
     case "error":
       return result.code;
     case "empty":
       return "";
     case "number":
-      return formatNumber(result.value, "general", locale);
+      return formatNumber(
+        result.value,
+        displayValue?.kind === "number" ? displayValue.format : "general",
+        locale,
+        displayValue?.kind === "number" ? displayValue.currencyCode : undefined,
+      );
     case "date":
       return formatDate(result.isoDate, "date", locale);
     case "string":
@@ -226,7 +231,7 @@ export function defaultExcelNumFmtForRequest(request: CellFormatRequest) {
     case "percent":
       return "0.00%";
     case "currency":
-      return request.currencyCode === "EUR" ? "€#,##0.00" : "$#,##0.00";
+      return request.currencyCode === "EUR" ? "€0.00" : "$0.00";
     case "custom":
       return request.excelNumFmt?.trim() || undefined;
     default:
@@ -361,15 +366,15 @@ function shouldTreatSingleSeparatorAsDecimal(text: string, separatorIndex: numbe
 function formatNumber(value: number, format: NumberFormat | undefined, locale: string, currencyCode: CurrencyCode = DEFAULT_CURRENCY_CODE) {
   switch (format) {
     case "integer":
-      return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
+      return new Intl.NumberFormat(locale, { maximumFractionDigits: 0, useGrouping: false }).format(value);
     case "decimal":
-      return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
+      return new Intl.NumberFormat(locale, { maximumFractionDigits: 2, useGrouping: false }).format(value);
     case "currency":
-      return new Intl.NumberFormat(locale, { style: "currency", currency: currencyCode }).format(value);
+      return new Intl.NumberFormat(locale, { style: "currency", currency: currencyCode, useGrouping: false }).format(value);
     case "percent":
-      return new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 2 }).format(value);
+      return new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 2, useGrouping: false }).format(value);
     default:
-      return new Intl.NumberFormat(locale, { maximumFractionDigits: 8 }).format(value);
+      return new Intl.NumberFormat(locale, { maximumFractionDigits: 8, useGrouping: false }).format(value);
   }
 }
 

@@ -5,6 +5,9 @@ import { DEFAULT_ROW_HEIGHT } from "@/lib/gridDimensions";
 import { getCell, projectWorksheet } from "@/lib/gridProjection";
 import type {
   Cell,
+  CellBorder,
+  CellBorderSide,
+  CellBorderStyle,
   CellStyle,
   CellValue,
   DateFormat,
@@ -91,7 +94,8 @@ function shouldWriteCell(cell: Cell, style: CellStyle) {
   return cell.value.kind !== "empty"
     || Boolean(cell.formula)
     || Boolean(cell.style)
-    || Boolean(style.backgroundColor);
+    || Boolean(style.backgroundColor)
+    || Boolean(style.borders && Object.keys(style.borders).length > 0);
 }
 
 function toExcelCellValue(cell: Cell): ExcelJS.CellValue {
@@ -187,6 +191,40 @@ function applyExcelStyle(cell: ExcelJS.Cell, style: CellStyle) {
       vertical: style.verticalAlign,
     };
   }
+
+  const borders = toExcelBorders(style.borders);
+  if (borders) {
+    cell.border = borders;
+  }
+}
+
+function toExcelBorders(borders: CellStyle["borders"]): Partial<ExcelJS.Borders> | null {
+  if (!borders || Object.keys(borders).length === 0) {
+    return null;
+  }
+  const excelBorders: Partial<ExcelJS.Borders> = {};
+  for (const side of ["top", "right", "bottom", "left"] satisfies CellBorderSide[]) {
+    const border = borders[side];
+    if (border) {
+      excelBorders[side] = toExcelBorder(border);
+    }
+  }
+  return Object.keys(excelBorders).length > 0 ? excelBorders : null;
+}
+
+function toExcelBorder(border: CellBorder): Partial<ExcelJS.Border> {
+  const excelBorder: Partial<ExcelJS.Border> = {
+    style: toExcelBorderStyle(border.style),
+  };
+  const color = normalizeHexColor(border.color);
+  if (color) {
+    excelBorder.color = { argb: color };
+  }
+  return excelBorder;
+}
+
+function toExcelBorderStyle(style: CellBorderStyle): ExcelJS.BorderStyle {
+  return style;
 }
 
 function applyExcelNumberFormat(cell: ExcelJS.Cell, value: CellValue) {
@@ -212,7 +250,7 @@ function mapNumberFormat(format: NumberFormat | undefined, currencyCode: Currenc
     case "decimal":
       return "0.00";
     case "currency":
-      return currencyCode === "EUR" ? "€#,##0.00" : "$#,##0.00";
+      return currencyCode === "EUR" ? "€0.00" : "$0.00";
     case "percent":
       return "0.00%";
     default:

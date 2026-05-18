@@ -17,10 +17,10 @@ describe("Teamgrid XLSX export", () => {
     expect(worksheet!.getRow(2).height).toBe(24);
 
     expect(worksheet!.getCell("A1").value).toBe(12);
-    expect(worksheet!.getCell("A1").numFmt).toBe("$#,##0.00");
+    expect(worksheet!.getCell("A1").numFmt).toBe("$0.00");
     expect(worksheet!.getCell("B1").value).toEqual({ formula: "A1*2", result: 24 });
     expect(worksheet!.getCell("C1").value).toBe(7);
-    expect(worksheet!.getCell("C1").numFmt).toBe("€#,##0.00");
+    expect(worksheet!.getCell("C1").numFmt).toBe("€0.00");
     expect(worksheet!.getCell("D1").value).toBe(1.2345);
     expect(worksheet!.getCell("D1").numFmt).toBe("0.0000");
     expect(worksheet!.getCell("A2").value).toBe("ready");
@@ -41,6 +41,10 @@ describe("Teamgrid XLSX export", () => {
     expect(worksheet!.getCell("A1").alignment).toMatchObject({
       horizontal: "center",
       vertical: "bottom",
+    });
+    expect(worksheet!.getCell("A1").border).toMatchObject({
+      top: { style: "thin", color: { argb: "FFEEF2FF" } },
+      bottom: { style: "double", color: { argb: "FF111827" } },
     });
   });
 
@@ -79,7 +83,14 @@ function createExportFixture() {
     rowId: row1,
     columnId: columnA,
     value: { kind: "number", value: 12, format: "currency" },
-    style: { textColor: "#eef2ff", fontSize: 16 },
+    style: {
+      textColor: "#eef2ff",
+      fontSize: 16,
+      borders: {
+        top: { style: "thin", color: "#eef2ff" },
+        bottom: { style: "double", color: "#111827" },
+      },
+    },
   };
   worksheet.cellsById[createCellId(row1, columnB)] = {
     id: createCellId(row1, columnB),

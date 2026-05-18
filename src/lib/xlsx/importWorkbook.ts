@@ -13,6 +13,9 @@ import {
   createId,
   createTeamGridDocument,
   type Cell,
+  type CellBorder,
+  type CellBorderSide,
+  type CellBorderStyle,
   type CellStyle,
   type CellValue,
   type ColumnId,
@@ -274,7 +277,33 @@ function excelStyleToCellStyle(cell: ExcelJS.Cell): CellStyle | undefined {
   if (cell.alignment?.vertical && isSupportedVerticalAlign(cell.alignment.vertical)) {
     style.verticalAlign = cell.alignment.vertical === "middle" ? "middle" : cell.alignment.vertical;
   }
+  const borders = readBorders(cell.border);
+  if (borders) {
+    style.borders = borders;
+  }
   return Object.keys(style).length > 0 ? style : undefined;
+}
+
+function readBorders(border: Partial<ExcelJS.Borders> | undefined) {
+  if (!border) {
+    return null;
+  }
+  const borders: CellStyle["borders"] = {};
+  for (const side of ["top", "right", "bottom", "left"] satisfies CellBorderSide[]) {
+    const sideBorder = readBorderSide(border[side]);
+    if (sideBorder) {
+      borders[side] = sideBorder;
+    }
+  }
+  return Object.keys(borders).length > 0 ? borders : null;
+}
+
+function readBorderSide(border: Partial<ExcelJS.Border> | undefined): CellBorder | null {
+  if (!border?.style || !isSupportedBorderStyle(border.style)) {
+    return null;
+  }
+  const color = excelColorToCssColor(border.color as ExcelColor | undefined);
+  return color ? { style: border.style, color } : { style: border.style };
 }
 
 function readFillColor(fill: ExcelJS.Fill | undefined) {
@@ -345,6 +374,15 @@ function isSupportedHorizontalAlign(value: string): value is NonNullable<CellSty
 
 function isSupportedVerticalAlign(value: string): value is NonNullable<CellStyle["verticalAlign"]> {
   return value === "top" || value === "middle" || value === "bottom";
+}
+
+function isSupportedBorderStyle(value: string): value is CellBorderStyle {
+  return value === "thin"
+    || value === "medium"
+    || value === "thick"
+    || value === "dashed"
+    || value === "dotted"
+    || value === "double";
 }
 
 function mapImportedDateFormat(numFmt: string | undefined) {

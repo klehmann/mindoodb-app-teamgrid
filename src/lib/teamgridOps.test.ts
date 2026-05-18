@@ -96,6 +96,92 @@ describe("teamgrid operation serialization", () => {
     }]);
   });
 
+  it("serializes cleared range styles without empty background overrides", () => {
+    const patch = serializeTeamGridOperations([{
+      type: "setCellsStyle",
+      worksheetId: "sheet_1",
+      style: {},
+      cells: [{
+        id: "row_1:col_1",
+        rowId: "row_1",
+        columnId: "col_1",
+        value: { kind: "empty" },
+        style: { bold: true },
+      }, {
+        id: "row_1:col_2",
+        rowId: "row_1",
+        columnId: "col_2",
+        value: { kind: "empty" },
+      }],
+    }]);
+
+    expect(patch.json?.set).toEqual([{
+      path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "cellsById", "row_1:col_1"],
+      value: {
+        id: "row_1:col_1",
+        rowId: "row_1",
+        columnId: "col_1",
+        value: { kind: "empty" },
+        style: { bold: true },
+      },
+    }, {
+      path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "cellsById", "row_1:col_2"],
+      value: {
+        id: "row_1:col_2",
+        rowId: "row_1",
+        columnId: "col_2",
+        value: { kind: "empty" },
+      },
+    }]);
+  });
+
+  it("serializes border changes and omits empty border objects", () => {
+    const patch = serializeTeamGridOperations([{
+      type: "setCellsStyle",
+      worksheetId: "sheet_1",
+      style: {},
+      cells: [{
+        id: "row_1:col_1",
+        rowId: "row_1",
+        columnId: "col_1",
+        value: { kind: "empty" },
+        style: {
+          borders: {
+            top: { style: "thin", color: "#111827" },
+          },
+        },
+      }, {
+        id: "row_1:col_2",
+        rowId: "row_1",
+        columnId: "col_2",
+        value: { kind: "empty" },
+      }],
+    }]);
+
+    expect(patch.json?.set).toEqual([{
+      path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "cellsById", "row_1:col_1"],
+      value: {
+        id: "row_1:col_1",
+        rowId: "row_1",
+        columnId: "col_1",
+        value: { kind: "empty" },
+        style: {
+          borders: {
+            top: { style: "thin", color: "#111827" },
+          },
+        },
+      },
+    }, {
+      path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "cellsById", "row_1:col_2"],
+      value: {
+        id: "row_1:col_2",
+        rowId: "row_1",
+        columnId: "col_2",
+        value: { kind: "empty" },
+      },
+    }]);
+  });
+
   it("serializes column width and row height changes by stable ID", () => {
     expect(serializeTeamGridOperations([
       {

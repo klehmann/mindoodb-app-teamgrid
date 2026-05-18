@@ -72,13 +72,7 @@ export function serializeTeamGridOperations(
         break;
       case "setCellsStyle":
         for (const cell of operation.cells) {
-          pushSet(json, cellPath(operation.worksheetId, cell.id), {
-            ...cell,
-            style: {
-              ...cell.style,
-              ...operation.style,
-            },
-          });
+          pushSet(json, cellPath(operation.worksheetId, cell.id), withMergedStyle(cell, operation.style));
         }
         break;
       case "setColumnWidth":
@@ -133,6 +127,22 @@ function worksheetPath(worksheetId: WorksheetId) {
 /** Path inside the persisted document that points at one cell's record. */
 function cellPath(worksheetId: WorksheetId, cellId: CellId) {
   return [...worksheetPath(worksheetId), "cellsById", cellId];
+}
+
+function withMergedStyle(cell: Cell, style: CellStyle): Cell {
+  const mergedStyle = {
+    ...cell.style,
+    ...style,
+  };
+  if (Object.keys(mergedStyle).length === 0) {
+    const cellWithoutStyle = { ...cell };
+    delete cellWithoutStyle.style;
+    return cellWithoutStyle;
+  }
+  return {
+    ...cell,
+    style: mergedStyle,
+  };
 }
 
 function pushSet(json: MindooDBAppJsonPatch, path: Array<string | number>, value: unknown) {

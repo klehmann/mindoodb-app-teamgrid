@@ -60,7 +60,7 @@ import {
 } from "@/lib/clipboard";
 import { evaluateFormula, parseFormula, type FunctionDefinition } from "@/lib/formulas";
 import { DEFAULT_COLUMN_WIDTH } from "@/lib/gridDimensions";
-import { createCellId, createId, getFirstVisibleWorksheet, normalizeTags, type Cell, type CellStyle, type ColumnId, type CurrencyCode, type RowId, type WorksheetId } from "@/lib/teamgridDocument";
+import { createCellId, createId, getFirstVisibleWorksheet, normalizeTags, type Cell, type CellBorder, type CellBorderSide, type CellBorderStyle, type CellStyle, type ColumnId, type CurrencyCode, type RowId, type WorksheetId } from "@/lib/teamgridDocument";
 import { getCell, projectWorksheet } from "@/lib/gridProjection";
 import type { TeamGridOperation } from "@/lib/teamgridOps";
 import { importTeamGridWorkbookBuffer } from "@/lib/xlsx/importWorkbook";
@@ -81,6 +81,16 @@ interface CellSelectionRange {
   startCellId: string;
   endCellId: string;
 }
+
+type CellBorders = NonNullable<CellStyle["borders"]>;
+type CellBorderPatch = Partial<Record<CellBorderSide, CellBorder | null>>;
+type CellStylePatch = Omit<{
+  [Key in keyof CellStyle]?: CellStyle[Key] | null;
+}, "borders"> & {
+  borders?: CellBorderPatch | null;
+};
+type FormatDialogTab = "cellType" | "font" | "fill" | "border";
+type BorderPreset = "custom" | "none" | "outline" | "inside" | "all";
 
 /**
  * Identifies which editor the formula assist panel is anchored against, so
@@ -116,9 +126,22 @@ const errorDialogVisible = ref(false);
 const formatDialogVisible = ref(false);
 const renameTargetId = ref<WorksheetId | null>(null);
 const renameDraft = ref("");
+const formatDialogTab = ref<FormatDialogTab>("cellType");
 const formatDialogKind = ref<CellFormatKind>("general");
 const formatDialogCurrency = ref<CurrencyCode>("USD");
 const formatDialogCustomNumFmt = ref("");
+const formatDialogFontFamily = ref("Inter, sans-serif");
+const formatDialogFontSize = ref(14);
+const formatDialogBold = ref(false);
+const formatDialogItalic = ref(false);
+const formatDialogUnderline = ref(false);
+const formatDialogTextColor = ref("#111827");
+const formatDialogFillEnabled = ref(false);
+const formatDialogFillColor = ref("#ffffff");
+const formatDialogBorderStyle = ref<CellBorderStyle | "none">("thin");
+const formatDialogBorderColor = ref("#111827");
+const formatDialogBorderPreset = ref<BorderPreset>("custom");
+const formatDialogBorders = ref<CellBorders>({});
 const selectedOpenDocId = ref("");
 const selectedOpenCategoryKey = ref(ALL_SPREADSHEETS_NODE_KEY);
 const openCategoryNodes = ref<OpenCategoryNode[]>([]);
@@ -198,25 +221,7 @@ const selectedCell = computed(() => {
  * applies to "everything the user picked", e.g. the format toolbar.
  */
 const selectedCells = computed(() => {
-  if (!activeWorksheet.value || !projection.value || !selectedRange.value) {
-    return selectedCell.value ? [selectedCell.value] : [];
-  }
-  const start = findCellCoordinates(selectedRange.value.startCellId);
-  const end = findCellCoordinates(selectedRange.value.endCellId);
-  if (!start || !end) {
-    return selectedCell.value ? [selectedCell.value] : [];
-  }
-  const cells: Cell[] = [];
-  for (let rowIndex = Math.min(start.rowIndex, end.rowIndex); rowIndex <= Math.max(start.rowIndex, end.rowIndex); rowIndex += 1) {
-    for (let columnIndex = Math.min(start.columnIndex, end.columnIndex); columnIndex <= Math.max(start.columnIndex, end.columnIndex); columnIndex += 1) {
-      const row = projection.value.rows[rowIndex];
-      const column = projection.value.columns[columnIndex];
-      if (row && column) {
-        cells.push(getCell(activeWorksheet.value, row.id, column.id));
-      }
-    }
-  }
-  return cells;
+  return cellsForRange(selectedRange.value);
 });
 
 /** Convenience flag used to gate selection-dependent menu commands. */
@@ -346,10 +351,6 @@ const menuItems = computed<MenuItem[]>(() => [
   {
     label: "Format",
     items: [
-      { label: "Bold", icon: "pi pi-bold", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => patchSelectedStyle({ bold: !selectedCell.value?.style?.bold }) },
-      { label: "Italic", icon: "pi pi-italic", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => patchSelectedStyle({ italic: !selectedCell.value?.style?.italic }) },
-      { label: "Underline", icon: "pi pi-underline", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => patchSelectedStyle({ underline: !selectedCell.value?.style?.underline }) },
-      { separator: true },
       { label: "Format cells...", icon: "pi pi-sliders-h", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => openCellFormatDialog(selectedRange.value) },
     ],
   },
@@ -766,6 +767,8 @@ function openCellFormatDialog(range: CellSelectionRange | null) {
 function seedFormatDialogFromCell(cell: Cell | null) {
   const value = cell?.value;
   const excelNumFmt = value && "excelNumFmt" in value ? value.excelNumFmt : undefined;
+  const style = cell?.style;
+  formatDialogTab.value = "cellType";
   formatDialogKind.value = excelNumFmt && isCustomExcelNumFmt(excelNumFmt)
     ? "custom"
     : value?.kind === "string"
@@ -777,10 +780,22 @@ function seedFormatDialogFromCell(cell: Cell | null) {
   formatDialogCustomNumFmt.value = value?.kind === "number" || value?.kind === "date" || value?.kind === "string"
     ? excelNumFmt ?? ""
     : "";
+  formatDialogFontFamily.value = style?.fontFamily ?? "Inter, sans-serif";
+  formatDialogFontSize.value = style?.fontSize ?? 14;
+  formatDialogBold.value = Boolean(style?.bold);
+  formatDialogItalic.value = Boolean(style?.italic);
+  formatDialogUnderline.value = Boolean(style?.underline);
+  formatDialogTextColor.value = style?.textColor ?? "#111827";
+  formatDialogFillEnabled.value = Boolean(style?.backgroundColor);
+  formatDialogFillColor.value = style?.backgroundColor ?? "#ffffff";
+  formatDialogBorderStyle.value = firstBorderStyle(style?.borders) ?? "thin";
+  formatDialogBorderColor.value = firstBorderColor(style?.borders) ?? "#111827";
+  formatDialogBorderPreset.value = "custom";
+  formatDialogBorders.value = { ...style?.borders };
 }
 
 function isCustomExcelNumFmt(numFmt: string) {
-  return !new Set(["@", "0", "0.00", "0.00%", "$#,##0.00", "€#,##0.00"]).has(numFmt);
+  return !new Set(["@", "0", "0.00", "0.00%", "$0.00", "€0.00", "$#,##0.00", "€#,##0.00"]).has(numFmt);
 }
 
 function currentCellFormatRequest(): CellFormatRequest {
@@ -793,27 +808,36 @@ function currentCellFormatRequest(): CellFormatRequest {
   return { kind: formatDialogKind.value };
 }
 
-/** Apply the chosen value format to every selected cell through granular cell patches. */
+/** Apply the chosen value and style format to every selected cell. */
 function applySelectedCellFormat() {
   if (!activeWorksheet.value || app.gridReadOnly.value || selectedCells.value.length === 0) {
     formatDialogVisible.value = false;
     return;
   }
   const request = currentCellFormatRequest();
-  const cellsToFormat = selectedCells.value;
+  const range = selectedRange.value;
+  const cellsToFormat = cellsWithCoordinatesForRange(range);
   const locale = app.activeGrid.value?.settings.locale ?? "en-US";
   app.updateGrid((grid) => {
     const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
     const operations: TeamGridOperation[] = [];
-    for (const cell of cellsToFormat) {
+    const patchedCells: Cell[] = [];
+    const bounds = boundsForRange(range);
+    for (const { cell, rowIndex, columnIndex } of cellsToFormat) {
       const existing = worksheet.cellsById[cell.id] ?? cell;
       const formatted = applyCellFormat(existing, request, locale);
-      if (formatted === existing) {
-        continue;
+      const stylePatch = formatDialogStylePatchForCell(rowIndex, columnIndex, bounds);
+      const nextStyle = applyCellStylePatch(formatted.style, stylePatch);
+      const nextCell: Cell = { ...formatted };
+      if (nextStyle) {
+        nextCell.style = nextStyle;
+      } else {
+        delete nextCell.style;
       }
-      worksheet.cellsById[formatted.id] = formatted;
-      operations.push({ type: "setCell", worksheetId: worksheet.id, cell: formatted });
+      worksheet.cellsById[nextCell.id] = nextCell;
+      patchedCells.push(nextCell);
     }
+    operations.push({ type: "setCellsStyle", worksheetId: worksheet.id, cells: patchedCells, style: {} });
     return operations;
   });
   formatDialogVisible.value = false;
@@ -1208,6 +1232,51 @@ function findCellCoordinates(cellId: string) {
     return null;
   }
   return findCellCoordinatesInProjection(cellId, activeWorksheet.value, projection.value);
+}
+
+function cellsForRange(range: CellSelectionRange | null) {
+  return cellsWithCoordinatesForRange(range).map(({ cell }) => cell);
+}
+
+function cellsWithCoordinatesForRange(range: CellSelectionRange | null) {
+  if (!activeWorksheet.value || !projection.value || !range) {
+    const coordinates = selectedCell.value ? findCellCoordinates(selectedCell.value.id) : null;
+    return selectedCell.value
+      ? [{ cell: selectedCell.value, rowIndex: coordinates?.rowIndex ?? 0, columnIndex: coordinates?.columnIndex ?? 0 }]
+      : [];
+  }
+  const start = findCellCoordinates(range.startCellId);
+  const end = findCellCoordinates(range.endCellId);
+  if (!start || !end) {
+    const coordinates = selectedCell.value ? findCellCoordinates(selectedCell.value.id) : null;
+    return selectedCell.value
+      ? [{ cell: selectedCell.value, rowIndex: coordinates?.rowIndex ?? 0, columnIndex: coordinates?.columnIndex ?? 0 }]
+      : [];
+  }
+  const cells: Array<{ cell: Cell; rowIndex: number; columnIndex: number }> = [];
+  for (let rowIndex = Math.min(start.rowIndex, end.rowIndex); rowIndex <= Math.max(start.rowIndex, end.rowIndex); rowIndex += 1) {
+    for (let columnIndex = Math.min(start.columnIndex, end.columnIndex); columnIndex <= Math.max(start.columnIndex, end.columnIndex); columnIndex += 1) {
+      const row = projection.value.rows[rowIndex];
+      const column = projection.value.columns[columnIndex];
+      if (row && column) {
+        cells.push({ cell: getCell(activeWorksheet.value, row.id, column.id), rowIndex, columnIndex });
+      }
+    }
+  }
+  return cells;
+}
+
+function boundsForRange(range: CellSelectionRange | null) {
+  const cells = cellsWithCoordinatesForRange(range);
+  if (cells.length === 0) {
+    return null;
+  }
+  return {
+    minRow: Math.min(...cells.map((cell) => cell.rowIndex)),
+    maxRow: Math.max(...cells.map((cell) => cell.rowIndex)),
+    minCol: Math.min(...cells.map((cell) => cell.columnIndex)),
+    maxCol: Math.max(...cells.map((cell) => cell.columnIndex)),
+  };
 }
 
 /**
@@ -1662,29 +1731,187 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
  *
  * The patch is shallow-merged onto each cell so the user can, for example,
  * change only `fontWeight` without losing previously set `backgroundColor`.
+ * A `null` patch value removes that cell-level override.
  * A single `setCellsStyle` operation is emitted so the persisted patch is
  * compact and Automerge sees one logical edit per selection.
  */
-function patchSelectedStyle(style: CellStyle) {
-  if (!activeWorksheet.value || selectedCells.value.length === 0) return;
-  const cellsToPatch = selectedCells.value;
+function patchSelectedStyle(style: CellStylePatch) {
+  patchCellsStyle(selectedRange.value, style);
+}
+
+function patchCellsStyle(range: CellSelectionRange | null, style: CellStylePatch) {
+  if (!activeWorksheet.value || app.gridReadOnly.value) return;
+  const cellsToPatch = cellsForRange(range);
+  if (cellsToPatch.length === 0) return;
   app.updateGrid((grid) => {
     const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
     const patchedCells: Cell[] = [];
     for (const cell of cellsToPatch) {
       const existing = worksheet.cellsById[cell.id] ?? cell;
-      const patchedCell = {
-        ...existing,
-        style: {
-          ...existing.style,
-          ...style,
-        },
-      };
+      const nextStyle = applyCellStylePatch(existing.style, style);
+      const patchedCell: Cell = { ...existing };
+      if (nextStyle) {
+        patchedCell.style = nextStyle;
+      } else {
+        delete patchedCell.style;
+      }
       worksheet.cellsById[existing.id] = patchedCell;
       patchedCells.push(patchedCell);
     }
-    return [{ type: "setCellsStyle", worksheetId: worksheet.id, cells: patchedCells, style }];
+    return [{ type: "setCellsStyle", worksheetId: worksheet.id, cells: patchedCells, style: compactCellStylePatch(style) }];
   });
+}
+
+function applyCellStylePatch(currentStyle: CellStyle | undefined, patch: CellStylePatch) {
+  const nextStyle: CellStyle = { ...currentStyle };
+  for (const key of Object.keys(patch) as Array<keyof CellStyle>) {
+    const value = patch[key];
+    if (value == null) {
+      delete nextStyle[key];
+    } else if (key === "borders") {
+      nextStyle.borders = applyCellBorderPatch(nextStyle.borders, value as CellBorderPatch);
+      if (!nextStyle.borders) {
+        delete nextStyle.borders;
+      }
+    } else {
+      nextStyle[key] = value as never;
+    }
+  }
+  return Object.keys(nextStyle).length > 0 ? nextStyle : undefined;
+}
+
+function compactCellStylePatch(patch: CellStylePatch): CellStyle {
+  const compact: CellStyle = {};
+  for (const key of Object.keys(patch) as Array<keyof CellStyle>) {
+    const value = patch[key];
+    if (value != null) {
+      compact[key] = value as never;
+    }
+  }
+  return compact;
+}
+
+function applyCellBorderPatch(currentBorders: CellBorders | undefined, patch: CellBorderPatch) {
+  const nextBorders: CellBorders = { ...currentBorders };
+  for (const side of Object.keys(patch) as CellBorderSide[]) {
+    const border = patch[side];
+    if (border == null) {
+      delete nextBorders[side];
+    } else {
+      nextBorders[side] = border;
+    }
+  }
+  return Object.keys(nextBorders).length > 0 ? nextBorders : undefined;
+}
+
+function formatDialogStylePatchForCell(rowIndex: number, columnIndex: number, bounds: ReturnType<typeof boundsForRange>): CellStylePatch {
+  return {
+    fontFamily: formatDialogFontFamily.value.trim() || null,
+    fontSize: formatDialogFontSize.value || null,
+    bold: formatDialogBold.value,
+    italic: formatDialogItalic.value,
+    underline: formatDialogUnderline.value,
+    textColor: formatDialogTextColor.value,
+    backgroundColor: formatDialogFillEnabled.value ? formatDialogFillColor.value : null,
+    borders: borderPatchForCell(rowIndex, columnIndex, bounds),
+  };
+}
+
+function borderPatchForCell(rowIndex: number, columnIndex: number, bounds: ReturnType<typeof boundsForRange>): CellBorderPatch | null {
+  if (formatDialogBorderPreset.value === "none") {
+    return { top: null, right: null, bottom: null, left: null };
+  }
+  if (formatDialogBorderStyle.value === "none") {
+    return formatDialogBorderPreset.value === "custom" ? normalizeBorderPatch(formatDialogBorders.value) : null;
+  }
+  const border = currentDialogBorder();
+  if (formatDialogBorderPreset.value === "outline" && bounds) {
+    return {
+      top: rowIndex === bounds.minRow ? border : null,
+      right: columnIndex === bounds.maxCol ? border : null,
+      bottom: rowIndex === bounds.maxRow ? border : null,
+      left: columnIndex === bounds.minCol ? border : null,
+    };
+  }
+  if (formatDialogBorderPreset.value === "inside" && bounds) {
+    return {
+      top: rowIndex > bounds.minRow ? border : null,
+      left: columnIndex > bounds.minCol ? border : null,
+    };
+  }
+  if (formatDialogBorderPreset.value === "all") {
+    return { top: border, right: border, bottom: border, left: border };
+  }
+  return normalizeBorderPatch(formatDialogBorders.value);
+}
+
+function normalizeBorderPatch(borders: CellBorders): CellBorderPatch | null {
+  return Object.keys(borders).length > 0 ? { ...borders } : null;
+}
+
+function currentDialogBorder(): CellBorder {
+  return {
+    style: formatDialogBorderStyle.value === "none" ? "thin" : formatDialogBorderStyle.value,
+    color: formatDialogBorderColor.value,
+  };
+}
+
+function currentDialogBorderCss(border: CellBorder | undefined) {
+  if (!border) {
+    return undefined;
+  }
+  const width = border.style === "thick"
+    ? "3px"
+    : border.style === "medium" || border.style === "double"
+      ? "2px"
+      : "1px";
+  const style = border.style === "dashed" || border.style === "dotted" || border.style === "double"
+    ? border.style
+    : "solid";
+  return `${width} ${style} ${border.color ?? formatDialogBorderColor.value}`;
+}
+
+function updateCustomBordersFromLineSelection() {
+  if (formatDialogBorderPreset.value !== "custom") {
+    return;
+  }
+  const sides = Object.keys(formatDialogBorders.value) as CellBorderSide[];
+  if (formatDialogBorderStyle.value === "none") {
+    formatDialogBorders.value = {};
+    return;
+  }
+  if (sides.length === 0) {
+    formatDialogBorderPreset.value = "outline";
+    return;
+  }
+  const border = currentDialogBorder();
+  formatDialogBorders.value = Object.fromEntries(sides.map((side) => [side, border])) as CellBorders;
+}
+
+function firstBorderStyle(borders: CellBorders | undefined) {
+  return Object.values(borders ?? {})[0]?.style;
+}
+
+function firstBorderColor(borders: CellBorders | undefined) {
+  return Object.values(borders ?? {})[0]?.color;
+}
+
+function toggleFormatDialogBorder(side: CellBorderSide) {
+  formatDialogBorderPreset.value = "custom";
+  const nextBorders = { ...formatDialogBorders.value };
+  if (formatDialogBorderStyle.value === "none" || nextBorders[side]) {
+    delete nextBorders[side];
+  } else {
+    nextBorders[side] = currentDialogBorder();
+  }
+  formatDialogBorders.value = nextBorders;
+}
+
+function setFormatDialogBorderPreset(preset: BorderPreset) {
+  formatDialogBorderPreset.value = preset;
+  if (preset === "none") {
+    formatDialogBorders.value = {};
+  }
 }
 </script>
 
@@ -1754,50 +1981,6 @@ function patchSelectedStyle(style: CellStyle) {
         </div>
 
         <div class="format-toolbar">
-          <label>
-            Text
-            <input type="color" :disabled="app.gridReadOnly.value || !hasSelection" :value="selectedCell?.style?.textColor ?? '#eef2ff'" @input="patchSelectedStyle({ textColor: ($event.target as HTMLInputElement).value })">
-          </label>
-          <label>
-            Fill
-            <input type="color" :disabled="app.gridReadOnly.value || !hasSelection" :value="selectedCell?.style?.backgroundColor ?? '#111827'" @input="patchSelectedStyle({ backgroundColor: ($event.target as HTMLInputElement).value })">
-          </label>
-          <label>
-            Font size
-            <input class="format-toolbar__number" type="number" min="8" max="48" :disabled="app.gridReadOnly.value || !hasSelection" :value="selectedCell?.style?.fontSize ?? 14" @change="patchSelectedStyle({ fontSize: Number(($event.target as HTMLInputElement).value) })">
-          </label>
-          <span class="format-toolbar__divider" aria-hidden="true" />
-          <button
-            type="button"
-            class="format-toolbar__text-button format-toolbar__text-button--bold"
-            aria-label="Bold"
-            :disabled="app.gridReadOnly.value || !hasSelection"
-            :class="{ 'format-toolbar__button--active': selectedCell?.style?.bold }"
-            @click="patchSelectedStyle({ bold: !selectedCell?.style?.bold })"
-          >
-            B
-          </button>
-          <button
-            type="button"
-            class="format-toolbar__text-button format-toolbar__text-button--italic"
-            aria-label="Italic"
-            :disabled="app.gridReadOnly.value || !hasSelection"
-            :class="{ 'format-toolbar__button--active': selectedCell?.style?.italic }"
-            @click="patchSelectedStyle({ italic: !selectedCell?.style?.italic })"
-          >
-            I
-          </button>
-          <button
-            type="button"
-            class="format-toolbar__text-button format-toolbar__text-button--underline"
-            aria-label="Underline"
-            :disabled="app.gridReadOnly.value || !hasSelection"
-            :class="{ 'format-toolbar__button--active': selectedCell?.style?.underline }"
-            @click="patchSelectedStyle({ underline: !selectedCell?.style?.underline })"
-          >
-            U
-          </button>
-          <span class="format-toolbar__divider" aria-hidden="true" />
           <button
             type="button"
             class="format-toolbar__value-button"
@@ -1865,39 +2048,120 @@ function patchSelectedStyle(style: CellStyle) {
 
     <footer class="status-line">{{ statusLineText }}</footer>
 
-    <Dialog v-model:visible="formatDialogVisible" modal header="Format cells" :style="{ width: '32rem', maxWidth: '96vw' }">
+    <Dialog v-model:visible="formatDialogVisible" modal header="Format cells" :style="{ width: '48rem', maxWidth: '96vw' }">
       <div class="cell-format-dialog">
-        <label class="field">
-          Format
-          <select v-model="formatDialogKind" class="native-input">
-            <option value="text">Text</option>
-            <option value="general">Standard</option>
-            <option value="integer">Integer</option>
-            <option value="decimal">Decimal</option>
-            <option value="percent">Percent</option>
-            <option value="currency">Currency</option>
-            <option value="custom">Custom Excel format</option>
-          </select>
-        </label>
-        <label v-if="formatDialogKind === 'currency'" class="field">
-          Currency
-          <select v-model="formatDialogCurrency" class="native-input">
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-          </select>
-        </label>
-        <label v-if="formatDialogKind === 'custom'" class="field">
-          Excel number format
-          <input
-            v-model="formatDialogCustomNumFmt"
-            class="native-input"
-            type="text"
-            autocomplete="off"
-            placeholder="$#,##0.00;[Red]-$#,##0.00"
-            @keyup.enter="applySelectedCellFormat"
-          >
-        </label>
-        <p class="cell-format-dialog__hint">Formatting is applied to the current selection. Numeric-looking text is converted for number, percent, and currency formats; incompatible values are left unchanged.</p>
+        <div class="cell-format-dialog__tabs" role="tablist" aria-label="Format cells sections">
+          <button type="button" :class="{ 'cell-format-dialog__tab--active': formatDialogTab === 'cellType' }" @click="formatDialogTab = 'cellType'">Cell type</button>
+          <button type="button" :class="{ 'cell-format-dialog__tab--active': formatDialogTab === 'font' }" @click="formatDialogTab = 'font'">Font</button>
+          <button type="button" :class="{ 'cell-format-dialog__tab--active': formatDialogTab === 'fill' }" @click="formatDialogTab = 'fill'">Fill</button>
+          <button type="button" :class="{ 'cell-format-dialog__tab--active': formatDialogTab === 'border' }" @click="formatDialogTab = 'border'">Border</button>
+        </div>
+
+        <section v-if="formatDialogTab === 'cellType'" class="cell-format-dialog__panel">
+          <label class="field">
+            Format
+            <select v-model="formatDialogKind" class="native-input">
+              <option value="text">Text</option>
+              <option value="general">Standard</option>
+              <option value="integer">Integer</option>
+              <option value="decimal">Decimal</option>
+              <option value="percent">Percent</option>
+              <option value="currency">Currency</option>
+              <option value="custom">Custom Excel format</option>
+            </select>
+          </label>
+          <label v-if="formatDialogKind === 'currency'" class="field">
+            Currency
+            <select v-model="formatDialogCurrency" class="native-input">
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </label>
+          <label v-if="formatDialogKind === 'custom'" class="field">
+            Excel number format
+            <input
+              v-model="formatDialogCustomNumFmt"
+              class="native-input"
+              type="text"
+              autocomplete="off"
+              placeholder="$0.00;[Red]-$0.00"
+              @keyup.enter="applySelectedCellFormat"
+            >
+          </label>
+          <p class="cell-format-dialog__hint">Numeric-looking text is converted for number, percent, and currency formats; incompatible values are left unchanged.</p>
+        </section>
+
+        <section v-else-if="formatDialogTab === 'font'" class="cell-format-dialog__panel cell-format-dialog__grid">
+          <label class="field">
+            Font family
+            <input v-model="formatDialogFontFamily" class="native-input" type="text" autocomplete="off">
+          </label>
+          <label class="field">
+            Font size
+            <input v-model.number="formatDialogFontSize" class="native-input" type="number" min="8" max="72">
+          </label>
+          <label class="field">
+            Text color
+            <input v-model="formatDialogTextColor" class="native-input native-input--color" type="color">
+          </label>
+          <div class="cell-format-dialog__checks">
+            <label><input v-model="formatDialogBold" type="checkbox"> Bold</label>
+            <label><input v-model="formatDialogItalic" type="checkbox"> Italic</label>
+            <label><input v-model="formatDialogUnderline" type="checkbox"> Underline</label>
+          </div>
+        </section>
+
+        <section v-else-if="formatDialogTab === 'fill'" class="cell-format-dialog__panel cell-format-dialog__grid">
+          <label class="field">
+            Background color
+            <input v-model="formatDialogFillColor" class="native-input native-input--color" type="color" :disabled="!formatDialogFillEnabled">
+          </label>
+          <div class="cell-format-dialog__checks">
+            <label><input v-model="formatDialogFillEnabled" type="checkbox"> Use fill color</label>
+            <button type="button" class="format-toolbar__value-button" @click="formatDialogFillEnabled = false">No fill</button>
+          </div>
+        </section>
+
+        <section v-else class="cell-format-dialog__panel cell-format-dialog__border">
+          <div class="cell-format-dialog__border-tools">
+            <label class="field">
+              Line style
+              <select v-model="formatDialogBorderStyle" class="native-input" @change="updateCustomBordersFromLineSelection">
+                <option value="none">None</option>
+                <option value="thin">Thin</option>
+                <option value="medium">Medium</option>
+                <option value="thick">Thick</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+                <option value="double">Double</option>
+              </select>
+            </label>
+            <label class="field">
+              Line color
+              <input v-model="formatDialogBorderColor" class="native-input native-input--color" type="color" :disabled="formatDialogBorderStyle === 'none'" @input="updateCustomBordersFromLineSelection">
+            </label>
+          </div>
+          <div class="cell-format-dialog__border-main">
+            <div class="cell-format-dialog__presets">
+              <span>Presets</span>
+              <button type="button" @click="setFormatDialogBorderPreset('none')">None</button>
+              <button type="button" @click="setFormatDialogBorderPreset('outline')">Outline</button>
+              <button type="button" @click="setFormatDialogBorderPreset('inside')">Inside</button>
+              <button type="button" @click="setFormatDialogBorderPreset('all')">All</button>
+            </div>
+            <div class="cell-format-dialog__border-preview" aria-label="Border preview">
+              <button type="button" class="cell-format-dialog__border-toggle cell-format-dialog__border-toggle--top" @click="toggleFormatDialogBorder('top')">Top</button>
+              <button type="button" class="cell-format-dialog__border-toggle cell-format-dialog__border-toggle--right" @click="toggleFormatDialogBorder('right')">Right</button>
+              <button type="button" class="cell-format-dialog__border-toggle cell-format-dialog__border-toggle--bottom" @click="toggleFormatDialogBorder('bottom')">Bottom</button>
+              <button type="button" class="cell-format-dialog__border-toggle cell-format-dialog__border-toggle--left" @click="toggleFormatDialogBorder('left')">Left</button>
+              <div class="cell-format-dialog__border-sample" :style="{ borderTop: currentDialogBorderCss(formatDialogBorders.top), borderRight: currentDialogBorderCss(formatDialogBorders.right), borderBottom: currentDialogBorderCss(formatDialogBorders.bottom), borderLeft: currentDialogBorderCss(formatDialogBorders.left) }">
+                <span>Text</span>
+                <span>Text</span>
+              </div>
+            </div>
+          </div>
+          <p class="cell-format-dialog__hint">Choose a line style and color, then use presets or click individual preview edges. Presets apply across the current selection.</p>
+        </section>
       </div>
       <template #footer>
         <Button label="Cancel" text @click="formatDialogVisible = false" />

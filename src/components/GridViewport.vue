@@ -117,7 +117,7 @@ import { evaluateFormula } from "@/lib/formulas";
 import { insertFunctionAtCaret } from "@/lib/formulas/assist";
 import { getCell, getCellAddress, type GridProjection } from "@/lib/gridProjection";
 import { DEFAULT_ROW_HEIGHT } from "@/lib/gridDimensions";
-import { createCellId, type Cell, type CellId, type ColumnId, type RowId, type Worksheet } from "@/lib/teamgridDocument";
+import { createCellId, type Cell, type CellBorder, type CellBorderSide, type CellId, type ColumnId, type RowId, type Worksheet } from "@/lib/teamgridDocument";
 import type { FunctionDefinition } from "@/lib/formulas";
 
 /**
@@ -229,6 +229,7 @@ const KEYBOARD_SELECTION_DELTAS: Record<string, { rows: number; cols: number }> 
 const MIN_COLUMN_WIDTH = 48;
 /** Resize handles cannot drag a row shorter than this. */
 const MIN_ROW_HEIGHT = 24;
+const BORDER_SIDES: CellBorderSide[] = ["top", "right", "bottom", "left"];
 
 /** State for an in-progress resize drag of a single column or row. */
 interface ResizeDrag {
@@ -292,7 +293,7 @@ onBeforeUnmount(() => {
  */
 function displayCell(cell: Cell) {
   if (cell.formula) {
-    return formatFormulaResult(evaluateFormula(cell.formula.source, props.worksheet, props.projection).result, props.locale);
+    return formatFormulaResult(evaluateFormula(cell.formula.source, props.worksheet, props.projection).result, props.locale, cell.value);
   }
   return formatCellValue(cell.value, props.locale);
 }
@@ -491,6 +492,39 @@ function cellStyle(cell: Cell) {
     textAlign: mergedStyle.horizontalAlign,
     verticalAlign: mergedStyle.verticalAlign,
   };
+}
+
+function cellBorderOverlayStyle(cell: Cell, side: CellBorderSide) {
+  const mergedStyle = mergeCellStyle(props.worksheet.rowsById[cell.rowId], props.worksheet.columnsById[cell.columnId], cell);
+  const border = cssBorder(mergedStyle.borders?.[side]);
+  if (!border) {
+    return { display: "none" };
+  }
+  switch (side) {
+    case "top":
+      return { borderTop: border };
+    case "right":
+      return { borderRight: border };
+    case "bottom":
+      return { borderBottom: border };
+    case "left":
+      return { borderLeft: border };
+  }
+}
+
+function cssBorder(border: CellBorder | undefined) {
+  if (!border) {
+    return undefined;
+  }
+  const width = border.style === "thick"
+    ? "3px"
+    : border.style === "medium" || border.style === "double"
+      ? "2px"
+      : "1px";
+  const lineStyle = border.style === "dashed" || border.style === "dotted" || border.style === "double"
+    ? border.style
+    : "solid";
+  return `${width} ${lineStyle} ${border.color ?? "currentColor"}`;
 }
 
 /**
@@ -1190,6 +1224,14 @@ defineExpose({ applyFormulaAssistSuggestion, flushPendingEdit });
             @dblclick="startEditing(row.id, column.id)"
             @keydown="handleEditKey($event, row.id, column.id)"
           >
+            <span
+              v-for="side in BORDER_SIDES"
+              :key="side"
+              class="grid-cell__border-overlay"
+              :class="`grid-cell__border-overlay--${side}`"
+              :style="cellBorderOverlayStyle(getCell(worksheet, row.id, column.id), side)"
+              aria-hidden="true"
+            />
             <input
               v-if="editingCellId === getCell(worksheet, row.id, column.id).id"
               ref="editorInputEl"
@@ -1328,7 +1370,39 @@ defineExpose({ applyFormulaAssistSuggestion, flushPendingEdit });
   color: var(--formula-text);
 }
 
+.grid-cell__border-overlay {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.grid-cell__border-overlay--top {
+  top: 0;
+  right: 0;
+  left: 0;
+}
+
+.grid-cell__border-overlay--right {
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.grid-cell__border-overlay--bottom {
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.grid-cell__border-overlay--left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+
 .grid-cell__editor {
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   padding: 0.25rem 0.45rem;

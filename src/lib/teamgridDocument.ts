@@ -15,6 +15,8 @@ export type DateFormat = "date" | "dateTime" | "time";
 export type CurrencyCode = "EUR" | "USD";
 export type HorizontalAlign = "left" | "center" | "right";
 export type VerticalAlign = "top" | "middle" | "bottom";
+export type CellBorderStyle = "thin" | "medium" | "thick" | "dashed" | "dotted" | "double";
+export type CellBorderSide = "top" | "right" | "bottom" | "left";
 
 export interface TeamGridDocumentEnvelope {
   subject: string;
@@ -99,6 +101,12 @@ export interface CellStyle {
   underline?: boolean;
   horizontalAlign?: HorizontalAlign;
   verticalAlign?: VerticalAlign;
+  borders?: Partial<Record<CellBorderSide, CellBorder>>;
+}
+
+export interface CellBorder {
+  style: CellBorderStyle;
+  color?: string;
 }
 
 export interface FormulaCell {

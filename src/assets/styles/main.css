@@ -550,12 +550,144 @@ button.toolbar__status-badge:focus-visible {
   gap: 1rem;
 }
 
+.cell-format-dialog__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.04);
+}
+
+.cell-format-dialog__tabs button,
+.cell-format-dialog__presets button,
+.cell-format-dialog__border-toggle {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.cell-format-dialog__tabs button {
+  padding: 0.45rem 0.8rem;
+}
+
+.cell-format-dialog__tab--active {
+  background: rgb(212 160 23 / 0.22) !important;
+}
+
+.cell-format-dialog__panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.cell-format-dialog__grid {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.native-input--color {
+  width: 5rem;
+  min-height: 2.4rem;
+  padding: 0.2rem;
+}
+
+.cell-format-dialog__checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cell-format-dialog__checks label {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.cell-format-dialog__border {
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(18rem, 1.2fr);
+}
+
+.cell-format-dialog__border-tools,
+.cell-format-dialog__presets {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+
+.cell-format-dialog__border-main {
+  display: grid;
+  gap: 1rem;
+}
+
+.cell-format-dialog__presets {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.cell-format-dialog__presets span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+
+.cell-format-dialog__presets button,
+.cell-format-dialog__border-toggle {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  background: rgb(255 255 255 / 0.04);
+}
+
+.cell-format-dialog__border-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 14rem;
+  padding: 2.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+}
+
+.cell-format-dialog__border-sample {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  place-items: center;
+  width: 14rem;
+  height: 8rem;
+  color: var(--text);
+  outline: 1px dashed var(--border);
+}
+
+.cell-format-dialog__border-toggle {
+  position: absolute;
+}
+
+.cell-format-dialog__border-toggle--top {
+  top: 0.6rem;
+}
+
+.cell-format-dialog__border-toggle--right {
+  right: 0.6rem;
+}
+
+.cell-format-dialog__border-toggle--bottom {
+  bottom: 0.6rem;
+}
+
+.cell-format-dialog__border-toggle--left {
+  left: 0.6rem;
+}
+
 .properties-dialog code {
   color: var(--formula-text);
 }
 
 @media (max-width: 720px) {
   .open-dialog__browser {
+    grid-template-columns: 1fr;
+  }
+
+  .cell-format-dialog__border {
     grid-template-columns: 1fr;
   }
 }

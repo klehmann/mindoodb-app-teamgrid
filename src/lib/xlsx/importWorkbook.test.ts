@@ -27,6 +27,10 @@ describe("Teamgrid XLSX import", () => {
       horizontal: "center",
       vertical: "bottom",
     };
+    worksheet.getCell("A1").border = {
+      top: { style: "thin", color: { argb: "FFEEF2FF" } },
+      bottom: { style: "double", color: { argb: "FF111827" } },
+    };
     worksheet.getCell("B1").value = { formula: "A1*2", result: 24 };
     worksheet.getCell("C1").value = 7;
     worksheet.getCell("C1").numFmt = "€#,##0.00";
@@ -63,6 +67,10 @@ describe("Teamgrid XLSX import", () => {
       backgroundColor: "#111827",
       horizontalAlign: "center",
       verticalAlign: "bottom",
+      borders: {
+        top: { style: "thin", color: "#eef2ff" },
+        bottom: { style: "double", color: "#111827" },
+      },
     });
     expect(cellB1.formula).toMatchObject({
       source: "=A1*2",
