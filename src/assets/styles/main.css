@@ -1,3 +1,22 @@
+/*
+ * Global stylesheet.
+ *
+ * After the feature-based refactor this file only holds:
+ *  - Design tokens (`:root` light/dark variables)
+ *  - CSS resets and document-level rules (`*`, `body`, `#app`, ...)
+ *  - The shared `.glass-card` utility
+ *  - The top-level layout shell (`.teamgrid-shell`, `.workspace`)
+ *  - Form primitives shared across dialogs (`.field`, `.native-input`)
+ *  - The toolbar / format toolbar / empty state / status line styles that
+ *    live in `src/app/App.vue` and intentionally cascade into PrimeVue
+ *    child elements (`:deep()` would force every selector to wrap the
+ *    PrimeVue parts, which is noisier than just keeping them global).
+ *  - The keyframes used by the grid clipboard marquee.
+ *
+ * Component-specific rules co-locate with their SFCs under
+ * `src/features/...` and use `<style scoped>`.
+ */
+
 :root {
   color-scheme: dark;
   --bg: #0b1020;
@@ -84,6 +103,40 @@ select {
   font: inherit;
 }
 
+/*
+ * XLSX-import font fallbacks.
+ *
+ * Cells imported from `.xlsx` files often reference Microsoft Office fonts
+ * (`Calibri`, `Cambria`) that aren't installed on macOS, Linux, or mobile.
+ * We bundle Google's metric-compatible open replacements (`Carlito`,
+ * `Caladea`) and alias them: the browser tries the real Microsoft font
+ * first, then falls back to the bundled stand-in, so layout stays stable
+ * everywhere without rewriting the persisted font name.
+ */
+@font-face {
+  font-family: "Calibri";
+  font-weight: 400;
+  src: local("Calibri"), local("Carlito");
+}
+
+@font-face {
+  font-family: "Calibri";
+  font-weight: 700;
+  src: local("Calibri Bold"), local("Calibri"), local("Carlito Bold"), local("Carlito");
+}
+
+@font-face {
+  font-family: "Cambria";
+  font-weight: 400;
+  src: local("Cambria"), local("Caladea");
+}
+
+@font-face {
+  font-family: "Cambria";
+  font-weight: 700;
+  src: local("Cambria Bold"), local("Cambria"), local("Caladea Bold"), local("Caladea");
+}
+
 @keyframes teamgrid-clipboard-marquee {
   to {
     background-position: 8px 0, -8px 100%, 0 -8px, 100% 8px;
@@ -99,26 +152,6 @@ select {
   border-radius: var(--radius-lg);
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
-}
-
-.grid-cell--clipboard-source {
-  background-image:
-    linear-gradient(90deg, var(--accent) 50%, transparent 50%),
-    linear-gradient(90deg, var(--accent) 50%, transparent 50%),
-    linear-gradient(0deg, var(--accent) 50%, transparent 50%),
-    linear-gradient(0deg, var(--accent) 50%, transparent 50%);
-  background-position: 0 0, 0 100%, 0 0, 100% 0;
-  background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
-  background-size: 8px 2px, 8px 2px, 2px 8px, 2px 8px;
-  animation: teamgrid-clipboard-marquee 0.65s linear infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .grid-cell--clipboard-source {
-    animation: none;
-    outline: 1px dashed var(--accent);
-    outline-offset: -2px;
-  }
 }
 
 .teamgrid-shell {
@@ -297,100 +330,6 @@ button.toolbar__status-badge:focus-visible {
   font-weight: 700;
 }
 
-.format-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.6rem;
-  border-bottom: 1px solid var(--border);
-  background: rgb(255 255 255 / 0.025);
-}
-
-.format-toolbar label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.format-toolbar__number {
-  width: 4.5rem;
-  padding: 0.25rem 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 0.45rem;
-  background: rgb(255 255 255 / 0.06);
-  color: var(--text);
-}
-
-.format-toolbar__divider {
-  width: 1px;
-  height: 1.75rem;
-  margin: 0 0.15rem;
-  background: var(--border);
-}
-
-.format-toolbar__text-button {
-  display: inline-grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font: inherit;
-}
-
-.format-toolbar__text-button:hover:not(:disabled),
-.format-toolbar__text-button:focus-visible {
-  background: rgb(255 255 255 / 0.08);
-  color: var(--text);
-}
-
-.format-toolbar__text-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.format-toolbar__text-button--bold {
-  font-weight: 800;
-}
-
-.format-toolbar__text-button--italic {
-  font-style: italic;
-}
-
-.format-toolbar__text-button--underline {
-  text-decoration: underline;
-}
-
-.format-toolbar__button--active {
-  background: rgb(212 160 23 / 0.18);
-  color: var(--text);
-}
-
-.format-toolbar__value-button {
-  padding: 0.35rem 0.65rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.04);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.format-toolbar__value-button:hover:not(:disabled),
-.format-toolbar__value-button:focus-visible {
-  border-color: var(--border-strong);
-  background: rgb(212 160 23 / 0.12);
-}
-
-.format-toolbar__value-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
 .empty-state {
   margin: auto;
   max-width: 36rem;
@@ -446,248 +385,8 @@ button.toolbar__status-badge:focus-visible {
   resize: vertical;
 }
 
-.open-dialog {
-  display: grid;
-  gap: 1rem;
-}
-
-.open-dialog__browser {
-  min-height: 22rem;
-  display: grid;
-  grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 1.4fr);
-  gap: 0.8rem;
-}
-
-.open-dialog__tree {
-  max-height: 24rem;
-  overflow: auto;
-  padding: 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: 0.85rem;
-  background: rgb(255 255 255 / 0.025);
-}
-
-.tag-tree-list {
-  display: grid;
-  gap: 0.2rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.tag-tree-list .tag-tree-list {
-  margin-left: 0.8rem;
-  padding-left: 0.55rem;
-  border-left: 1px solid var(--border);
-}
-
-.tag-tree-list__button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid transparent;
-  border-radius: 0.65rem;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-}
-
-.tag-tree-list__button:hover,
-.tag-tree-list__button--selected {
-  border-color: var(--border-strong);
-  background: rgb(212 160 23 / 0.12);
-}
-
-.tag-tree-list__button small {
-  color: var(--muted);
-}
-
-.document-list {
-  max-height: 22rem;
-  overflow: auto;
-  display: grid;
-  align-content: start;
-  gap: 0.45rem;
-}
-
-.document-row {
-  display: grid;
-  gap: 0.2rem;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 0.85rem;
-  background: rgb(255 255 255 / 0.03);
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.document-row--selected,
-.document-row:hover {
-  border-color: var(--accent);
-  background: rgb(255 255 255 / 0.07);
-}
-
-.document-row small {
-  color: var(--muted);
-}
-
-.document-list__empty,
-.properties-dialog__hint,
-.cell-format-dialog__hint {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.properties-dialog,
-.cell-format-dialog {
-  display: grid;
-  gap: 1rem;
-}
-
-.cell-format-dialog__tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.04);
-}
-
-.cell-format-dialog__tabs button,
-.cell-format-dialog__presets button,
-.cell-format-dialog__border-toggle {
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.cell-format-dialog__tabs button {
-  padding: 0.45rem 0.8rem;
-}
-
-.cell-format-dialog__tab--active {
-  background: rgb(212 160 23 / 0.22) !important;
-}
-
-.cell-format-dialog__panel {
-  display: grid;
-  gap: 1rem;
-}
-
-.cell-format-dialog__grid {
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-}
-
 .native-input--color {
   width: 5rem;
   min-height: 2.4rem;
   padding: 0.2rem;
-}
-
-.cell-format-dialog__checks {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.cell-format-dialog__checks label {
-  display: inline-flex;
-  gap: 0.35rem;
-  align-items: center;
-}
-
-.cell-format-dialog__border {
-  grid-template-columns: minmax(12rem, 0.8fr) minmax(18rem, 1.2fr);
-}
-
-.cell-format-dialog__border-tools,
-.cell-format-dialog__presets {
-  display: grid;
-  gap: 0.75rem;
-  align-content: start;
-}
-
-.cell-format-dialog__border-main {
-  display: grid;
-  gap: 1rem;
-}
-
-.cell-format-dialog__presets {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.cell-format-dialog__presets span {
-  grid-column: 1 / -1;
-  color: var(--muted);
-}
-
-.cell-format-dialog__presets button,
-.cell-format-dialog__border-toggle {
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--border);
-  background: rgb(255 255 255 / 0.04);
-}
-
-.cell-format-dialog__border-preview {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 14rem;
-  padding: 2.4rem;
-  border: 1px solid var(--border);
-  border-radius: 0.85rem;
-}
-
-.cell-format-dialog__border-sample {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  place-items: center;
-  width: 14rem;
-  height: 8rem;
-  color: var(--text);
-  outline: 1px dashed var(--border);
-}
-
-.cell-format-dialog__border-toggle {
-  position: absolute;
-}
-
-.cell-format-dialog__border-toggle--top {
-  top: 0.6rem;
-}
-
-.cell-format-dialog__border-toggle--right {
-  right: 0.6rem;
-}
-
-.cell-format-dialog__border-toggle--bottom {
-  bottom: 0.6rem;
-}
-
-.cell-format-dialog__border-toggle--left {
-  left: 0.6rem;
-}
-
-.properties-dialog code {
-  color: var(--formula-text);
-}
-
-@media (max-width: 720px) {
-  .open-dialog__browser {
-    grid-template-columns: 1fr;
-  }
-
-  .cell-format-dialog__border {
-    grid-template-columns: 1fr;
-  }
 }

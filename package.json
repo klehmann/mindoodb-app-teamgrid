@@ -9,7 +9,7 @@
   "license": "Apache-2.0",
   "author": "Mindoo GmbH",
   "type": "module",
-  "main": "./src/main.ts",
+  "main": "./src/app/main.ts",
   "scripts": {
     "dev": "vite --port 4207",
     "dev:local": "LOCAL_MINDOODB=1 vite --port 4207",
@@ -21,6 +21,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fontsource/caladea": "^5.2.8",
+    "@fontsource/carlito": "^5.2.8",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/rubik": "^5.2.8",

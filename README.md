@@ -67,7 +67,7 @@ The formula subsystem is permissive-license sample code rather than a GPL/commer
 - Content assist with function signatures and inline help.
 - Highlighting referenced cells and ranges while editing formulas.
 
-The parser stores formula source text plus normalized stable-ID references. The function registry in `src/lib/formulas/functionRegistry.ts` is the shared source of truth for evaluation and authoring assistance.
+The parser stores formula source text plus normalized stable-ID references. The function registry in `src/features/formulas/lib/functionRegistry.ts` is the shared source of truth for evaluation and authoring assistance.
 
 ## Formatting
 
@@ -83,23 +83,64 @@ Cells separate semantic values from presentation:
 
 TeamGrid imports and exports the .xlsx format through `exceljs`, and it copy/pastes ranges through the OS clipboard in an Excel-friendly way.
 
-- **File import / export.** `File / Import XLSX` builds a TeamGrid workbook envelope from any `.xlsx` file, mapping values, supported formulas, number and date formats, fonts, fills, and alignment. `File / Export XLSX` produces an `.xlsx` blob from the current workbook. See `src/lib/xlsx/importWorkbook.ts` and `src/lib/xlsx/exportWorkbook.ts`.
-- **Clipboard.** Copy and Cut emit three parallel encodings: a TeamGrid-native JSON payload embedded in the HTML clipboard for lossless TeamGrid-to-TeamGrid paste (preserves stable IDs, styles, and formula source); an Excel-compatible HTML body with `x:fmla`, `x:num`, and `x:str` attributes so Excel keeps relative formulas; and a plain TSV fallback for everything else. Paste decodes in the same priority order. See `src/lib/clipboard/`.
+- **File import / export.** `File / Import XLSX` builds a TeamGrid workbook envelope from any `.xlsx` file, mapping values, supported formulas, number and date formats, fonts, fills, and alignment. `File / Export XLSX` produces an `.xlsx` blob from the current workbook. See `src/features/xlsx/lib/importWorkbook.ts` and `src/features/xlsx/lib/exportWorkbook.ts`.
+- **Clipboard.** Copy and Cut emit three parallel encodings: a TeamGrid-native JSON payload embedded in the HTML clipboard for lossless TeamGrid-to-TeamGrid paste (preserves stable IDs, styles, and formula source); an Excel-compatible HTML body with `x:fmla`, `x:num`, and `x:str` attributes so Excel keeps relative formulas; and a plain TSV fallback for everything else. Paste decodes in the same priority order. See `src/features/clipboard/lib/`.
 
 TeamGrid intentionally supports only a small, well-chosen subset of Excel's functionality — enough to demonstrate the collaboration model on a real-world structured document, not enough to replace Excel.
 
 ## Code Layout
 
-- `src/composables/useTeamGridDocument.ts` owns Haven bridge setup, database/document lifecycle, capability gates, time travel, revision snapshots, and `baseHeads`-aware granular saves.
-- `src/lib/teamgridDocument.ts` defines the persisted schema, migrations, ID helpers, and default workbook factory.
-- `src/lib/teamgridOps.ts` defines semantic edit operations and serializes them to `MindooDBAppJsonPatch`.
-- `src/lib/gridProjection.ts` turns stable IDs into visible rows, columns, and addresses.
-- `src/lib/cellFormatting.ts` handles value coercion, date/number formatting, and style merging.
-- `src/lib/formulas/` contains parsing, evaluation, dependency tracking, and function metadata.
-- `src/lib/clipboard/` contains the serializer/deserializer for the TeamGrid + Excel + TSV clipboard payloads.
-- `src/lib/xlsx/` contains the `.xlsx` import and export.
-- `src/lib/viewOpen.ts` builds the dynamic view navigator used by the File / Open dialog.
-- `src/components/GridViewport.vue`, `FormulaBar.vue`, `FormulaAssistPanel.vue`, `WorksheetTabs.vue`, and `DocumentRevisionDialog.vue` make up the spreadsheet UI.
+The project is organized by feature under `src/features/*`, with `src/app/` for the application shell and `src/shared/` for cross-cutting helpers. The `@/` Vite/TS alias points at `src/`, so feature folders are addressable as `@/features/...` from anywhere.
+
+Inside each feature folder we keep the same three sub-folders so a contributor can find what they need from the feature name alone:
+
+- `composables/` holds Vue composables (`use*.ts`) that own reactive state for that feature. Composables are the only place state should live.
+- `components/` holds Single File Components for that feature. Each component imports its composable and renders the corresponding UI; tests live next to the component.
+- `lib/` holds plain TypeScript modules: parsers, evaluators, schemas, helpers. Anything that does not depend on Vue belongs here.
+
+`src/app/` only contains the entry point and the root `App.vue`, which is intentionally a thin orchestration layer: it wires composables together, passes their controller objects into feature dialogs, and renders the toolbar/status bar. `src/shared/` is for primitives that genuinely cross feature boundaries (capability checks, theme tokens, default cell dimensions).
+
+```
+src/
+  app/                          application shell (entry point + root SFC)
+  shared/lib/                   cross-feature helpers (capabilities, theme, dimensions)
+  features/
+    document/                   Haven bridge, save/history, document dialogs
+      composables/{useTeamGridDocument,useErrorDialog,useOpenDialog,
+                   useDocumentPropertiesDialog,useWorksheetDialogs}.ts
+      lib/{teamgridDocument,teamgridOps,viewOpen}.ts
+      components/{DocumentRevisionDialog,TagTreeList,ErrorDialog,
+                  OpenSpreadsheetDialog,DocumentPropertiesDialog,
+                  DeleteSpreadsheetDialog,RenameWorksheetDialog}.vue
+    grid/                       spreadsheet surface and formula bar
+      composables/{useSelection,useFormulaBarEditing,useFormulaAssistRouter,
+                   useGridClipboard,useCellFormatDialog,useInlineCellEditor,
+                   useGridSelectionGestures,useColumnRowResize,
+                   useGridClipboardBridge}.ts
+      components/{GridViewport,FormulaBar,FormulaAssistPanel,
+                  WorksheetTabs,CellFormatDialog}.vue
+      lib/{gridProjection,cellFormatting}.ts
+    formulas/lib/               parser, evaluator, dependency tracking, registry
+    clipboard/lib/              TeamGrid / Excel / TSV clipboard payloads
+    xlsx/lib/                   .xlsx import and export
+  assets/styles/main.css        design tokens, resets, app-shell layout only
+                                (component-specific rules live in <style scoped>
+                                next to the component they belong to)
+```
+
+Pointers into the most important modules:
+
+- `src/features/document/composables/useTeamGridDocument.ts` owns Haven bridge setup, database/document lifecycle, capability gates, time travel, revision snapshots, and `baseHeads`-aware granular saves. Its `TeamGridAppApi` type is the contract every other composable depends on.
+- `src/features/document/lib/teamgridDocument.ts` defines the persisted schema, migrations, ID helpers, and default workbook factory.
+- `src/features/document/lib/teamgridOps.ts` defines semantic edit operations and serializes them to `MindooDBAppJsonPatch`.
+- `src/features/document/lib/viewOpen.ts` builds the dynamic view navigator used by the File / Open dialog.
+- `src/features/grid/lib/gridProjection.ts` turns stable IDs into visible rows, columns, and addresses.
+- `src/features/grid/lib/cellFormatting.ts` handles value coercion, date/number formatting, and style merging.
+- `src/features/formulas/lib/` contains parsing, evaluation, dependency tracking, and function metadata.
+- `src/features/clipboard/lib/` contains the serializer/deserializer for the TeamGrid + Excel + TSV clipboard payloads.
+- `src/features/xlsx/lib/` contains the `.xlsx` import and export.
+- `src/features/grid/components/GridViewport.vue` is the spreadsheet surface; it delegates selection, inline editing, column/row resizing, and native clipboard plumbing to the composables in `src/features/grid/composables/`.
+- The dialog SFCs under `src/features/document/components/` and `src/features/grid/components/CellFormatDialog.vue` each take a controller object from their matching composable (`useErrorDialog`, `useOpenDialog`, `useDocumentPropertiesDialog`, `useWorksheetDialogs`, `useCellFormatDialog`) as a prop. The composable owns state and actions; the SFC renders the UI.
 
 ## Current Scope
 
