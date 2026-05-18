@@ -15,6 +15,7 @@
 import { ref, type Ref } from "vue";
 import {
   applyCellFormat,
+  normalizeFontFamily,
   type CellFormatKind,
   type CellFormatRequest,
 } from "@/features/grid/lib/cellFormatting";
@@ -78,7 +79,7 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
   const formatDialogKind = ref<CellFormatKind>("general");
   const formatDialogCurrency = ref<CurrencyCode>("USD");
   const formatDialogCustomNumFmt = ref("");
-  const formatDialogFontFamily = ref("Inter, sans-serif");
+  const formatDialogFontFamily = ref("Calibri");
   const formatDialogFontSize = ref(14);
   const formatDialogBold = ref(false);
   const formatDialogItalic = ref(false);
@@ -118,7 +119,7 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
     formatDialogCustomNumFmt.value = value?.kind === "number" || value?.kind === "date" || value?.kind === "string"
       ? excelNumFmt ?? ""
       : "";
-    formatDialogFontFamily.value = style?.fontFamily ?? "Inter, sans-serif";
+    formatDialogFontFamily.value = normalizeFontFamily(style?.fontFamily);
     formatDialogFontSize.value = style?.fontSize ?? 14;
     formatDialogBold.value = Boolean(style?.bold);
     formatDialogItalic.value = Boolean(style?.italic);
@@ -307,8 +308,12 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
   }
 
   function formatDialogStylePatchForCell(rowIndex: number, columnIndex: number, bounds: RangeBounds | null): CellStylePatch {
+    const fontFamilyDraft = formatDialogFontFamily.value.trim();
     return {
-      fontFamily: formatDialogFontFamily.value.trim() || null,
+      // Strip any CSS fallback chain a legacy seed or paste might have
+      // introduced; the document model stores bare family names so the
+      // Format-cells combobox matches its option list.
+      fontFamily: fontFamilyDraft ? normalizeFontFamily(fontFamilyDraft) : null,
       fontSize: formatDialogFontSize.value || null,
       bold: formatDialogBold.value,
       italic: formatDialogItalic.value,

@@ -13,7 +13,7 @@ function makeController() {
     formatDialogKind: ref("general"),
     formatDialogCurrency: ref("USD"),
     formatDialogCustomNumFmt: ref(""),
-    formatDialogFontFamily: ref("Inter, sans-serif"),
+    formatDialogFontFamily: ref("Calibri"),
     formatDialogFontSize: ref(14),
     formatDialogBold: ref(false),
     formatDialogItalic: ref(false),

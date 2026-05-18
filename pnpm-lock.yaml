@@ -8,12 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@fontsource/arimo':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@fontsource/caladea':
         specifier: ^5.2.8
         version: 5.2.8
       '@fontsource/carlito':
         specifier: ^5.2.8
         version: 5.2.8
+      '@fontsource/cousine':
+        specifier: ^5.2.7
+        version: 5.2.7
       '@fontsource/inter':
         specifier: ^5.2.8
         version: 5.2.8
@@ -23,6 +29,9 @@ importers:
       '@fontsource/rubik':
         specifier: ^5.2.8
         version: 5.2.8
+      '@fontsource/tinos':
+        specifier: ^5.2.7
+        version: 5.2.7
       '@primeuix/styled':
         specifier: ^0.7.4
         version: 0.7.4
@@ -380,11 +389,17 @@ packages:
   '@fast-csv/parse@4.3.6':
     resolution: {integrity: sha512-uRsLYksqpbDmWaSmzvJcuApSEe38+6NQZBUsuAyMZKqHxH0g1wcJgsKUvN3WC8tewaqFjBMMGrkHmC+T7k8LvA==}
 
+  '@fontsource/arimo@5.2.8':
+    resolution: {integrity: sha512-EGB/l4PhYsxJbskePrgFQKM3Ob+x3Xr+VZDuSMR2XNVQYhx8t5zIfiMxCLLbgBPkY2qeXGfbyrXeAOEGl1lOSA==}
+
   '@fontsource/caladea@5.2.8':
     resolution: {integrity: sha512-+gzoYzqxRdGYcO7nSkmx6btoJvtYWxNZSHM9WWTCQqS4aN498FbHpENGhOKI9SPbOeCJiFXz0RvhVUdbcKEECg==}
 
   '@fontsource/carlito@5.2.8':
     resolution: {integrity: sha512-EbsNaWvGUWiuSAv/9+n9lHMi2hfPabhw5rY7r+B84XDb0fvkw+3bCksrcEBE3sQDIKgAsIjDzzSbb0+GYJlvEQ==}
+
+  '@fontsource/cousine@5.2.7':
+    resolution: {integrity: sha512-2l6qNHghWeQDGqaR1QmS8iR1YWzhZczcVQpR/MJVNSKE8bELI6v2Rqe+d4pFfG+5PY9QhvZ+aKriqlbKubcR8g==}
 
   '@fontsource/inter@5.2.8':
     resolution: {integrity: sha512-P6r5WnJoKiNVV+zvW2xM13gNdFhAEpQ9dQJHt3naLvfg+LkF2ldgSLiF4T41lf1SQCM9QmkqPTn4TH568IRagg==}
@@ -394,6 +409,9 @@ packages:
 
   '@fontsource/rubik@5.2.8':
     resolution: {integrity: sha512-PIc8QR7FqWPcYhbdRiGff56vQlKqg/ytES1YqecSq1GkgxiH4TBshrFvDEOZ9JonUF9m1qQ+qXxJj7wD5zgXEw==}
+
+  '@fontsource/tinos@5.2.7':
+    resolution: {integrity: sha512-F+rSTz0CNDZ/nx3BlmVA+wlbfCR1gwXeJTkGxb6pwu5KjeWVyaZ6ioInm533pw2Ha7472Lwb4vLjzo1zT0RXmA==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -1971,15 +1989,21 @@ snapshots:
       lodash.isundefined: 3.0.1
       lodash.uniq: 4.5.0
 
+  '@fontsource/arimo@5.2.8': {}
+
   '@fontsource/caladea@5.2.8': {}
 
   '@fontsource/carlito@5.2.8': {}
+
+  '@fontsource/cousine@5.2.7': {}
 
   '@fontsource/inter@5.2.8': {}
 
   '@fontsource/jetbrains-mono@5.2.8': {}
 
   '@fontsource/rubik@5.2.8': {}
+
+  '@fontsource/tinos@5.2.7': {}
 
   '@img/colour@1.1.0': {}
 

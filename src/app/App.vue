@@ -524,6 +524,18 @@ function clearAdditionalRanges() {
   }
 }
 
+/**
+ * Atomically replace the disjoint extra-selection list. Used by
+ * Ctrl/Meta+click deselection, which subtracts a cell from every
+ * enclosing rectangle and produces a fresh fragmented sub-range list.
+ */
+function setAdditionalRanges(ranges: CellSelectionRange[]) {
+  if (formulaEditing.value) {
+    return;
+  }
+  additionalRanges.value = ranges;
+}
+
 /** Open the cell context menu, preserving an existing range when right-clicked inside it. */
 function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: string; range: CellSelectionRange }) {
   if (!selectedRange.value || selectedRange.value.startCellId !== payload.range.startCellId || selectedRange.value.endCellId !== payload.range.endCellId) {
@@ -782,6 +794,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
           @select-range="selectRange"
           @add-range="addRange"
           @clear-additional-ranges="clearAdditionalRanges"
+          @set-additional-ranges="setAdditionalRanges"
           @commit="commitCell"
           @cell-context="openCellContextMenu"
           @request-help="openFormulaAssist('inlineCell', $event)"

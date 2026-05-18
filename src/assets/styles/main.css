@@ -104,15 +104,24 @@ select {
 }
 
 /*
- * XLSX-import font fallbacks.
+ * XLSX-import and cell-format font fallbacks.
  *
- * Cells imported from `.xlsx` files often reference Microsoft Office fonts
- * (`Calibri`, `Cambria`) that aren't installed on macOS, Linux, or mobile.
- * We bundle Google's metric-compatible open replacements (`Carlito`,
- * `Caladea`) and alias them: the browser tries the real Microsoft font
- * first, then falls back to the bundled stand-in, so layout stays stable
+ * Cells imported from `.xlsx` files (and cells the user formats from the
+ * Format-cells dialog) often reference Microsoft Office / Windows fonts
+ * (`Calibri`, `Cambria`, `Courier New`, `Arial`, `Times New Roman`) that
+ * are not installed on default Linux desktops or Android.
+ *
+ * We bundle Google's open Croscore family — `Carlito`, `Caladea`,
+ * `Cousine`, `Arimo`, `Tinos` — each of which is metric-compatible with
+ * one of the Microsoft fonts (same glyph widths and line metrics). The
+ * `@font-face` rules below alias the Microsoft family name to the
+ * bundled stand-in: the browser tries the real font first and only
+ * falls through to the metric-compatible replacement when the user
+ * does not have the real font installed, so column widths stay stable
  * everywhere without rewriting the persisted font name.
  */
+
+/* Calibri → Carlito (sans-serif, default cell font) */
 @font-face {
   font-family: "Calibri";
   font-weight: 400;
@@ -125,6 +134,7 @@ select {
   src: local("Calibri Bold"), local("Calibri"), local("Carlito Bold"), local("Carlito");
 }
 
+/* Cambria → Caladea (serif, classic Office heading font) */
 @font-face {
   font-family: "Cambria";
   font-weight: 400;
@@ -135,6 +145,45 @@ select {
   font-family: "Cambria";
   font-weight: 700;
   src: local("Cambria Bold"), local("Cambria"), local("Caladea Bold"), local("Caladea");
+}
+
+/* Courier New → Cousine (monospace) */
+@font-face {
+  font-family: "Courier New";
+  font-weight: 400;
+  src: local("Courier New"), local("Cousine");
+}
+
+@font-face {
+  font-family: "Courier New";
+  font-weight: 700;
+  src: local("Courier New Bold"), local("Courier New"), local("Cousine Bold"), local("Cousine");
+}
+
+/* Arial → Arimo (sans-serif, very common XLSX default) */
+@font-face {
+  font-family: "Arial";
+  font-weight: 400;
+  src: local("Arial"), local("Arimo");
+}
+
+@font-face {
+  font-family: "Arial";
+  font-weight: 700;
+  src: local("Arial Bold"), local("Arial"), local("Arimo Bold"), local("Arimo");
+}
+
+/* Times New Roman → Tinos (serif, very common XLSX default) */
+@font-face {
+  font-family: "Times New Roman";
+  font-weight: 400;
+  src: local("Times New Roman"), local("Tinos");
+}
+
+@font-face {
+  font-family: "Times New Roman";
+  font-weight: 700;
+  src: local("Times New Roman Bold"), local("Times New Roman"), local("Tinos Bold"), local("Tinos");
 }
 
 @keyframes teamgrid-clipboard-marquee {

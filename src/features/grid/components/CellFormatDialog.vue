@@ -21,10 +21,12 @@ import type { useCellFormatDialog } from "@/features/grid/composables/useCellFor
  * string a user types — including XLSX-imported names like `Wingdings`,
  * `Aptos`, or `Segoe UI` that we don't bundle — is preserved verbatim.
  *
- * `Calibri` and `Cambria` are aliased to the bundled metric-compatible
- * `Carlito` / `Caladea` fonts via `@font-face` rules in `main.css`, so
- * cells imported from Office documents render with the right glyph
- * widths even on machines without Office installed.
+ * The Microsoft Office / Windows families (`Calibri`, `Cambria`,
+ * `Courier New`, `Arial`, `Times New Roman`) are aliased to the bundled
+ * metric-compatible Croscore fonts (`Carlito`, `Caladea`, `Cousine`,
+ * `Arimo`, `Tinos`) via `@font-face` rules in `main.css`, so cells
+ * imported from Office documents render with the right glyph widths
+ * even on machines without Office installed.
  */
 const FONT_FAMILY_OPTIONS: string[] = [
   "Inter",

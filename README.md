@@ -74,10 +74,30 @@ The parser stores formula source text plus normalized stable-ID references. The 
 Cells separate semantic values from presentation:
 
 - Values can be empty, string, number, or date.
-- Number and date values can carry simple display formats — integer, decimal, currency, percent, date, date+time, time.
-- Styles include text color, background color, font family, font size, bold, italic, underline, and horizontal and vertical alignment.
+- Number and date values can carry simple display formats — integer, decimal, currency, percent, date, date+time, time — and an optional Excel `numFmt` string for round-trip fidelity with imported workbooks.
+- Styles include text color, background color, font family, font size, bold, italic, underline, and horizontal and vertical alignment. The default font is Calibri 11pt to match Excel; family names are stored bare (`"Calibri"`, `"Arial"`, …) the way Excel does, and the render layer appends a generic CSS fallback at paint time so the document model stays portable. The five Microsoft Office / Windows families that show up most often in XLSX workbooks — Calibri, Cambria, Courier New, Arial, and Times New Roman — are aliased via `@font-face` rules in `main.css` to Google's bundled metric-compatible Croscore replacements (Carlito, Caladea, Cousine, Arimo, Tinos), so column widths and line heights stay stable on macOS, Linux, Windows, and mobile even when the real Office font is not installed.
+- Per-edge cell borders carry their own style (`thin`, `medium`, `thick`, `dashed`, `dotted`, `double`) and color. The Format cells dialog exposes range-level presets — none, outline, inside, all — alongside an interactive line picker that toggles individual top / bottom / left / right / inside-horizontal / inside-vertical edges.
 - Row heights and column widths are configurable per worksheet.
 - Row and column defaults are kept separate from per-cell overrides so broad formatting does not rewrite every cell.
+
+The Format cells dialog (`CellFormatDialog.vue`, controlled by `useCellFormatDialog`) is the single entry point for value formatting and presentation:
+
+- **Cell type** picks the value kind (text, general, integer, decimal, percent, currency, custom) and accepts a custom Excel `numFmt` string for advanced cases.
+- **Font** sets family, size, weight, slant, underline, and text color.
+- **Fill** toggles and picks the background color.
+- **Border** picks edge style and color, applies presets, and edits individual edges.
+
+Every action in the dialog is range-aware: it iterates over the active range plus any additional ranges from multi-selection (see below), so a single Apply mutates every selected rectangle in one granular operation rather than one cell at a time.
+
+## Selection & Editing
+
+Selection follows the same conventions as Excel and Google Sheets, with `useSelection` owning the reactive state, `useGridSelectionGestures` translating mouse and keyboard events into intent, and `useInlineCellEditor` handling the inline input field. The model tracks an active cell, a primary rectangular range, and a list of additional disjoint ranges so cells, rows, and columns can be mixed in one multi-selection.
+
+- **Cells.** Click selects a single cell. Drag, or Shift+click, extends the primary range from the original anchor. Ctrl/Cmd+click on an unselected cell pushes the previous range onto the additional-ranges list and starts a new primary range. Ctrl/Cmd+click on an already-selected cell removes it from the selection — any range containing the cell is split into up to four sub-rectangles so the data structure stays rectangular. The last selected cell cannot be deselected, mirroring Excel.
+- **Rows and columns.** Clicking a row or column header selects the whole row or column. Shift+click on another header extends from the anchor to cover every row or column in between. Ctrl/Cmd+click on a header adds (or, on an already-selected line, splits and removes) a disjoint row or column band. The same multi-selection list holds cell ranges, row bands, and column bands at once, so you can express "this column, that row, except their intersection" in one selection.
+- **Inline editing.** Double-click, F2, or starting to type opens the inline editor. Enter and Shift+Enter commit and move the active cell down or up; Tab and Shift+Tab commit and move right or left. Escape cancels. While typing a formula, clicking a different cell appends its A1 address to the editor instead of changing the selection.
+- **Keyboard navigation.** Arrow keys, Tab, and Shift+Tab move the active cell outside the editor. They also clear additional ranges, matching how Excel collapses a multi-selection on a navigation keypress. Shift+arrow extends the primary range from the anchor.
+- **Formatting and clipboard awareness.** Every selection-driven feature — Format cells, copy, cut, paste, the formula bar's address indicator — reads from the combined "all selected ranges" list, so a row + column + cells multi-selection is treated as one logical target.
 
 ## Excel Interop
 

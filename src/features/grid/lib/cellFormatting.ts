@@ -17,13 +17,65 @@
  */
 import type { Cell, CellStyle, CellValue, ColumnMeta, CurrencyCode, FormulaResult, NumberFormat, RowMeta } from "@/features/document/lib/teamgridDocument";
 
-/** Fallbacks used when neither the column, row, nor cell specifies a value. */
+/**
+ * Fallbacks used when neither the column, row, nor cell specifies a value.
+ *
+ * Matches Excel's default of Calibri 11pt. We store bare family names
+ * (`"Calibri"`, `"Arial"`, etc.) the same way Excel and our XLSX import
+ * do — the generic CSS fallback is appended by the render layer in
+ * {@link cssFontFamily}, not baked into the document model.
+ *
+ * The five Microsoft Office / Windows families that show up most often
+ * in `.xlsx` workbooks (Calibri, Cambria, Courier New, Arial, Times New
+ * Roman) are aliased via `@font-face` rules in `main.css` to the bundled
+ * metric-compatible Croscore fonts (Carlito, Caladea, Cousine, Arimo,
+ * Tinos), so the default — and any cell that picks one of those Office
+ * families — renders with the right glyph widths on macOS, Linux,
+ * Windows, and mobile.
+ */
 export const DEFAULT_CELL_STYLE: Required<Pick<CellStyle, "fontFamily" | "fontSize" | "horizontalAlign" | "verticalAlign">> = {
-  fontFamily: "Inter, sans-serif",
+  fontFamily: "Calibri",
   fontSize: 14,
   horizontalAlign: "left",
   verticalAlign: "middle",
 };
+
+/**
+ * Strip any legacy CSS fallback chain off a stored font family.
+ *
+ * Older documents (and ad-hoc user typing) sometimes store the full
+ * fallback chain (`"Calibri, sans-serif"`). The Format-cells combobox
+ * and Excel export both want the bare family name (`"Calibri"`), so we
+ * keep one canonical normalizer instead of stripping ad-hoc.
+ */
+export function normalizeFontFamily(fontFamily: string | undefined): string {
+  if (!fontFamily) {
+    return DEFAULT_CELL_STYLE.fontFamily;
+  }
+  const head = fontFamily.split(",")[0]?.trim().replace(/^["']|["']$/g, "");
+  return head || DEFAULT_CELL_STYLE.fontFamily;
+}
+
+/**
+ * Build a CSS `font-family` value from a bare family name.
+ *
+ * Appends a generic fallback chain so a custom or imported family that is
+ * not available on the user's system (`Wingdings`, `Aptos`, etc.) still
+ * falls back to the app body font rather than the user-agent default.
+ * Multi-word names are quoted so they parse correctly as CSS identifiers.
+ */
+export function cssFontFamily(fontFamily: string | undefined): string | undefined {
+  const trimmed = fontFamily?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  // Already a CSS chain (legacy stored values); pass through unchanged
+  // so we do not double-quote or double-fallback.
+  if (trimmed.includes(",")) {
+    return trimmed;
+  }
+  return `'${trimmed}', var(--font-body)`;
+}
 
 export type CellFormatKind = "text" | "general" | "integer" | "decimal" | "percent" | "currency" | "custom";
 

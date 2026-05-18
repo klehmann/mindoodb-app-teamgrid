@@ -21,11 +21,14 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fontsource/arimo": "^5.2.8",
     "@fontsource/caladea": "^5.2.8",
     "@fontsource/carlito": "^5.2.8",
+    "@fontsource/cousine": "^5.2.7",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/rubik": "^5.2.8",
+    "@fontsource/tinos": "^5.2.7",
     "@primeuix/styled": "^0.7.4",
     "@primeuix/themes": "^2.0.3",
     "exceljs": "^4.4.0",

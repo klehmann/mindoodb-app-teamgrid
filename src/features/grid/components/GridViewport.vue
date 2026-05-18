@@ -38,7 +38,7 @@
  *   document before another operation runs.
  */
 import { computed, toRef } from "vue";
-import { mergeCellStyle } from "@/features/grid/lib/cellFormatting";
+import { cssFontFamily, mergeCellStyle } from "@/features/grid/lib/cellFormatting";
 import { getCell, type GridProjection } from "@/features/grid/lib/gridProjection";
 import {
   type Cell,
@@ -96,6 +96,7 @@ const emit = defineEmits<{
   "select-range": [range: CellSelectionRange];
   "add-range": [range: CellSelectionRange];
   "clear-additional-ranges": [];
+  "set-additional-ranges": [ranges: CellSelectionRange[]];
   commit: [cell: Cell, rawValue: string];
   "request-help": [payload: { anchorEl: HTMLElement; draft: string; caretPos: number }];
   "edit-state": [payload: { editing: boolean; draft: string }];
@@ -126,10 +127,12 @@ const editor = useInlineCellEditor({
   selectedCellId: selectedCellIdRef,
   locale: localeRef,
   readonly: readonlyRef,
+  viewportEl: gridViewport,
   onCommit: (cell, rawValue) => emit("commit", cell, rawValue),
   onEditState: (payload) => emit("edit-state", payload),
   onRequestHelp: (payload) => emit("request-help", payload),
   onSelect: (cell, address) => emit("select", cell, address),
+  onSelectRange: (range) => emit("select-range", range),
 });
 
 const {
@@ -174,6 +177,7 @@ const {
   onSelectRange: (range) => emit("select-range", range),
   onAddRange: (range) => emit("add-range", range),
   onClearAdditionalRanges: () => emit("clear-additional-ranges"),
+  onSetAdditionalRanges: (ranges) => emit("set-additional-ranges", ranges),
   onCellContext: (payload) => emit("cell-context", payload),
 });
 
@@ -215,7 +219,7 @@ function cellStyle(cell: Cell) {
   return {
     color: mergedStyle.textColor,
     backgroundColor: mergedStyle.backgroundColor,
-    fontFamily: mergedStyle.fontFamily,
+    fontFamily: cssFontFamily(mergedStyle.fontFamily),
     fontSize: mergedStyle.fontSize ? `${mergedStyle.fontSize}px` : undefined,
     fontWeight: mergedStyle.bold ? "700" : undefined,
     fontStyle: mergedStyle.italic ? "italic" : undefined,
@@ -384,7 +388,7 @@ export type { CellId };
             :class="{ 'grid-axis-header--selected': isWholeColumnSelected(column.id) }"
             scope="col"
             :style="columnHeaderStyle(column)"
-            @mousedown.prevent="selectWholeColumn(column.id)"
+            @mousedown.prevent="selectWholeColumn($event, column.id)"
           >
             <span class="grid-axis-header__label">{{ column.label }}</span>
             <span
@@ -404,7 +408,7 @@ export type { CellId };
             class="grid-row-header"
             :class="{ 'grid-axis-header--selected': isWholeRowSelected(row.id) }"
             scope="row"
-            @mousedown.prevent="selectWholeRow(row.id)"
+            @mousedown.prevent="selectWholeRow($event, row.id)"
           >
             <span class="grid-axis-header__label">{{ row.label }}</span>
             <span

@@ -286,7 +286,7 @@ function normalizeHexColor(color: string | undefined) {
 }
 
 function stripCssFontFallbacks(fontFamily: string) {
-  return fontFamily.split(",")[0]?.trim().replace(/^["']|["']$/g, "") || "Inter";
+  return fontFamily.split(",")[0]?.trim().replace(/^["']|["']$/g, "") || "Calibri";
 }
 
 function pixelsToExcelWidth(pixels: number) {

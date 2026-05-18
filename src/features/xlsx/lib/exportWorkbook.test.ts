@@ -28,7 +28,7 @@ describe("Teamgrid XLSX export", () => {
     expect(worksheet!.getCell("B2").numFmt).toBe("mmm d, yyyy");
 
     expect(worksheet!.getCell("A1").font).toMatchObject({
-      name: "Inter",
+      name: "Calibri",
       size: 16,
       bold: true,
       color: { argb: "FFEEF2FF" },

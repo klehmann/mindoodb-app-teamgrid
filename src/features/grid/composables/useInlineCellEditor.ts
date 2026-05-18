@@ -7,14 +7,19 @@
  * Mid-edit clicks on other cells are routed through
  * {@link UseInlineCellEditorReturn.appendPickedCellToInlineFormula} so
  * users can build formulas by clicking references instead of typing them.
+ *
+ * Enter / Tab also advance the active cell (down or right respectively,
+ * up / left with Shift) after committing, matching Excel and Google
+ * Sheets behavior.
  */
 import { nextTick, ref, watch, type Ref } from "vue";
 import { formatCellValue, formatFormulaResult } from "@/features/grid/lib/cellFormatting";
 import { evaluateFormula } from "@/features/formulas/lib";
 import { insertFunctionAtCaret } from "@/features/formulas/lib/assist";
 import { getCell, getCellAddress, type GridProjection } from "@/features/grid/lib/gridProjection";
-import type { Cell, ColumnId, RowId, Worksheet } from "@/features/document/lib/teamgridDocument";
+import type { Cell, CellId, ColumnId, RowId, Worksheet } from "@/features/document/lib/teamgridDocument";
 import type { FunctionDefinition } from "@/features/formulas/lib";
+import type { CellSelectionRange } from "@/features/grid/composables/useSelection";
 
 export interface UseInlineCellEditorOptions {
   worksheet: Readonly<Ref<Worksheet>>;
@@ -22,10 +27,22 @@ export interface UseInlineCellEditorOptions {
   selectedCellId: Readonly<Ref<string | null>>;
   locale: Readonly<Ref<string>>;
   readonly: Readonly<Ref<boolean>>;
+  /**
+   * Grid viewport element used to locate the `<td>` of the cell we
+   * want to focus after Enter/Tab navigation. Optional so existing
+   * callers that don't yet plumb the ref through keep working; in
+   * that case the new cell is selected but not DOM-focused.
+   */
+  viewportEl?: Readonly<Ref<HTMLElement | null>>;
   onCommit: (cell: Cell, rawValue: string) => void;
   onEditState: (payload: { editing: boolean; draft: string }) => void;
   onRequestHelp: (payload: { anchorEl: HTMLElement; draft: string; caretPos: number }) => void;
   onSelect: (cell: Cell, address: string) => void;
+  /**
+   * Collapse the selection range to the post-Enter/Tab cell. Optional
+   * so tests can mount the editor without wiring range emission.
+   */
+  onSelectRange?: (range: CellSelectionRange) => void;
 }
 
 export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
@@ -97,17 +114,65 @@ export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
 
   /**
    * Variant called when the commit is triggered by a key press
-   * (typically Enter). We commit explicitly and force-blur the input so
-   * focus returns to the cell `<td>`; the blur guard prevents the
-   * resulting `blur` event from firing a duplicate commit.
+   * (typically Enter / Tab). We commit explicitly and force-blur the
+   * input so focus returns to the cell `<td>`; the blur guard prevents
+   * the resulting `blur` event from firing a duplicate commit.
+   *
+   * When `delta` is non-zero the active cell advances after the commit
+   * (Enter -> down, Tab -> right, with Shift inverting the direction)
+   * and DOM focus moves to the new `<td>`, matching the spreadsheet
+   * navigation conventions in Excel / Sheets.
    */
-  function commitEditFromKeyboard(event: KeyboardEvent, cell: Cell) {
+  function commitEditFromKeyboard(
+    event: KeyboardEvent,
+    cell: Cell,
+    delta?: { rows: number; cols: number },
+  ) {
     suppressNextBlurCommit = true;
     commitEdit(cell);
     (event.currentTarget as HTMLInputElement | null)?.blur();
     queueMicrotask(() => {
       suppressNextBlurCommit = false;
     });
+    if (delta && (delta.rows !== 0 || delta.cols !== 0)) {
+      void moveActiveCellRelativeTo(cell, delta);
+    }
+  }
+
+  /**
+   * Advance the active cell by `delta` rows/columns relative to
+   * `originCell`, clamping at the edges of the visible projection. The
+   * new cell is emitted via {@link UseInlineCellEditorOptions.onSelect}
+   * and {@link UseInlineCellEditorOptions.onSelectRange} (so the range
+   * collapses to the new active cell), and the matching `<td>` is
+   * focused on the next render tick.
+   */
+  async function moveActiveCellRelativeTo(originCell: Cell, delta: { rows: number; cols: number }) {
+    const rowIndex = options.projection.value.rowIndexById.get(originCell.rowId);
+    const columnIndex = options.projection.value.columnIndexById.get(originCell.columnId);
+    if (rowIndex == null || columnIndex == null) {
+      return;
+    }
+    const targetRow = options.projection.value.rows[clampIndex(rowIndex + delta.rows, options.projection.value.rows.length)];
+    const targetColumn = options.projection.value.columns[clampIndex(columnIndex + delta.cols, options.projection.value.columns.length)];
+    if (!targetRow || !targetColumn) {
+      return;
+    }
+    const targetCell = getCell(options.worksheet.value, targetRow.id, targetColumn.id);
+    options.onSelect(targetCell, getCellAddress(options.projection.value, targetRow.id, targetColumn.id));
+    options.onSelectRange?.({ startCellId: targetCell.id, endCellId: targetCell.id });
+    await nextTick();
+    focusCellById(targetCell.id);
+  }
+
+  function focusCellById(cellId: CellId) {
+    const cells = options.viewportEl?.value?.querySelectorAll<HTMLElement>("[data-cell-id]") ?? [];
+    for (const candidate of cells) {
+      if (candidate.dataset.cellId === cellId) {
+        candidate.focus();
+        return;
+      }
+    }
   }
 
   /**
@@ -129,10 +194,23 @@ export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
       requestFormulaHelp();
       return;
     }
-    if (event.key === "Enter" || event.code === "NumpadEnter" || event.keyCode === 13) {
+    if (event.key === "Tab") {
+      // Tab commits and advances to the cell to the right
+      // (Shift+Tab moves left), matching Excel / Sheets and
+      // preventing the browser's default focus traversal.
       event.preventDefault();
       event.stopPropagation();
-      commitEditFromKeyboard(event, cell);
+      commitEditFromKeyboard(event, cell, { rows: 0, cols: event.shiftKey ? -1 : 1 });
+      return;
+    }
+    if (event.key === "Enter" || event.code === "NumpadEnter" || event.keyCode === 13) {
+      // Enter commits and advances one row down (Shift+Enter moves
+      // up). Plain Enter without movement only on the last visible
+      // row is handled implicitly by the clamping in
+      // `moveActiveCellRelativeTo`.
+      event.preventDefault();
+      event.stopPropagation();
+      commitEditFromKeyboard(event, cell, { rows: event.shiftKey ? -1 : 1, cols: 0 });
       return;
     }
     if (event.key === "Escape") {
@@ -273,4 +351,8 @@ export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
     findEditingCell,
     commitEditingExternally,
   };
+}
+
+function clampIndex(index: number, length: number) {
+  return Math.max(0, Math.min(index, length - 1));
 }
