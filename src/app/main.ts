@@ -21,15 +21,23 @@ import "primeicons/primeicons.css";
 
 import App from "./App.vue";
 import "@/assets/styles/main.css";
+import { registerTeamGridServiceWorker } from "@/app/pwa/appUpdate";
+import { TEAMGRID_BOOT_COMPLETED_EVENT } from "@/app/pwa/bootRecovery";
 import { applyAppTheme, buildPrimeVueTheme } from "@/shared/lib/theme";
 
-const app = createApp(App);
+async function bootstrap() {
+  const app = createApp(App);
 
-app.use(PrimeVue, {
-  ripple: true,
-  theme: buildPrimeVueTheme(),
-});
-app.directive("tooltip", Tooltip);
+  app.use(PrimeVue, {
+    ripple: true,
+    theme: buildPrimeVueTheme(),
+  });
+  app.directive("tooltip", Tooltip);
 
-applyAppTheme();
-app.mount("#app");
+  applyAppTheme();
+  void registerTeamGridServiceWorker();
+  app.mount("#app");
+  window.dispatchEvent(new Event(TEAMGRID_BOOT_COMPLETED_EVENT));
+}
+
+void bootstrap();

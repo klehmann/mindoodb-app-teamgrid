@@ -27,6 +27,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import Button from "primevue/button";
 import ContextMenu from "primevue/contextmenu";
 import Menubar from "primevue/menubar";
+import Message from "primevue/message";
 import type { MenuItem } from "primevue/menuitem";
 
 import DocumentRevisionDialog from "@/features/document/components/DocumentRevisionDialog.vue";
@@ -46,6 +47,7 @@ import { useErrorDialog } from "@/features/document/composables/useErrorDialog";
 import { useOpenDialog } from "@/features/document/composables/useOpenDialog";
 import { useDocumentPropertiesDialog } from "@/features/document/composables/useDocumentPropertiesDialog";
 import { useWorksheetDialogs } from "@/features/document/composables/useWorksheetDialogs";
+import { useTeamGridAppUpdate } from "@/app/pwa/appUpdate";
 
 import { useSelection, type CellSelectionRange } from "@/features/grid/composables/useSelection";
 import { useFormulaAssistRouter } from "@/features/grid/composables/useFormulaAssistRouter";
@@ -74,6 +76,7 @@ import { importTeamGridWorkbookBuffer } from "@/features/xlsx/lib/importWorkbook
 import { writeTeamGridExcelBuffer } from "@/features/xlsx/lib/exportWorkbook";
 
 const app = useTeamGridDocument();
+const { updateAvailable, updateReloading, reloadForUpdate } = useTeamGridAppUpdate();
 
 const cellContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
 const formulaBarComponent = ref<InstanceType<typeof FormulaBar> | null>(null);
@@ -705,6 +708,21 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
 
 <template>
   <main class="teamgrid-shell">
+    <Message
+      v-if="updateAvailable"
+      severity="warn"
+      :closable="false"
+      class="app-update-banner"
+    >
+      <div class="app-update-banner__content">
+        <div class="app-update-banner__copy">
+          <strong>New version available</strong>
+          <p>Reload TeamGrid to switch to the latest version and refresh offline assets.</p>
+        </div>
+        <Button label="Reload now" size="small" :loading="updateReloading" @click="reloadForUpdate" />
+      </div>
+    </Message>
+
     <input
       ref="xlsxImportInput"
       type="file"
@@ -876,3 +894,37 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
     />
   </main>
 </template>
+
+<style scoped>
+.app-update-banner {
+  left: 50%;
+  max-width: min(44rem, calc(100vw - 1.5rem));
+  position: fixed;
+  top: 0.75rem;
+  transform: translateX(-50%);
+  width: calc(100vw - 1.5rem);
+  z-index: 2400;
+}
+
+.app-update-banner__content {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.app-update-banner__copy {
+  min-width: 0;
+}
+
+.app-update-banner__copy p {
+  margin: 0.2rem 0 0;
+}
+
+@media (max-width: 640px) {
+  .app-update-banner__content {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+</style>

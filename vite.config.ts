@@ -1,6 +1,7 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
+import { VitePWA } from "vite-plugin-pwa";
 import wasm from "vite-plugin-wasm";
 
 function createResolveAliases() {
@@ -20,7 +21,21 @@ function createResolveAliases() {
 }
 
 export default defineConfig({
-  plugins: [wasm(), vue()],
+  plugins: [
+    wasm(),
+    vue(),
+    VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      injectRegister: false,
+      manifest: false,
+      injectManifest: {
+        globPatterns: ["**/*.{css,html,ico,js,png,svg,ttf,wasm,webmanifest,woff,woff2}"],
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
+      },
+    }),
+  ],
   resolve: {
     alias: createResolveAliases(),
   },
