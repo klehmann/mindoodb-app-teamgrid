@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyCellFormat, coerceInputToCellValue, effectiveHorizontalAlign, formatCellValue, formatFormulaResult, indentPaddingRem, preserveCompatibleCellValueFormat } from "@/features/grid/lib/cellFormatting";
+import { applyCellFormat, coerceInputToCellValue, effectiveHorizontalAlign, formatCellValue, formatDatePreview, formatFormulaResult, indentPaddingRem, preserveCompatibleCellValueFormat } from "@/features/grid/lib/cellFormatting";
 import type { Cell } from "@/features/document/lib/teamgridDocument";
 
 describe("cell formatting", () => {
@@ -57,6 +57,63 @@ describe("cell formatting", () => {
   it("keeps thousands separators distinct from comma decimals while autodetecting currencies", () => {
     expect(coerceInputToCellValue("1.234,56 €")).toMatchObject({ kind: "number", value: 1234.56, currencyCode: "EUR" });
     expect(coerceInputToCellValue("1,234.56 $")).toMatchObject({ kind: "number", value: 1234.56, currencyCode: "USD" });
+  });
+
+  it("autodetects explicit typed date values", () => {
+    expect(coerceInputToCellValue("1.1.2026")).toMatchObject({
+      kind: "date",
+      isoDate: "2026-01-01T00:00:00.000Z",
+      format: "date",
+      excelNumFmt: "dd.mm.yy",
+    });
+    expect(coerceInputToCellValue("01.01.2026")).toMatchObject({ kind: "date", isoDate: "2026-01-01T00:00:00.000Z" });
+    expect(coerceInputToCellValue("2026-01-01")).toMatchObject({ kind: "date", isoDate: "2026-01-01T00:00:00.000Z" });
+  });
+
+  it("uses the default Excel date format when displaying typed dates", () => {
+    expect(formatCellValue(coerceInputToCellValue("12.4.2026"), "en-US")).toBe("12.04.26");
+  });
+
+  it("autodetects typed time values", () => {
+    expect(coerceInputToCellValue("12:05")).toEqual({
+      kind: "date",
+      isoDate: "1899-12-30T12:05:00.000Z",
+      format: "time",
+      excelNumFmt: "h:mm",
+    });
+    expect(formatCellValue(coerceInputToCellValue("12:05"), "en-US")).toBe("12:05");
+    expect(coerceInputToCellValue("12:05:06")).toEqual({
+      kind: "date",
+      isoDate: "1899-12-30T12:05:06.000Z",
+      format: "time",
+      excelNumFmt: "h:mm:ss",
+    });
+    expect(formatCellValue(coerceInputToCellValue("12:05:06"), "en-US")).toBe("12:05:06");
+    expect(formatDatePreview("h:mm:ss", "de-DE")).toBe("13:30:55");
+  });
+
+  it("uses locale order for ambiguous slash dates", () => {
+    expect(coerceInputToCellValue("1/2/2026", undefined, "en-US")).toMatchObject({ kind: "date", isoDate: "2026-01-02T00:00:00.000Z" });
+    expect(coerceInputToCellValue("1/2/2026", undefined, "de-DE")).toMatchObject({ kind: "date", isoDate: "2026-02-01T00:00:00.000Z" });
+    expect(coerceInputToCellValue("13/1/2026", undefined, "en-US")).toMatchObject({ kind: "date", isoDate: "2026-01-13T00:00:00.000Z" });
+    expect(coerceInputToCellValue("1/13/2026", undefined, "de-DE")).toMatchObject({ kind: "date", isoDate: "2026-01-13T00:00:00.000Z" });
+  });
+
+  it("leaves invalid or incomplete date-looking text as strings", () => {
+    expect(coerceInputToCellValue("31.2.2026")).toEqual({ kind: "string", text: "31.2.2026" });
+    expect(coerceInputToCellValue("1/1")).toEqual({ kind: "string", text: "1/1" });
+  });
+
+  it("applies date display formats to parseable text", () => {
+    const cell = createCell({ kind: "string", text: "14.3.2012" });
+
+    expect(applyCellFormat(cell, { kind: "date", excelNumFmt: "dd.mm.yy" }, "de-DE").value).toEqual({
+      kind: "date",
+      isoDate: "2012-03-14T00:00:00.000Z",
+      format: "date",
+      excelNumFmt: "dd.mm.yy",
+    });
+    expect(formatDatePreview("dd.mm.yy", "de-DE")).toBe("14.03.12");
   });
 
   it("turns non-formula values into text without losing cell identity", () => {

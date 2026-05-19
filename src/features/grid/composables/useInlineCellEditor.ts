@@ -16,7 +16,7 @@
  */
 import { nextTick, ref, watch, type Ref } from "vue";
 import { formatCellValue, formatFormulaResult } from "@/features/grid/lib/cellFormatting";
-import { evaluateFormula } from "@/features/formulas/lib";
+import { evaluateFormula, renderFormulaSource, type FormulaContext } from "@/features/formulas/lib";
 import { insertFunctionAtCaret } from "@/features/formulas/lib/assist";
 import { getCell, getCellAddress, type GridProjection } from "@/features/grid/lib/gridProjection";
 import type { Cell, CellId, ColumnId, RowId, Worksheet } from "@/features/document/lib/teamgridDocument";
@@ -25,6 +25,7 @@ import type { CellSelectionRange } from "@/features/grid/composables/useSelectio
 
 export interface UseInlineCellEditorOptions {
   worksheet: Readonly<Ref<Worksheet>>;
+  formulaContext: Readonly<Ref<FormulaContext>>;
   projection: Readonly<Ref<GridProjection>>;
   selectedCellId: Readonly<Ref<string | null>>;
   locale: Readonly<Ref<string>>;
@@ -78,7 +79,7 @@ export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
   function displayCell(cell: Cell) {
     if (cell.formula) {
       return formatFormulaResult(
-        evaluateFormula(cell.formula.source, options.worksheet.value, options.projection.value).result,
+        evaluateFormula(renderFormulaSource(cell.formula, options.worksheet.value.id, options.formulaContext.value), options.worksheet.value.id, options.formulaContext.value).result,
         options.locale.value,
         cell.value,
       );
@@ -108,7 +109,7 @@ export function useInlineCellEditor(options: UseInlineCellEditorOptions) {
     }
     const cell = getCell(options.worksheet.value, rowId, columnId);
     editingCellId.value = cell.id;
-    editDraft.value = initialValue ?? cell.formula?.source ?? displayCell(cell);
+    editDraft.value = initialValue ?? (cell.formula ? renderFormulaSource(cell.formula, options.worksheet.value.id, options.formulaContext.value) : displayCell(cell));
     options.onEditState({ editing: true, draft: editDraft.value });
     selectCellByCoordinates(rowId, columnId);
     await nextTick();

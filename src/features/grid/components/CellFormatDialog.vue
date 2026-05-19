@@ -7,11 +7,12 @@
  * forwards the read-only flag so the apply button can be disabled in
  * historical revisions and other guarded modes.
  */
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import Select from "primevue/select";
 import type { useCellFormatDialog } from "@/features/grid/composables/useCellFormatDialog";
+import { DATE_FORMAT_OPTIONS, formatDatePreview } from "@/features/grid/lib/cellFormatting";
 
 /**
  * Curated font suggestions for the editable Font family combobox.
@@ -69,6 +70,7 @@ const {
   formatDialogKind,
   formatDialogCurrency,
   formatDialogCustomNumFmt,
+  formatDialogLocale,
   formatDialogFontFamily,
   formatDialogFontSize,
   formatDialogBold,
@@ -93,6 +95,38 @@ const {
 
 /** Indent applies only when horizontal alignment is Left or Right. */
 const indentEnabled = computed(() => formatDialogHorizontalAlign.value === "left" || formatDialogHorizontalAlign.value === "right");
+const dateFormatOptions = computed(() => {
+  const options = DATE_FORMAT_OPTIONS.map((option) => ({
+    label: formatDatePreview(option.excelNumFmt, formatDialogLocale.value),
+    value: option.excelNumFmt,
+    kind: option.kind,
+  }));
+  if (
+    isDateFormatKind.value
+    && formatDialogCustomNumFmt.value
+    && !options.some((option) => option.kind === formatDialogKind.value && option.value === formatDialogCustomNumFmt.value)
+  ) {
+    options.push({
+      label: formatDatePreview(formatDialogCustomNumFmt.value, formatDialogLocale.value),
+      value: formatDialogCustomNumFmt.value,
+      kind: formatDialogKind.value as "date" | "dateTime" | "time",
+    });
+  }
+  return options;
+});
+const selectedDatePreview = computed(() => formatDialogCustomNumFmt.value
+  ? formatDatePreview(formatDialogCustomNumFmt.value, formatDialogLocale.value)
+  : "");
+const isDateFormatKind = computed(() => formatDialogKind.value === "date" || formatDialogKind.value === "dateTime" || formatDialogKind.value === "time");
+watch(formatDialogKind, (kind) => {
+  if (kind !== "date" && kind !== "dateTime" && kind !== "time") {
+    return;
+  }
+  if (DATE_FORMAT_OPTIONS.some((option) => option.kind === kind && option.excelNumFmt === formatDialogCustomNumFmt.value)) {
+    return;
+  }
+  formatDialogCustomNumFmt.value = DATE_FORMAT_OPTIONS.find((option) => option.kind === kind)?.excelNumFmt ?? "";
+});
 
 /**
  * Two-way bridge between the editable size Select (which can hold a string
@@ -134,6 +168,9 @@ const fontSizeModel = computed<number | string>({
             <option value="decimal">Decimal</option>
             <option value="percent">Percent</option>
             <option value="currency">Currency</option>
+            <option value="date">Date</option>
+            <option value="dateTime">Date &amp; Time</option>
+            <option value="time">Time</option>
             <option value="custom">Custom Excel format</option>
           </select>
         </label>
@@ -155,7 +192,23 @@ const fontSizeModel = computed<number | string>({
             @keyup.enter="applySelectedCellFormat"
           >
         </label>
-        <p class="cell-format-dialog__hint">Numeric-looking text is converted for number, percent, and currency formats; incompatible values are left unchanged.</p>
+        <label v-if="isDateFormatKind" class="field">
+          Type
+          <select v-model="formatDialogCustomNumFmt" class="native-input">
+            <option
+              v-for="option in dateFormatOptions.filter((candidate) => candidate.kind === formatDialogKind)"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <div v-if="isDateFormatKind" class="field">
+          <span>Example</span>
+          <div class="cell-format-dialog__sample">{{ selectedDatePreview }}</div>
+        </div>
+        <p class="cell-format-dialog__hint">Numeric-looking text is converted for number, percent, and currency formats; date-looking text is converted for date formats. Incompatible values are left unchanged.</p>
       </section>
 
       <section v-else-if="formatDialogTab === 'alignment'" class="cell-format-dialog__panel cell-format-dialog__grid">
@@ -302,6 +355,13 @@ const fontSizeModel = computed<number | string>({
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.cell-format-dialog__sample {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: rgb(255 255 255 / 0.04);
 }
 
 /*

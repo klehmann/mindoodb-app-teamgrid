@@ -1,13 +1,15 @@
 import ExcelJS from "exceljs";
 
 import {
+  excelSerialToIsoDate,
   formulaResultToCellValue,
   inferCurrencyCodeFromExcelNumFmt,
+  inferDateFormatFromExcelNumFmt,
   inferNumberFormatFromExcelNumFmt,
+  preserveCompatibleCellValueFormat,
 } from "@/features/grid/lib/cellFormatting";
-import { evaluateFormula, parseFormula } from "@/features/formulas/lib";
+import { createFormulaContext, evaluateFormula, parseFormula, renderFormulaSource } from "@/features/formulas/lib";
 import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
-import { projectWorksheet } from "@/features/grid/lib/gridProjection";
 import {
   createCellId,
   createId,
@@ -22,6 +24,7 @@ import {
   type ColumnMeta,
   type FormulaErrorCode,
   type FormulaResult,
+  type Workbook,
   type RowId,
   type RowMeta,
   type TeamGridDocumentEnvelope,
@@ -73,6 +76,7 @@ export function createTeamGridDocumentFromExcelWorkbook(workbook: ExcelJS.Workbo
 
   envelope.teamgrid.workbook.worksheetOrder = importedWorksheets.map((worksheet) => worksheet.id);
   envelope.teamgrid.workbook.worksheetsById = Object.fromEntries(importedWorksheets.map((worksheet) => [worksheet.id, worksheet]));
+  importSupportedFormulas(envelope.teamgrid.workbook);
   return withoutUndefinedProperties(envelope);
 }
 
@@ -105,7 +109,6 @@ function importWorksheet(excelWorksheet: ExcelJS.Worksheet): Worksheet {
     }
   }
 
-  importSupportedFormulas(worksheet);
   return worksheet;
 }
 
@@ -148,26 +151,33 @@ function importCell(excelCell: ExcelJS.Cell, rowId: RowId, columnId: ColumnId): 
   };
 }
 
-function importSupportedFormulas(worksheet: Worksheet) {
-  const projection = projectWorksheet(worksheet);
-  for (const cell of Object.values(worksheet.cellsById)) {
-    if (!cell.formula?.source) {
+function importSupportedFormulas(workbook: Workbook) {
+  const formulaContext = createFormulaContext(workbook);
+  for (const worksheetId of workbook.worksheetOrder) {
+    const worksheet = workbook.worksheetsById[worksheetId];
+    if (!worksheet || worksheet.deletedAt) {
       continue;
     }
-    const parsed = parseFormula(cell.formula.source, worksheet.id, projection);
-    if ("code" in parsed) {
-      cell.formula = undefined;
-      continue;
+    for (const cell of Object.values(worksheet.cellsById)) {
+      if (!cell.formula?.source) {
+        continue;
+      }
+      const parsed = parseFormula(cell.formula.source, worksheet.id, formulaContext);
+      if ("code" in parsed) {
+        cell.formula = undefined;
+        continue;
+      }
+      const evaluated = evaluateFormula(cell.formula.source, worksheet.id, formulaContext);
+      cell.formula = {
+        kind: "formula",
+        source: renderFormulaSource(parsed, worksheet.id, formulaContext),
+        segments: parsed.segments,
+        references: evaluated.references,
+        cached: evaluated.result,
+        error: evaluated.result.kind === "error" ? evaluated.result.code : undefined,
+      };
+      cell.value = preserveCompatibleCellValueFormat(formulaResultToCellValue(evaluated.result), cell.value);
     }
-    const evaluated = evaluateFormula(cell.formula.source, worksheet, projection);
-    cell.formula = {
-      kind: "formula",
-      source: parsed.source,
-      references: evaluated.references,
-      cached: evaluated.result,
-      error: evaluated.result.kind === "error" ? evaluated.result.code : undefined,
-    };
-    cell.value = formulaResultToCellValue(evaluated.result);
   }
 }
 
@@ -196,9 +206,19 @@ function excelValueToCellValue(value: ExcelJS.CellValue | undefined, numFmt?: st
     return { kind: "empty" };
   }
   if (value instanceof Date) {
-    return { kind: "date", isoDate: value.toISOString(), format: mapImportedDateFormat(numFmt), excelNumFmt: numFmt };
+    return { kind: "date", isoDate: value.toISOString(), format: inferDateFormatFromExcelNumFmt(numFmt) ?? "date", excelNumFmt: numFmt };
   }
   if (typeof value === "number") {
+    const dateFormat = inferDateFormatFromExcelNumFmt(numFmt);
+    const isoDate = dateFormat ? excelSerialToIsoDate(value) : null;
+    if (isoDate) {
+      return {
+        kind: "date",
+        isoDate,
+        format: dateFormat,
+        excelNumFmt: numFmt,
+      };
+    }
     return {
       kind: "number",
       value,
@@ -389,17 +409,6 @@ function isSupportedBorderStyle(value: string): value is CellBorderStyle {
     || value === "dashed"
     || value === "dotted"
     || value === "double";
-}
-
-function mapImportedDateFormat(numFmt: string | undefined) {
-  const normalized = numFmt?.toLowerCase() ?? "";
-  if (/[hs]/.test(normalized) && /[dmy]/.test(normalized)) {
-    return "dateTime" as const;
-  }
-  if (/[hs]/.test(normalized)) {
-    return "time" as const;
-  }
-  return "date" as const;
 }
 
 function excelWidthToPixels(width: number) {

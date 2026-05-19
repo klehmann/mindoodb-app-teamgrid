@@ -137,10 +137,12 @@ function handleDocumentPointerDown(event: PointerEvent) {
         class="formula-assist__suggestion"
         type="button"
         :disabled="readonly"
+        @pointerdown.prevent.stop
         @click="choose(suggestion)"
       >
         <strong>{{ suggestion.name }}</strong>
         <span>{{ suggestion.signature }}</span>
+        <small>{{ suggestion.description }}</small>
       </button>
     </div>
   </Teleport>
@@ -152,12 +154,16 @@ function handleDocumentPointerDown(event: PointerEvent) {
   z-index: 1000;
   display: grid;
   gap: 0.35rem;
+  align-content: start;
   max-width: min(32rem, calc(100vw - 2rem));
+  max-height: min(28rem, calc(100vh - 2rem));
+  overflow-y: auto;
   padding: 0.75rem 2.35rem 0.75rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
+  overscroll-behavior: contain;
 }
 
 .formula-assist__close {
@@ -192,7 +198,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
   display: grid;
   gap: 0.15rem;
   padding: 0.45rem 0.55rem;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 0.55rem;
   background: transparent;
   color: var(--text);
@@ -200,12 +206,21 @@ function handleDocumentPointerDown(event: PointerEvent) {
   text-align: left;
 }
 
-.formula-assist__suggestion:hover {
-  background: rgb(255 255 255 / 0.07);
+.formula-assist__suggestion:hover,
+.formula-assist__suggestion:focus-visible {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  outline: none;
 }
 
 .formula-assist__suggestion span {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.formula-assist__suggestion small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
 }
 </style>

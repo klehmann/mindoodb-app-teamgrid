@@ -133,10 +133,15 @@ export interface CellBorder {
 export interface FormulaCell {
   kind: "formula";
   source: string;
+  segments?: FormulaSegment[];
   references: FormulaReference[];
   cached?: FormulaResult;
   error?: FormulaErrorCode;
 }
+
+export type FormulaSegment =
+  | { kind: "text"; text: string }
+  | { kind: "reference"; reference: FormulaReference };
 
 export type FormulaReference =
   | { kind: "cell"; worksheetId: WorksheetId; rowId: RowId; columnId: ColumnId }

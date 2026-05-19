@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { createTeamGridExcelWorkbook } from "@/features/xlsx/lib/exportWorkbook";
 import { createCellId, createTeamGridDocument, type TeamGridDocumentV1, type Worksheet } from "@/features/document/lib/teamgridDocument";
+import { getCell, projectWorksheet } from "@/features/grid/lib/gridProjection";
+import { createTeamGridDocumentFromExcelWorkbook } from "@/features/xlsx/lib/importWorkbook";
+import { createFormulaContext, evaluateFormula, renderFormulaSource } from "@/features/formulas/lib";
 
 describe("Teamgrid XLSX export", () => {
   it("exports visible worksheets with typed values, formulas, dimensions, and merged styles", () => {
@@ -63,6 +66,61 @@ describe("Teamgrid XLSX export", () => {
     const workbook = createTeamGridExcelWorkbook(document);
 
     expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(["A B", "A B 2"]);
+  });
+
+  it("exports cross-sheet formulas from stable references using exported sheet names", () => {
+    const envelope = createTeamGridDocument();
+    const document = envelope.teamgrid;
+    const firstWorksheet = firstVisibleWorksheet(document);
+    const secondWorksheet = cloneWorksheet(firstWorksheet, "sheet_summary");
+    firstWorksheet.title = "Tabelle/1";
+    secondWorksheet.title = "Summary";
+    document.workbook.worksheetOrder.push(secondWorksheet.id);
+    document.workbook.worksheetsById[secondWorksheet.id] = secondWorksheet;
+    const firstProjection = projectWorksheet(firstWorksheet);
+    const secondProjection = projectWorksheet(secondWorksheet);
+    const c10 = createCellId(firstProjection.rows[9].id, firstProjection.columns[2].id);
+    const c11 = createCellId(firstProjection.rows[10].id, firstProjection.columns[2].id);
+    const a1 = createCellId(secondProjection.rows[0].id, secondProjection.columns[0].id);
+    firstWorksheet.cellsById[c10] = { id: c10, rowId: firstProjection.rows[9].id, columnId: firstProjection.columns[2].id, value: { kind: "number", value: 4 } };
+    firstWorksheet.cellsById[c11] = { id: c11, rowId: firstProjection.rows[10].id, columnId: firstProjection.columns[2].id, value: { kind: "number", value: 6 } };
+    const context = createFormulaContext(document.workbook);
+    const evaluated = evaluateFormula("=SUM('Tabelle/1'!C10:C11)", secondWorksheet.id, context);
+    secondWorksheet.cellsById[a1] = {
+      id: a1,
+      rowId: secondProjection.rows[0].id,
+      columnId: secondProjection.columns[0].id,
+      value: { kind: "number", value: 10 },
+      formula: {
+        kind: "formula",
+        source: renderFormulaSource({ source: "=SUM('Tabelle/1'!C10:C11)", segments: evaluated.segments }, secondWorksheet.id, context),
+        segments: evaluated.segments,
+        references: evaluated.references,
+        cached: evaluated.result,
+      },
+    };
+
+    const workbook = createTeamGridExcelWorkbook(document);
+
+    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(["Tabelle 1", "Summary"]);
+    expect(workbook.getWorksheet("Summary")!.getCell("A1").value).toEqual({ formula: "SUM('Tabelle 1'!C10:C11)", result: 10 });
+  });
+
+  it("round-trips date cells through the Excel workbook representation", () => {
+    const document = createExportFixture();
+    const workbook = createTeamGridExcelWorkbook(document);
+
+    const envelope = createTeamGridDocumentFromExcelWorkbook(workbook, "Round-tripped");
+    const importedWorksheet = envelope.teamgrid.workbook.worksheetsById[envelope.teamgrid.workbook.worksheetOrder[0]];
+    const projection = projectWorksheet(importedWorksheet);
+    const cellB2 = getCell(importedWorksheet, projection.rows[1].id, projection.columns[1].id);
+
+    expect(cellB2.value).toMatchObject({
+      kind: "date",
+      isoDate: "2026-05-12T00:00:00.000Z",
+      format: "date",
+      excelNumFmt: "mmm d, yyyy",
+    });
   });
 });
 

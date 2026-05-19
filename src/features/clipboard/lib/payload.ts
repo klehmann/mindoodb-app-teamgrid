@@ -82,6 +82,10 @@ export interface SerializedClipboardPayload {
   payload: ClipboardPayload;
 }
 
+export interface SerializeRangeOptions {
+  formulaSource?: (cell: Cell) => string;
+}
+
 /**
  * Anchor used when we synthesize a payload from foreign Excel HTML.
  *
@@ -109,6 +113,7 @@ export function serializeRange(
   range: ClipboardRange,
   getCellAt: (row: number, col: number) => Cell,
   mode: ClipboardMode,
+  options: SerializeRangeOptions = {},
 ): SerializedClipboardPayload {
   const bounds = normalizeRange(range);
   const rows = bounds.endRow - bounds.startRow + 1;
@@ -123,22 +128,23 @@ export function serializeRange(
     const htmlCells: string[] = [];
     for (let colIndex = bounds.startCol; colIndex <= bounds.endCol; colIndex += 1) {
       const cell = getCellAt(rowIndex, colIndex);
-      const text = cellToClipboardText(cell);
+      const formulaSource = cell.formula ? options.formulaSource?.(cell) ?? cell.formula.source : undefined;
+      const text = cellToClipboardText(cell, formulaSource);
       const clipboardCell: ClipboardCell = {
         rowOffset: rowIndex - bounds.startRow,
         colOffset: colIndex - bounds.startCol,
         value: cell.value,
         text,
       };
-      if (cell.formula?.source) {
-        clipboardCell.formulaSource = cell.formula.source;
+      if (formulaSource) {
+        clipboardCell.formulaSource = formulaSource;
       }
       if (cell.style) {
         clipboardCell.style = cell.style;
       }
       cells.push(clipboardCell);
       tsvRow.push(text);
-      htmlCells.push(createHtmlCell(cell, text, { row: rowIndex, col: colIndex }));
+      htmlCells.push(createHtmlCell(cell, text, { row: rowIndex, col: colIndex }, formulaSource));
       cutCellIds.push(cell.id);
     }
     tsvRows.push(tsvRow);
@@ -248,9 +254,9 @@ function normalizeRange(range: ClipboardRange) {
  * Formula cells contribute their `source` so a Teamgrid-aware target sees the
  * original A1 expression; plain-value cells contribute their formatted text.
  */
-function cellToClipboardText(cell: Cell) {
-  if (cell.formula?.source) {
-    return cell.formula.source;
+function cellToClipboardText(cell: Cell, formulaSource?: string) {
+  if (formulaSource) {
+    return formulaSource;
   }
   switch (cell.value.kind) {
     case "number":
@@ -296,11 +302,11 @@ function cellToDisplayText(cell: Cell) {
  * which is what spreadsheet apps fall back to when they do not understand
  * the Excel metadata.
  */
-function createHtmlCell(cell: Cell, fallbackText: string, position: { row: number; col: number }) {
+function createHtmlCell(cell: Cell, fallbackText: string, position: { row: number; col: number }, formulaSource?: string) {
   const attributes: string[] = [];
-  const displayText = cell.formula?.source ? cellToDisplayText(cell) : fallbackText;
-  if (cell.formula?.source) {
-    attributes.push(`x:fmla="${escapeAttribute(a1FormulaToRelativeR1C1(cell.formula.source, position))}"`);
+  const displayText = formulaSource ? cellToDisplayText(cell) : fallbackText;
+  if (formulaSource) {
+    attributes.push(`x:fmla="${escapeAttribute(a1FormulaToRelativeR1C1(formulaSource, position))}"`);
   }
   if (cell.value.kind === "number") {
     attributes.push(`x:num="${escapeAttribute(String(cell.value.value))}"`);

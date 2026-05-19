@@ -26,7 +26,7 @@ import {
   type ClipboardRange,
   type SerializedClipboardPayload,
 } from "@/features/clipboard/lib";
-import { evaluateFormula } from "@/features/formulas/lib";
+import { createFormulaContext, evaluateFormula, renderFormulaSource, type FormulaContext } from "@/features/formulas/lib";
 import { formulaResultToCellValue } from "@/features/grid/lib/cellFormatting";
 import {
   createCellId,
@@ -128,9 +128,10 @@ export function useGridClipboard(options: UseGridClipboardOptions) {
    */
   function serializeSelection(range: CellSelectionRange | null, mode: "copy" | "cut") {
     const clipboardRange = selectionToClipboardRange(range);
-    if (!clipboardRange || !activeWorksheet.value || !projection.value) {
+    if (!clipboardRange || !activeWorksheet.value || !projection.value || !app.activeGrid.value) {
       return null;
     }
+    const formulaContext = createFormulaContext(app.activeGrid.value.workbook);
     return serializeRange(
       clipboardRange,
       (rowIndex, columnIndex) => {
@@ -139,6 +140,11 @@ export function useGridClipboard(options: UseGridClipboardOptions) {
         return getCell(activeWorksheet.value!, row.id, column.id);
       },
       mode,
+      {
+        formulaSource: (cell) => cell.formula
+          ? renderFormulaSource(cell.formula, activeWorksheet.value!.id, formulaContext)
+          : "",
+      },
     );
   }
 
@@ -318,7 +324,7 @@ export function useGridClipboard(options: UseGridClipboardOptions) {
           formula: undefined,
         };
         if (formulaSource) {
-          applyFormulaToCell(nextCell, formulaSource, worksheet, nextProjection);
+          applyFormulaToCell(nextCell, formulaSource, worksheet, createFormulaContext(grid.workbook));
         }
         worksheet.cellsById[targetCellId] = nextCell;
         operations.push({ type: "setCell", worksheetId: worksheet.id, cell: nextCell });
@@ -340,7 +346,7 @@ export function useGridClipboard(options: UseGridClipboardOptions) {
       }
 
       if (payload.mode === "cut" && sourceRange && payload.source.worksheetId === worksheet.id) {
-        operations.push(...applyMoveTracking(worksheet, nextProjection, sourceRange, destinationRange));
+        operations.push(...applyMoveTracking(worksheet, nextProjection, sourceRange, destinationRange, createFormulaContext(grid.workbook)));
       }
 
       return operations;
@@ -383,11 +389,15 @@ export function useGridClipboard(options: UseGridClipboardOptions) {
    * pipe it through a single setCell operation. The cached `references`
    * allow the dependency tracker to skip re-parsing on subsequent reads.
    */
-  function applyFormulaToCell(cell: Cell, formulaSource: string, worksheet: Worksheet, worksheetProjection: GridProjection) {
-    const evaluated = evaluateFormula(formulaSource, worksheet, worksheetProjection);
+  function applyFormulaToCell(cell: Cell, formulaSource: string, worksheet: Worksheet, formulaContext: FormulaContext) {
+    const evaluated = evaluateFormula(formulaSource, worksheet.id, formulaContext);
+    const renderedSource = evaluated.segments
+      ? renderFormulaSource({ source: formulaSource, segments: evaluated.segments }, worksheet.id, formulaContext)
+      : formulaSource;
     cell.formula = {
       kind: "formula",
-      source: formulaSource,
+      source: renderedSource,
+      segments: evaluated.segments,
       references: evaluated.references,
       cached: evaluated.result,
       error: evaluated.result.kind === "error" ? evaluated.result.code : undefined,
@@ -404,6 +414,7 @@ export function useGridClipboard(options: UseGridClipboardOptions) {
     worksheetProjection: GridProjection,
     sourceRange: ClipboardRange,
     destinationRange: ClipboardRange,
+    formulaContext: FormulaContext,
   ) {
     const operations: TeamGridOperation[] = [];
     const delta = {
@@ -415,7 +426,8 @@ export function useGridClipboard(options: UseGridClipboardOptions) {
       if (!coordinates || rangeContains(sourceRange, coordinates.rowIndex, coordinates.columnIndex) || rangeContains(destinationRange, coordinates.rowIndex, coordinates.columnIndex) || !cell.formula?.source) {
         continue;
       }
-      const nextSource = rewriteFormulaSource(cell.formula.source, delta, {
+      const renderedSource = renderFormulaSource(cell.formula, worksheet.id, formulaContext);
+      const nextSource = rewriteFormulaSource(renderedSource, delta, {
         insideRange: {
           startRow: sourceRange.startRow,
           startCol: sourceRange.startCol,
@@ -423,11 +435,11 @@ export function useGridClipboard(options: UseGridClipboardOptions) {
           endCol: sourceRange.endCol,
         },
       });
-      if (nextSource === cell.formula.source) {
+      if (nextSource === renderedSource) {
         continue;
       }
       const nextCell: Cell = { ...cell, formula: undefined };
-      applyFormulaToCell(nextCell, nextSource, worksheet, worksheetProjection);
+      applyFormulaToCell(nextCell, nextSource, worksheet, formulaContext);
       worksheet.cellsById[nextCell.id] = nextCell;
       operations.push({ type: "setCell", worksheetId: worksheet.id, cell: nextCell });
     }

@@ -57,17 +57,13 @@ Inside `teamgrid.workbook` a workbook is an ordered list of worksheet IDs plus a
 
 ## Formulas
 
-The formula subsystem is permissive-license sample code rather than a GPL/commercial engine integration. It currently supports:
+TeamGrid uses the permissively licensed `fast-formula-parser` package behind a local adapter, so the app now supports a much broader Excel-compatible formula subset while keeping TeamGrid's stable-ID storage model. Supported formulas include arithmetic, comparisons, cell references, ranges, whole-column references, formula-to-formula dependencies, and hundreds of functions from categories such as math, statistics, text, date/time, and logical formulas. Examples include `IF`, `ROUND`, `COUNTIF`, `LOWER`, `UPPER`, `LEFT`, `RIGHT`, `DATE`, `YEAR`, `MONTH`, and `DAY`, in addition to the original `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT`, and `TODAY`.
 
-- Arithmetic with `+`, `-`, `*`, and `/`.
-- Cell references such as `A1`.
-- Ranges such as `A1:B4`.
-- The functions `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT`, and `TODAY`.
-- A dependency graph for invalidation.
-- Content assist with function signatures and inline help.
-- Highlighting referenced cells and ranges while editing formulas.
+The adapter in `src/features/formulas/lib/fastFormulaParserAdapter.ts` maps visible Excel-style addresses (`A1`, `A1:B4`, `A:A`) to TeamGrid's persisted row and column IDs. Formula cells store the original source text plus normalized stable-ID references, so formulas keep pointing at the intended cells when rows or columns are inserted, deleted, or concurrently reordered.
 
-The parser stores formula source text plus normalized stable-ID references. The function registry in `src/features/formulas/lib/functionRegistry.ts` is the shared source of truth for evaluation and authoring assistance.
+Formulas can also reference cells and ranges on other worksheets. Use Excel's sheet qualifier syntax, quoting sheet names that contain spaces or punctuation: `=SUM('Sheet 2'!A1:C1)`. TeamGrid accepts the friendlier unquoted form while editing when the sheet name is unambiguous, such as `=SUM(Sheet 2!A1:C1)`, and normalizes it back to Excel-compatible quoted syntax for display and XLSX export. Internally those cross-sheet references are still stored as worksheet, row, and column IDs, so they tolerate sheet renames and row/column insertions in the target sheet.
+
+Formula authoring now includes Ctrl+Space / fx content assist with live filtering, scrollable suggestions, hover feedback, signatures, and short descriptions for available functions. The metadata in `src/features/formulas/lib/functionRegistry.ts` drives that help UI; evaluation itself is delegated to `fast-formula-parser` through the adapter.
 
 ## Formatting
 
@@ -82,7 +78,7 @@ Cells separate semantic values from presentation:
 
 The Format cells dialog (`CellFormatDialog.vue`, controlled by `useCellFormatDialog`) is the single entry point for value formatting and presentation:
 
-- **Cell type** picks the value kind (text, general, integer, decimal, percent, currency, custom) and accepts a custom Excel `numFmt` string for advanced cases.
+- **Cell type** picks the value kind (text, general, integer, decimal, percent, currency, date, date+time, time, custom) and accepts a custom Excel `numFmt` string for advanced cases.
 - **Alignment** picks horizontal alignment (General — Excel's value-aware default that right-aligns numbers and dates and left-aligns text — plus explicit Left, Center, Right), vertical alignment (Top, Middle, Bottom), an Excel-style indent (0..15, applies to Left and Right), and a Wrap text checkbox that lets multi-line content (Alt+Enter) and long values wrap inside the cell instead of spilling into the empty neighbour.
 - **Font** sets family, size, weight, slant, underline, and text color.
 - **Fill** toggles and picks the background color.
@@ -107,7 +103,7 @@ TeamGrid imports and exports the .xlsx format through `exceljs`, and it copy/pas
 - **File import / export.** `File / Import XLSX` builds a TeamGrid workbook envelope from any `.xlsx` file, mapping values, supported formulas, number and date formats, fonts, fills, and alignment. `File / Export XLSX` produces an `.xlsx` blob from the current workbook. See `src/features/xlsx/lib/importWorkbook.ts` and `src/features/xlsx/lib/exportWorkbook.ts`.
 - **Clipboard.** Copy and Cut emit three parallel encodings: a TeamGrid-native JSON payload embedded in the HTML clipboard for lossless TeamGrid-to-TeamGrid paste (preserves stable IDs, styles, and formula source); an Excel-compatible HTML body with `x:fmla`, `x:num`, and `x:str` attributes so Excel keeps relative formulas; and a plain TSV fallback for everything else. Paste decodes in the same priority order. See `src/features/clipboard/lib/`.
 
-TeamGrid intentionally supports only a small, well-chosen subset of Excel's functionality — enough to demonstrate the collaboration model on a real-world structured document, not enough to replace Excel.
+TeamGrid intentionally supports only a well-chosen subset of Excel's functionality — enough to demonstrate the collaboration model on a real-world structured document, not enough to replace Excel.
 
 ## Code Layout
 
@@ -165,4 +161,4 @@ Pointers into the most important modules:
 
 ## Current Scope
 
-This sample is deliberately small. It does not yet implement virtualization for very large sheets, named ranges in the UI, cross-workbook formulas, conditional formatting, charts, or a full Excel formula language. We are actively exploring more advanced editors — both open source and commercial — to edit Office formats in a data-sovereign way with full concurrency support, but most packages we evaluated are not yet powerful enough for our requirements (in particular: a clean separation between presentation and a stable-ID data model, and being able to drive edits through granular CRDT-friendly operations rather than whole-document replacements). The pieces above can all be layered onto TeamGrid's stable-ID schema and JSON-patch save path without changing the core collaboration model.
+This sample is deliberately small. It does not yet implement virtualization for very large sheets, named ranges in the UI, cross-workbook formulas, conditional formatting, charts, or every Excel formula edge case. We are actively exploring more advanced editors — both open source and commercial — to edit Office formats in a data-sovereign way with full concurrency support, but most packages we evaluated are not yet powerful enough for our requirements (in particular: a clean separation between presentation and a stable-ID data model, and being able to drive edits through granular CRDT-friendly operations rather than whole-document replacements). The pieces above can all be layered onto TeamGrid's stable-ID schema and JSON-patch save path without changing the core collaboration model.

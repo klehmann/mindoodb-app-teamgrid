@@ -60,7 +60,7 @@ import {
   formulaResultToCellValue,
   preserveCompatibleCellValueFormat,
 } from "@/features/grid/lib/cellFormatting";
-import { evaluateFormula } from "@/features/formulas/lib";
+import { createFormulaContext, evaluateFormula, renderFormulaSource } from "@/features/formulas/lib";
 import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
 import {
   createId,
@@ -113,6 +113,7 @@ const activeWorksheet = computed(() => {
  * changes so consumers never have to track invalidation themselves.
  */
 const projection = computed(() => activeWorksheet.value ? projectWorksheet(activeWorksheet.value) : null);
+const formulaContext = computed(() => app.activeGrid.value ? createFormulaContext(app.activeGrid.value.workbook) : null);
 
 const locale = computed(() => app.activeGrid.value?.settings.locale);
 
@@ -132,6 +133,7 @@ const {
 
 const {
   formulaAssistOpen,
+  formulaAssistEditor,
   formulaAssistAnchor,
   formulaAssistDraft,
   formulaAssistCaretPos,
@@ -156,6 +158,7 @@ const {
 } = useFormulaBarEditing({
   selectedCell,
   activeWorksheet,
+  formulaContext,
   projection,
   locale,
   commitCell: (cell, rawValue) => commitCell(cell, rawValue),
@@ -229,6 +232,14 @@ const showFormulaAssistHint = computed(() =>
 const statusLineText = computed(() => showFormulaAssistHint.value
   ? `${app.status.value} \u00B7 Press Ctrl+Space for function help`
   : app.status.value);
+
+const activeFormulaAssistDraft = computed(() =>
+  formulaAssistEditor.value === "formulaBar" ? formulaDraft.value : inlineCellDraft.value);
+
+const activeFormulaAssistCaretPos = computed(() =>
+  activeFormulaAssistDraft.value === formulaAssistDraft.value
+    ? formulaAssistCaretPos.value
+    : activeFormulaAssistDraft.value.length);
 
 /**
  * Right-hand toolbar badge that summarizes the current document mode:
@@ -588,16 +599,25 @@ function commitCell(cell: Cell, rawValue: string) {
     const targetCell: Cell = {
       ...cell,
       value: preserveCompatibleCellValueFormat(
-        coerceInputToCellValue(rawValue, worksheet.columnsById[cell.columnId]?.defaultValueKind),
+        coerceInputToCellValue(
+          rawValue,
+          worksheet.columnsById[cell.columnId]?.defaultValueKind,
+          grid.settings.locale,
+        ),
         cell.value,
       ),
       formula: undefined,
     };
     if (rawValue.trim().startsWith("=")) {
-      const evaluated = evaluateFormula(rawValue, worksheet, projectWorksheet(worksheet));
+      const context = createFormulaContext(grid.workbook);
+      const evaluated = evaluateFormula(rawValue, worksheet.id, context);
+      const renderedSource = evaluated.segments
+        ? renderFormulaSource({ source: rawValue, segments: evaluated.segments }, worksheet.id, context)
+        : rawValue;
       targetCell.formula = {
         kind: "formula",
-        source: rawValue,
+        source: renderedSource,
+        segments: evaluated.segments,
         references: evaluated.references,
         cached: evaluated.result,
         error: evaluated.result.kind === "error" ? evaluated.result.code : undefined,
@@ -800,6 +820,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
         <GridViewport
           ref="gridViewportComponent"
           :worksheet="activeWorksheet"
+          :formula-context="formulaContext"
           :projection="projection"
           :selected-cell-id="selectedCellId"
           :selected-range="selectedRange"
@@ -857,8 +878,8 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
 
     <FormulaAssistPanel
       v-model:visible="formulaAssistOpen"
-      :draft="formulaAssistDraft"
-      :caret-pos="formulaAssistCaretPos"
+      :draft="activeFormulaAssistDraft"
+      :caret-pos="activeFormulaAssistCaretPos"
       :anchor-el="formulaAssistAnchor"
       :readonly="app.gridReadOnly.value"
       @select="handleFormulaAssistSelect"

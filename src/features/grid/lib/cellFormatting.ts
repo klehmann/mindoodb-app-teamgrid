@@ -15,7 +15,7 @@
  *   default, and cell override in that order so bulk formatting on a column
  *   does not require rewriting every cell.
  */
-import type { Cell, CellStyle, CellValue, ColumnMeta, CurrencyCode, FormulaResult, NumberFormat, RowMeta } from "@/features/document/lib/teamgridDocument";
+import type { Cell, CellStyle, CellValue, ColumnMeta, CurrencyCode, DateFormat, FormulaResult, NumberFormat, RowMeta } from "@/features/document/lib/teamgridDocument";
 
 /**
  * Fallbacks used when neither the column, row, nor cell specifies a value.
@@ -118,7 +118,7 @@ export function indentPaddingRem(indent: number | undefined): number {
   return Math.min(15, Math.max(0, indent)) * 0.6;
 }
 
-export type CellFormatKind = "text" | "general" | "integer" | "decimal" | "percent" | "currency" | "custom";
+export type CellFormatKind = "text" | "general" | "integer" | "decimal" | "percent" | "currency" | "date" | "dateTime" | "time" | "custom";
 
 export interface CellFormatRequest {
   kind: CellFormatKind;
@@ -127,6 +127,40 @@ export interface CellFormatRequest {
 }
 
 const DEFAULT_CURRENCY_CODE: CurrencyCode = "USD";
+const MS_PER_DAY = 86400000;
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30);
+const EXCEL_TIME_ONLY_YEAR = 1899;
+const EXCEL_TIME_ONLY_MONTH = 12;
+const EXCEL_TIME_ONLY_DAY = 30;
+
+type DateFormatKind = Extract<CellFormatKind, "date" | "dateTime" | "time">;
+type DateCellValue = Extract<CellValue, { kind: "date" }>;
+
+export interface DateFormatOption {
+  kind: DateFormatKind;
+  excelNumFmt: string;
+}
+
+export const DATE_FORMAT_OPTIONS: readonly DateFormatOption[] = Object.freeze([
+  { kind: "date", excelNumFmt: "dd.mm.yy" },
+  { kind: "date", excelNumFmt: "dddd, d. mmmm yyyy" },
+  { kind: "date", excelNumFmt: "yyyy-mm-dd" },
+  { kind: "date", excelNumFmt: "d.m" },
+  { kind: "date", excelNumFmt: "d.m.yy" },
+  { kind: "date", excelNumFmt: "dd.mm.yyyy" },
+  { kind: "date", excelNumFmt: "d. mmm." },
+  { kind: "date", excelNumFmt: "d. mmm. yy" },
+  { kind: "dateTime", excelNumFmt: "dd.mm.yy h:mm" },
+  { kind: "dateTime", excelNumFmt: "dd.mm.yy h:mm:ss" },
+  { kind: "dateTime", excelNumFmt: "dd.mm.yy h:mm AM/PM" },
+  { kind: "dateTime", excelNumFmt: "yyyy-mm-dd h:mm" },
+  { kind: "time", excelNumFmt: "h:mm" },
+  { kind: "time", excelNumFmt: "h:mm AM/PM" },
+  { kind: "time", excelNumFmt: "h:mm:ss" },
+  { kind: "time", excelNumFmt: "h:mm:ss AM/PM" },
+  { kind: "time", excelNumFmt: "m:ss.0" },
+  { kind: "time", excelNumFmt: "[h]:mm:ss" },
+]);
 
 /**
  * Convert a raw text edit into a typed {@link CellValue}.
@@ -134,7 +168,7 @@ const DEFAULT_CURRENCY_CODE: CurrencyCode = "USD";
  * Tries the column's preferred kind first (date or number), then falls back
  * to a generic numeric regex, and finally treats the input as a string.
  */
-export function coerceInputToCellValue(input: string, preferredKind?: ColumnMeta["defaultValueKind"]): CellValue {
+export function coerceInputToCellValue(input: string, preferredKind?: ColumnMeta["defaultValueKind"], locale = "en-US"): CellValue {
   const trimmed = input.trim();
   if (trimmed === "") {
     return { kind: "empty" };
@@ -143,11 +177,9 @@ export function coerceInputToCellValue(input: string, preferredKind?: ColumnMeta
   if (currencyValue) {
     return currencyValue;
   }
-  if (preferredKind === "date") {
-    const timestamp = Date.parse(trimmed);
-    if (!Number.isNaN(timestamp)) {
-      return { kind: "date", isoDate: new Date(timestamp).toISOString(), format: "date" };
-    }
+  const dateValue = parseDateInput(trimmed, locale);
+  if (dateValue) {
+    return dateValue;
   }
   if (preferredKind === "number" || /^-?\d+(\.\d+)?$/.test(trimmed)) {
     const value = Number(trimmed);
@@ -158,6 +190,140 @@ export function coerceInputToCellValue(input: string, preferredKind?: ColumnMeta
     }
   }
   return { kind: "string", text: input };
+}
+
+interface ParsedDateParts {
+  year: number;
+  month: number;
+  day: number;
+  hours?: number;
+  minutes?: number;
+  seconds?: number;
+  timeOnly?: boolean;
+}
+
+export function parseDateInput(input: string, locale = "en-US", preferredFormat?: DateFormat): DateCellValue | null {
+  const trimmed = input.trim();
+  const parsed = parseDateParts(trimmed, locale);
+  if (!parsed) {
+    return null;
+  }
+  const isoDate = datePartsToIsoDate(parsed);
+  if (!isoDate) {
+    return null;
+  }
+  const hasTime = parsed.hours != null || parsed.minutes != null || parsed.seconds != null;
+  const format = preferredFormat ?? (parsed.timeOnly ? "time" : hasTime ? "dateTime" : "date");
+  return {
+    kind: "date",
+    isoDate,
+    format,
+    excelNumFmt: defaultExcelNumFmtForParsedDate(parsed, format),
+  };
+}
+
+function parseDateParts(input: string, locale: string): ParsedDateParts | null {
+  const timeMatch = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(input);
+  if (timeMatch) {
+    return {
+      year: EXCEL_TIME_ONLY_YEAR,
+      month: EXCEL_TIME_ONLY_MONTH,
+      day: EXCEL_TIME_ONLY_DAY,
+      hours: Number(timeMatch[1]),
+      minutes: Number(timeMatch[2]),
+      seconds: timeMatch[3] == null ? undefined : Number(timeMatch[3]),
+      timeOnly: true,
+    };
+  }
+
+  const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(input);
+  if (isoMatch) {
+    return datePartsFromMatch(isoMatch, "ymd");
+  }
+
+  const dottedMatch = /^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(input);
+  if (dottedMatch?.[3]) {
+    return datePartsFromMatch(dottedMatch, "dmy");
+  }
+
+  const slashMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(input);
+  if (slashMatch) {
+    const first = Number(slashMatch[1]);
+    const second = Number(slashMatch[2]);
+    const order = first > 12
+      ? "dmy"
+      : second > 12
+        ? "mdy"
+        : localePrefersMonthFirst(locale) ? "mdy" : "dmy";
+    return datePartsFromMatch(slashMatch, order);
+  }
+
+  return null;
+}
+
+function datePartsFromMatch(match: RegExpExecArray, order: "ymd" | "dmy" | "mdy"): ParsedDateParts | null {
+  const first = Number(match[1]);
+  const second = Number(match[2]);
+  const third = Number(match[3]);
+  const hours = match[4] == null ? undefined : Number(match[4]);
+  const minutes = match[5] == null ? undefined : Number(match[5]);
+  const seconds = match[6] == null ? undefined : Number(match[6]);
+  const year = normalizeInputYear(order === "ymd" ? first : third);
+  const month = order === "ymd" ? second : order === "dmy" ? second : first;
+  const day = order === "ymd" ? third : order === "dmy" ? first : second;
+  if (year == null) {
+    return null;
+  }
+  return { year, month, day, hours, minutes, seconds };
+}
+
+function normalizeInputYear(year: number) {
+  if (!Number.isInteger(year) || year < 0) {
+    return null;
+  }
+  return year < 100 ? 2000 + year : year;
+}
+
+function datePartsToIsoDate(parts: ParsedDateParts) {
+  const hours = parts.hours ?? 0;
+  const minutes = parts.minutes ?? 0;
+  const seconds = parts.seconds ?? 0;
+  if (
+    !Number.isInteger(parts.year)
+    || !Number.isInteger(parts.month)
+    || !Number.isInteger(parts.day)
+    || parts.month < 1
+    || parts.month > 12
+    || parts.day < 1
+    || parts.day > 31
+    || hours < 0
+    || hours > 23
+    || minutes < 0
+    || minutes > 59
+    || seconds < 0
+    || seconds > 59
+  ) {
+    return null;
+  }
+  const timestamp = Date.UTC(parts.year, parts.month - 1, parts.day, hours, minutes, seconds);
+  const date = new Date(timestamp);
+  if (
+    date.getUTCFullYear() !== parts.year
+    || date.getUTCMonth() !== parts.month - 1
+    || date.getUTCDate() !== parts.day
+    || date.getUTCHours() !== hours
+    || date.getUTCMinutes() !== minutes
+    || date.getUTCSeconds() !== seconds
+  ) {
+    return null;
+  }
+  return date.toISOString();
+}
+
+function localePrefersMonthFirst(locale: string) {
+  const parts = new Intl.DateTimeFormat(locale, { day: "numeric", month: "numeric", timeZone: "UTC" })
+    .formatToParts(new Date(Date.UTC(2026, 0, 2)));
+  return parts.find((part) => part.type === "day" || part.type === "month")?.type === "month";
 }
 
 function parseCurrencyInput(input: string): CellValue | null {
@@ -234,7 +400,7 @@ export function formatCellValue(value: CellValue, locale = "en-US") {
     case "number":
       return formatNumber(value.value, value.format, locale, value.currencyCode);
     case "date":
-      return formatDate(value.isoDate, value.format, locale);
+      return formatDate(value.isoDate, value.format, locale, value.excelNumFmt);
   }
 }
 
@@ -253,7 +419,12 @@ export function formatFormulaResult(result: FormulaResult, locale = "en-US", dis
         displayValue?.kind === "number" ? displayValue.currencyCode : undefined,
       );
     case "date":
-      return formatDate(result.isoDate, "date", locale);
+      return formatDate(
+        result.isoDate,
+        displayValue?.kind === "date" ? displayValue.format : "date",
+        locale,
+        displayValue?.kind === "date" ? displayValue.excelNumFmt : undefined,
+      );
     case "string":
       return result.value;
   }
@@ -300,6 +471,25 @@ export function inferNumberFormatFromExcelNumFmt(numFmt: string | undefined): Nu
   return "general";
 }
 
+export function inferDateFormatFromExcelNumFmt(numFmt: string | undefined): DateFormat | undefined {
+  const normalized = normalizeExcelDateFormat(numFmt);
+  if (!normalized) {
+    return undefined;
+  }
+  const hasDateToken = /[dy]/.test(normalized) || /m{3,5}/.test(normalized);
+  const hasTimeToken = /[hs]/.test(normalized);
+  if (!hasDateToken && !hasTimeToken) {
+    return undefined;
+  }
+  if (hasDateToken && hasTimeToken) {
+    return "dateTime";
+  }
+  if (hasTimeToken) {
+    return "time";
+  }
+  return "date";
+}
+
 export function inferCurrencyCodeFromExcelNumFmt(numFmt: string | undefined): CurrencyCode | undefined {
   if (!numFmt) {
     return undefined;
@@ -325,6 +515,10 @@ export function defaultExcelNumFmtForRequest(request: CellFormatRequest) {
       return "0.00%";
     case "currency":
       return request.currencyCode === "EUR" ? "€0.00" : "$0.00";
+    case "date":
+    case "dateTime":
+    case "time":
+      return request.excelNumFmt?.trim() || defaultExcelNumFmtForDateFormat(request.kind);
     case "custom":
       return request.excelNumFmt?.trim() || undefined;
     default:
@@ -340,10 +534,14 @@ function applyFormatToCellValue(value: CellValue, request: CellFormatRequest, lo
     return valueToTextCellValue(value, locale);
   }
 
+  if (isDateFormatKind(request.kind)) {
+    return applyDateFormatToCellValue(value, request, locale);
+  }
+
   if (value.kind === "date") {
     if (request.kind === "custom") {
       const excelNumFmt = defaultExcelNumFmtForRequest(request);
-      return excelNumFmt ? { ...value, excelNumFmt } : value;
+      return excelNumFmt ? { ...value, format: inferDateFormatFromExcelNumFmt(excelNumFmt) ?? value.format, excelNumFmt } : value;
     }
     return value;
   }
@@ -383,6 +581,52 @@ function applyFormatToCellValue(value: CellValue, request: CellFormatRequest, lo
   };
 }
 
+function applyDateFormatToCellValue(value: CellValue, request: CellFormatRequest, locale: string): CellValue {
+  const format = dateFormatFromRequestKind(request.kind);
+  const excelNumFmt = defaultExcelNumFmtForRequest(request);
+  if (value.kind === "date") {
+    return { ...value, format, excelNumFmt };
+  }
+  if (value.kind === "string") {
+    const parsed = parseDateInput(value.text, locale, format);
+    return parsed ? { ...parsed, format, excelNumFmt } : value;
+  }
+  if (value.kind === "number") {
+    const isoDate = excelSerialToIsoDate(value.value);
+    return isoDate ? { kind: "date", isoDate, format, excelNumFmt } : value;
+  }
+  return value;
+}
+
+function isDateFormatKind(kind: CellFormatKind): kind is DateFormatKind {
+  return kind === "date" || kind === "dateTime" || kind === "time";
+}
+
+function dateFormatFromRequestKind(kind: CellFormatKind): DateFormat {
+  return kind === "dateTime" || kind === "time" ? kind : "date";
+}
+
+function defaultExcelNumFmtForDateFormat(format: DateFormat) {
+  switch (format) {
+    case "dateTime":
+      return "dd.mm.yy h:mm";
+    case "time":
+      return "h:mm";
+    default:
+      return "dd.mm.yy";
+  }
+}
+
+function defaultExcelNumFmtForParsedDate(parts: ParsedDateParts, format: DateFormat) {
+  if (format === "time") {
+    return parts.seconds == null ? "h:mm" : "h:mm:ss";
+  }
+  if (format === "dateTime") {
+    return parts.seconds == null ? "dd.mm.yy h:mm" : "dd.mm.yy h:mm:ss";
+  }
+  return defaultExcelNumFmtForDateFormat(format);
+}
+
 function valueToTextCellValue(value: CellValue, locale: string): CellValue {
   switch (value.kind) {
     case "empty":
@@ -396,7 +640,7 @@ function valueToTextCellValue(value: CellValue, locale: string): CellValue {
   }
 }
 
-function readNumberForFormat(value: CellValue, kind: Exclude<CellFormatKind, "text">) {
+function readNumberForFormat(value: CellValue, kind: Exclude<CellFormatKind, "text" | DateFormatKind>) {
   if (value.kind === "number") {
     return value.value;
   }
@@ -471,16 +715,141 @@ function formatNumber(value: number, format: NumberFormat | undefined, locale: s
   }
 }
 
-function formatDate(isoDate: string, format = "date", locale: string) {
+export function excelSerialToIsoDate(serial: number) {
+  if (!Number.isFinite(serial) || serial < 0) {
+    return null;
+  }
+  return new Date(EXCEL_EPOCH_UTC + serial * MS_PER_DAY).toISOString();
+}
+
+export function formatDatePreview(excelNumFmt: string, locale = "en-US", isoDate = "2012-03-14T13:30:55.000Z") {
+  return formatDateWithExcelNumFmt(isoDate, excelNumFmt, locale) ?? formatDate(isoDate, inferDateFormatFromExcelNumFmt(excelNumFmt), locale);
+}
+
+function normalizeExcelDateFormat(numFmt: string | undefined) {
+  const firstSection = numFmt?.split(";")[0]?.trim();
+  if (!firstSection) {
+    return "";
+  }
+  return firstSection
+    .replace(/"[^"]*"/g, "")
+    .replace(/\\./g, "")
+    .replace(/\[([hms]+)]/gi, "$1")
+    .replace(/\[[^\]]*]/g, "")
+    .toLowerCase();
+}
+
+function formatDate(isoDate: string, format = "date", locale: string, excelNumFmt?: string) {
+  const formatted = formatDateWithExcelNumFmt(isoDate, excelNumFmt, locale);
+  if (formatted) {
+    return formatted;
+  }
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) {
     return "";
   }
   if (format === "time") {
-    return new Intl.DateTimeFormat(locale, { timeStyle: "short" }).format(date);
+    return new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone: "UTC" }).format(date);
   }
   if (format === "dateTime") {
-    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(date);
   }
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date);
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(date);
+}
+
+function formatDateWithExcelNumFmt(isoDate: string, excelNumFmt: string | undefined, locale: string) {
+  const normalized = normalizeExcelDateFormat(excelNumFmt);
+  if (!normalized || !inferDateFormatFromExcelNumFmt(excelNumFmt)) {
+    return null;
+  }
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const values = dateFormatValues(date, locale);
+  const usesAmPm = /am\/pm/i.test(excelNumFmt ?? "");
+  const format = normalized.replace(/am\/pm/gi, "AM/PM");
+  let output = "";
+  let previousToken = "";
+  for (let index = 0; index < format.length;) {
+    const token = /^(yyyy|yy|dddd|ddd|dd|d|mmmm|mmm|mm|m|hh|h|ss|s|AM\/PM)/i.exec(format.slice(index))?.[0];
+    if (!token) {
+      output += format[index];
+      index += 1;
+      continue;
+    }
+    const lowerToken = token.toLowerCase();
+    const nextToken = /^(yyyy|yy|dddd|ddd|dd|d|mmmm|mmm|mm|m|hh|h|ss|s|AM\/PM)/i.exec(format.slice(index + token.length))?.[0]?.toLowerCase() ?? "";
+    output += formatDateToken(lowerToken, values, previousToken, nextToken, usesAmPm);
+    previousToken = lowerToken;
+    index += token.length;
+  }
+  return output.trim();
+}
+
+function dateFormatValues(date: Date, locale: string) {
+  const hours24 = date.getUTCHours();
+  const hours12 = hours24 % 12 || 12;
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+    weekdayShort: new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(date),
+    weekdayLong: new Intl.DateTimeFormat(locale, { weekday: "long", timeZone: "UTC" }).format(date),
+    monthShort: new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }).format(date),
+    monthLong: new Intl.DateTimeFormat(locale, { month: "long", timeZone: "UTC" }).format(date),
+    hours24,
+    hours12,
+    minutes: date.getUTCMinutes(),
+    seconds: date.getUTCSeconds(),
+  };
+}
+
+function formatDateToken(
+  token: string,
+  values: ReturnType<typeof dateFormatValues>,
+  previousToken: string,
+  nextToken: string,
+  usesAmPm: boolean,
+) {
+  switch (token) {
+    case "yyyy":
+      return String(values.year);
+    case "yy":
+      return String(values.year % 100).padStart(2, "0");
+    case "dddd":
+      return values.weekdayLong;
+    case "ddd":
+      return values.weekdayShort;
+    case "dd":
+      return String(values.day).padStart(2, "0");
+    case "d":
+      return String(values.day);
+    case "mmmm":
+      return values.monthLong;
+    case "mmm":
+      return values.monthShort;
+    case "mm":
+      return isMinuteToken(previousToken, nextToken)
+        ? String(values.minutes).padStart(2, "0")
+        : String(values.month).padStart(2, "0");
+    case "m":
+      return isMinuteToken(previousToken, nextToken) ? String(values.minutes) : String(values.month);
+    case "hh":
+      return String(usesAmPm ? values.hours12 : values.hours24).padStart(2, "0");
+    case "h":
+      return String(usesAmPm ? values.hours12 : values.hours24);
+    case "ss":
+      return String(values.seconds).padStart(2, "0");
+    case "s":
+      return String(values.seconds);
+    case "am/pm":
+      return values.hours24 < 12 ? "AM" : "PM";
+    default:
+      return token;
+  }
+}
+
+function isMinuteToken(previousToken: string, nextToken: string) {
+  return previousToken.startsWith("h") || nextToken.startsWith("s");
 }

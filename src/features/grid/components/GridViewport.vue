@@ -57,6 +57,7 @@ import {
 } from "@/features/grid/composables/useColumnRowResize";
 import { useGridClipboardBridge } from "@/features/grid/composables/useGridClipboardBridge";
 import type { CellSelectionRange } from "@/features/grid/composables/useSelection";
+import { createSingleWorksheetFormulaContext, type FormulaContext } from "@/features/formulas/lib";
 
 /**
  * Coordinate range used to draw the clipboard source marquee ("marching
@@ -73,6 +74,7 @@ export interface GridClipboardRange {
 
 const props = withDefaults(defineProps<{
   worksheet: Worksheet;
+  formulaContext?: FormulaContext | null;
   projection: GridProjection;
   selectedCellId: string | null;
   selectedRange: CellSelectionRange | null;
@@ -113,6 +115,7 @@ const BORDER_SIDES: CellBorderSide[] = ["top", "right", "bottom", "left"];
 const gridViewport = ref<HTMLElement | null>(null);
 
 const worksheetRef = toRef(props, "worksheet");
+const formulaContextRef = computed(() => props.formulaContext ?? createSingleWorksheetFormulaContext(props.worksheet));
 const projectionRef = toRef(props, "projection");
 const selectedCellIdRef = toRef(props, "selectedCellId");
 const selectedRangeRef = toRef(props, "selectedRange");
@@ -122,6 +125,7 @@ const readonlyRef = toRef(props, "readonly");
 
 const editor = useInlineCellEditor({
   worksheet: worksheetRef,
+  formulaContext: formulaContextRef,
   projection: projectionRef,
   selectedCellId: selectedCellIdRef,
   locale: localeRef,

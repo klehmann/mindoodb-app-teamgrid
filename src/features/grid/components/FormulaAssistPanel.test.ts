@@ -32,6 +32,7 @@ describe("FormulaAssistPanel", () => {
     const suggestions = document.body.querySelectorAll(".formula-assist__suggestion");
     expect(suggestions.length).toBeGreaterThan(0);
     expect(suggestions[0].textContent).toMatch(/SUM/i);
+    expect(suggestions[0].querySelector("small")?.textContent).toBeTruthy();
     wrapper.unmount();
     anchor.remove();
   });
@@ -47,6 +48,25 @@ describe("FormulaAssistPanel", () => {
 
     const events = wrapper.emitted<[{ name: string }]>("select");
     expect(events?.[0]?.[0]?.name).toBeTruthy();
+    wrapper.unmount();
+    anchor.remove();
+  });
+
+  it("keeps editor focus stable before selecting a suggestion", async () => {
+    const anchor = makeAnchor();
+    const wrapper = mountPanel({ draft: "=SUM", caretPos: 4, anchorEl: anchor });
+    anchor.focus();
+    await flushPromises();
+
+    const first = document.body.querySelector<HTMLButtonElement>(".formula-assist__suggestion");
+    const pointerEvent = new PointerEvent("pointerdown", { bubbles: true, cancelable: true });
+    first?.dispatchEvent(pointerEvent);
+    first?.click();
+    await flushPromises();
+
+    expect(pointerEvent.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(anchor);
+    expect(wrapper.emitted("select")).toHaveLength(1);
     wrapper.unmount();
     anchor.remove();
   });

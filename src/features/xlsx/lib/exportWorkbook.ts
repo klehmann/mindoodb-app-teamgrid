@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 
+import { createFormulaContext, renderFormulaSource, type FormulaContext } from "@/features/formulas/lib";
 import { mergeCellStyle } from "@/features/grid/lib/cellFormatting";
 import { DEFAULT_ROW_HEIGHT } from "@/shared/lib/gridDimensions";
 import { getCell, projectWorksheet } from "@/features/grid/lib/gridProjection";
@@ -15,6 +16,7 @@ import type {
   NumberFormat,
   TeamGridDocumentV1,
   Worksheet,
+  WorksheetId,
   CurrencyCode,
 } from "@/features/document/lib/teamgridDocument";
 
@@ -36,12 +38,23 @@ export function createTeamGridExcelWorkbook(document: TeamGridDocumentV1) {
   workbook.modified = new Date();
 
   const usedSheetNames = new Set<string>();
+  const exportedSheetNamesById = new Map<WorksheetId, string>();
   for (const worksheetId of document.workbook.worksheetOrder) {
     const worksheet = document.workbook.worksheetsById[worksheetId];
     if (!worksheet || worksheet.deletedAt) {
       continue;
     }
-    appendWorksheet(workbook, worksheet, usedSheetNames);
+    exportedSheetNamesById.set(worksheet.id, createUniqueSheetName(worksheet.title, usedSheetNames));
+  }
+
+  const formulaContext = createFormulaContext(document.workbook, exportedSheetNamesById);
+  for (const worksheetId of document.workbook.worksheetOrder) {
+    const worksheet = document.workbook.worksheetsById[worksheetId];
+    const sheetName = exportedSheetNamesById.get(worksheetId);
+    if (!worksheet || !sheetName) {
+      continue;
+    }
+    appendWorksheet(workbook, worksheet, sheetName, formulaContext);
   }
 
   if (workbook.worksheets.length === 0) {
@@ -58,9 +71,9 @@ export async function writeTeamGridExcelBuffer(document: TeamGridDocumentV1) {
   return toArrayBuffer(buffer);
 }
 
-function appendWorksheet(workbook: ExcelJS.Workbook, teamgridWorksheet: Worksheet, usedSheetNames: Set<string>) {
+function appendWorksheet(workbook: ExcelJS.Workbook, teamgridWorksheet: Worksheet, sheetName: string, formulaContext: FormulaContext) {
   const projection = projectWorksheet(teamgridWorksheet);
-  const worksheet = workbook.addWorksheet(createUniqueSheetName(teamgridWorksheet.title, usedSheetNames));
+  const worksheet = workbook.addWorksheet(sheetName);
 
   projection.columns.forEach((column) => {
     worksheet.getColumn(column.index + 1).width = pixelsToExcelWidth(column.width);
@@ -80,7 +93,7 @@ function appendWorksheet(workbook: ExcelJS.Workbook, teamgridWorksheet: Workshee
 
       if (shouldWriteCell(cell, style)) {
         const excelCell = excelRow.getCell(column.index + 1);
-        excelCell.value = toExcelCellValue(cell);
+        excelCell.value = toExcelCellValue(cell, teamgridWorksheet.id, formulaContext);
         applyExcelStyle(excelCell, style);
         applyExcelNumberFormat(excelCell, cell.value);
       }
@@ -98,16 +111,17 @@ function shouldWriteCell(cell: Cell, style: CellStyle) {
     || Boolean(style.borders && Object.keys(style.borders).length > 0);
 }
 
-function toExcelCellValue(cell: Cell): ExcelJS.CellValue {
+function toExcelCellValue(cell: Cell, worksheetId: WorksheetId, formulaContext: FormulaContext): ExcelJS.CellValue {
   if (cell.formula?.source) {
+    const formulaSource = renderFormulaSource(cell.formula, worksheetId, formulaContext);
     const result = toExcelFormulaResult(cell.value, cell.formula.error);
     if (result == null) {
       return {
-        formula: stripFormulaPrefix(cell.formula.source),
+        formula: stripFormulaPrefix(formulaSource),
       };
     }
     return {
-      formula: stripFormulaPrefix(cell.formula.source),
+      formula: stripFormulaPrefix(formulaSource),
       result,
     };
   }

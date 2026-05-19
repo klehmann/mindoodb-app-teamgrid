@@ -15,6 +15,8 @@
 import { ref, type Ref } from "vue";
 import {
   applyCellFormat,
+  DATE_FORMAT_OPTIONS,
+  inferDateFormatFromExcelNumFmt,
   normalizeFontFamily,
   type CellFormatKind,
   type CellFormatRequest,
@@ -81,6 +83,7 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
   const formatDialogKind = ref<CellFormatKind>("general");
   const formatDialogCurrency = ref<CurrencyCode>("USD");
   const formatDialogCustomNumFmt = ref("");
+  const formatDialogLocale = ref("en-US");
   const formatDialogFontFamily = ref("Calibri");
   const formatDialogFontSize = ref(14);
   const formatDialogBold = ref(false);
@@ -108,6 +111,7 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
       return;
     }
     selectedRange.value = targetRange;
+    formatDialogLocale.value = app.activeGrid.value?.settings.locale ?? "en-US";
     seedFormatDialogFromCell(selectedCell.value);
     formatDialogVisible.value = true;
   }
@@ -117,16 +121,18 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
     const excelNumFmt = value && "excelNumFmt" in value ? value.excelNumFmt : undefined;
     const style = cell?.style;
     formatDialogTab.value = "cellType";
-    formatDialogKind.value = excelNumFmt && isCustomExcelNumFmt(excelNumFmt)
-      ? "custom"
-      : value?.kind === "string"
+    formatDialogKind.value = value?.kind === "date"
+      ? (inferDateFormatFromExcelNumFmt(excelNumFmt) ?? value.format ?? "date")
+      : excelNumFmt && isCustomExcelNumFmt(excelNumFmt)
+        ? "custom"
+        : value?.kind === "string"
         ? "text"
         : value?.kind === "number"
           ? (value.format ?? "general")
           : "general";
     formatDialogCurrency.value = value?.kind === "number" && value.currencyCode ? value.currencyCode : "USD";
     formatDialogCustomNumFmt.value = value?.kind === "number" || value?.kind === "date" || value?.kind === "string"
-      ? excelNumFmt ?? ""
+      ? excelNumFmt ?? defaultDateExcelNumFmt(value?.kind === "date" ? (value.format ?? "date") : undefined)
       : "";
     formatDialogFontFamily.value = normalizeFontFamily(style?.fontFamily);
     formatDialogFontSize.value = style?.fontSize ?? 14;
@@ -154,12 +160,29 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
   }
 
   function isCustomExcelNumFmt(numFmt: string) {
-    return !new Set(["@", "0", "0.00", "0.00%", "$0.00", "\u20AC0.00", "$#,##0.00", "\u20AC#,##0.00"]).has(numFmt);
+    return !new Set([
+      "@",
+      "0",
+      "0.00",
+      "0.00%",
+      "$0.00",
+      "\u20AC0.00",
+      "$#,##0.00",
+      "\u20AC#,##0.00",
+      ...DATE_FORMAT_OPTIONS.map((option) => option.excelNumFmt),
+    ]).has(numFmt);
+  }
+
+  function defaultDateExcelNumFmt(format: "date" | "dateTime" | "time" | undefined) {
+    return DATE_FORMAT_OPTIONS.find((option) => option.kind === format)?.excelNumFmt ?? "";
   }
 
   function currentCellFormatRequest(): CellFormatRequest {
     if (formatDialogKind.value === "currency") {
       return { kind: "currency", currencyCode: formatDialogCurrency.value };
+    }
+    if (formatDialogKind.value === "date" || formatDialogKind.value === "dateTime" || formatDialogKind.value === "time") {
+      return { kind: formatDialogKind.value, excelNumFmt: formatDialogCustomNumFmt.value };
     }
     if (formatDialogKind.value === "custom") {
       return { kind: "custom", excelNumFmt: formatDialogCustomNumFmt.value };
@@ -456,6 +479,7 @@ export function useCellFormatDialog(options: UseCellFormatDialogOptions) {
     formatDialogKind,
     formatDialogCurrency,
     formatDialogCustomNumFmt,
+    formatDialogLocale,
     formatDialogFontFamily,
     formatDialogFontSize,
     formatDialogBold,

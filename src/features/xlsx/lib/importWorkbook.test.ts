@@ -101,6 +101,77 @@ describe("Teamgrid XLSX import", () => {
     expect(cellA1.value).toEqual({ kind: "string", text: "fallback" });
   });
 
+  it("imports numeric Excel serials with date formats as date cells", () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Serial dates");
+    worksheet.getCell("A1").value = excelSerialForUtcDate("2026-01-01T00:00:00.000Z");
+    worksheet.getCell("A1").numFmt = "dd.mm.yy";
+    worksheet.getCell("B1").value = excelSerialForUtcDate("2026-01-01T14:30:00.000Z");
+    worksheet.getCell("B1").numFmt = "dd.mm.yy h:mm";
+    worksheet.getCell("C1").value = 42;
+    worksheet.getCell("C1").numFmt = "0.00";
+
+    const envelope = createTeamGridDocumentFromExcelWorkbook(workbook, "Serial dates");
+    const importedWorksheet = envelope.teamgrid.workbook.worksheetsById[envelope.teamgrid.workbook.worksheetOrder[0]];
+    const projection = projectWorksheet(importedWorksheet);
+    const cellA1 = getCell(importedWorksheet, projection.rows[0].id, projection.columns[0].id);
+    const cellB1 = getCell(importedWorksheet, projection.rows[0].id, projection.columns[1].id);
+    const cellC1 = getCell(importedWorksheet, projection.rows[0].id, projection.columns[2].id);
+
+    expect(cellA1.value).toEqual({ kind: "date", isoDate: "2026-01-01T00:00:00.000Z", format: "date", excelNumFmt: "dd.mm.yy" });
+    expect(cellB1.value).toEqual({ kind: "date", isoDate: "2026-01-01T14:30:00.000Z", format: "dateTime", excelNumFmt: "dd.mm.yy h:mm" });
+    expect(cellC1.value).toEqual({ kind: "number", value: 42, format: "decimal", excelNumFmt: "0.00" });
+  });
+
+  it("imports newly supported formulas as formulas", () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Supported");
+    worksheet.getCell("A1").value = 4;
+    worksheet.getCell("A2").value = 6;
+    worksheet.getCell("B1").value = { formula: "IF(A2>5,ROUND(A1*2.25,1),0)", result: 9 };
+
+    const envelope = createTeamGridDocumentFromExcelWorkbook(workbook, "Supported formulas");
+    const importedWorksheet = envelope.teamgrid.workbook.worksheetsById[envelope.teamgrid.workbook.worksheetOrder[0]];
+    const projection = projectWorksheet(importedWorksheet);
+    const cellB1 = getCell(importedWorksheet, projection.rows[0].id, projection.columns[1].id);
+
+    expect(cellB1.formula).toMatchObject({
+      source: "=IF(A2>5,ROUND(A1*2.25,1),0)",
+      cached: { kind: "number", value: 9 },
+    });
+    expect(cellB1.value).toEqual({ kind: "number", value: 9 });
+  });
+
+  it("imports cross-sheet formulas after all worksheets exist", () => {
+    const workbook = new ExcelJS.Workbook();
+    const sourceWorksheet = workbook.addWorksheet("Tabelle1");
+    const summaryWorksheet = workbook.addWorksheet("Summary");
+    sourceWorksheet.getCell("C10").value = 4;
+    sourceWorksheet.getCell("C11").value = 6;
+    summaryWorksheet.getCell("A1").value = { formula: "SUM(Tabelle1!C10:C11)", result: 10 };
+
+    const envelope = createTeamGridDocumentFromExcelWorkbook(workbook, "Cross-sheet");
+    const source = envelope.teamgrid.workbook.worksheetsById[envelope.teamgrid.workbook.worksheetOrder[0]];
+    const summary = envelope.teamgrid.workbook.worksheetsById[envelope.teamgrid.workbook.worksheetOrder[1]];
+    const sourceProjection = projectWorksheet(source);
+    const summaryProjection = projectWorksheet(summary);
+    const summaryA1 = getCell(summary, summaryProjection.rows[0].id, summaryProjection.columns[0].id);
+
+    expect(summaryA1.formula).toMatchObject({
+      source: "=SUM(Tabelle1!C10:C11)",
+      cached: { kind: "number", value: 10 },
+      references: [{
+        kind: "range",
+        worksheetId: source.id,
+        startRowId: sourceProjection.rows[9].id,
+        endRowId: sourceProjection.rows[10].id,
+        startColumnId: sourceProjection.columns[2].id,
+        endColumnId: sourceProjection.columns[2].id,
+      }],
+    });
+    expect(summaryA1.value).toEqual({ kind: "number", value: 10 });
+  });
+
   it("omits optional fields instead of importing them as undefined", () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Defaults");
@@ -156,4 +227,8 @@ function hasExplicitUndefined(value: unknown): boolean {
     return value.some(hasExplicitUndefined);
   }
   return Object.values(value).some(hasExplicitUndefined);
+}
+
+function excelSerialForUtcDate(isoDate: string) {
+  return (new Date(isoDate).getTime() - Date.UTC(1899, 11, 30)) / 86400000;
 }

@@ -12,13 +12,14 @@
  */
 import { computed, ref, watch, type Ref } from "vue";
 import { formatCellValue } from "@/features/grid/lib/cellFormatting";
-import { parseFormula } from "@/features/formulas/lib";
+import { parseFormula, renderFormulaSource, type FormulaContext } from "@/features/formulas/lib";
 import { createCellId, type Cell, type Worksheet } from "@/features/document/lib/teamgridDocument";
 import type { GridProjection } from "@/features/grid/lib/gridProjection";
 
 export interface UseFormulaBarEditingOptions {
   selectedCell: Readonly<Ref<Cell | null>>;
   activeWorksheet: Readonly<Ref<Worksheet | null>>;
+  formulaContext: Readonly<Ref<FormulaContext | null>>;
   projection: Readonly<Ref<GridProjection | null>>;
   locale: Readonly<Ref<string | undefined>>;
   commitCell: (cell: Cell, rawValue: string) => void;
@@ -26,7 +27,7 @@ export interface UseFormulaBarEditingOptions {
 }
 
 export function useFormulaBarEditing(options: UseFormulaBarEditingOptions) {
-  const { selectedCell, activeWorksheet, projection, locale, commitCell, closeFormulaAssist } = options;
+  const { selectedCell, activeWorksheet, formulaContext, projection, locale, commitCell, closeFormulaAssist } = options;
   const formulaDraft = ref("");
   const formulaError = ref<string | null>(null);
   const formulaEditing = ref(false);
@@ -37,14 +38,17 @@ export function useFormulaBarEditing(options: UseFormulaBarEditingOptions) {
    * more cells so the user gets instant visual feedback for formula targets.
    */
   const highlightedCellIds = computed(() => {
-    if (!activeWorksheet.value || !projection.value || !formulaDraft.value.trim().startsWith("=")) {
+    if (!activeWorksheet.value || !formulaContext.value || !projection.value || !formulaDraft.value.trim().startsWith("=")) {
       return [];
     }
-    const parsed = parseFormula(formulaDraft.value, activeWorksheet.value.id, projection.value);
+    const parsed = parseFormula(formulaDraft.value, activeWorksheet.value.id, formulaContext.value);
     if ("code" in parsed) {
       return [];
     }
     return parsed.references.flatMap((reference) => {
+      if (reference.worksheetId !== activeWorksheet.value?.id) {
+        return [];
+      }
       if (reference.kind === "cell") {
         return [createCellId(reference.rowId, reference.columnId)];
       }
@@ -99,21 +103,24 @@ export function useFormulaBarEditing(options: UseFormulaBarEditingOptions) {
     formulaEditing.value = false;
     closeFormulaAssist();
     formulaError.value = null;
-    formulaDraft.value = selectedCell.value?.formula?.source
-      ?? (selectedCell.value ? formatCellValue(selectedCell.value.value, locale.value) : "");
+    formulaDraft.value = selectedCell.value?.formula && activeWorksheet.value && formulaContext.value
+      ? renderFormulaSource(selectedCell.value.formula, activeWorksheet.value.id, formulaContext.value)
+      : (selectedCell.value ? formatCellValue(selectedCell.value.value, locale.value) : "");
   }
 
   // Mirror the selected cell into the formula bar draft. Formula cells
   // expose their `source` (e.g. `=SUM(A1:A10)`); plain cells get their
   // formatted display value so the user can edit it as text.
   watch(
-    selectedCell,
-    (cell) => {
+    [selectedCell, activeWorksheet, formulaContext],
+    ([cell]) => {
       if (!cell) {
         formulaDraft.value = "";
         return;
       }
-      formulaDraft.value = cell.formula?.source ?? formatCellValue(cell.value, locale.value);
+      formulaDraft.value = cell.formula && activeWorksheet.value && formulaContext.value
+        ? renderFormulaSource(cell.formula, activeWorksheet.value.id, formulaContext.value)
+        : formatCellValue(cell.value, locale.value);
     },
   );
 
