@@ -994,73 +994,77 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
 
     <section class="workspace">
       <template v-if="app.activeGrid.value && activeWorksheet && projection">
-        <div v-if="app.isTimeTravelActive.value" class="history-banner">
-          <i class="pi pi-clock" aria-hidden="true" />
-          <span>Time travel mode is active as of {{ app.timeTravelDateLabel.value }} - read-only.</span>
-        </div>
-        <div v-if="app.isViewingHistorical.value" class="history-banner">
-          <i class="pi pi-history" aria-hidden="true" />
-          <span>You're viewing a historical revision - read-only.</span>
-          <button type="button" @click="app.returnToCurrent">Return to current</button>
-        </div>
+        <div class="workspace__sheet">
+          <div v-if="app.isTimeTravelActive.value" class="history-banner">
+            <i class="pi pi-clock" aria-hidden="true" />
+            <span>Time travel mode is active as of {{ app.timeTravelDateLabel.value }} - read-only.</span>
+          </div>
+          <div v-if="app.isViewingHistorical.value" class="history-banner">
+            <i class="pi pi-history" aria-hidden="true" />
+            <span>You're viewing a historical revision - read-only.</span>
+            <button type="button" @click="app.returnToCurrent">Return to current</button>
+          </div>
 
-        <FormulaBar
-          ref="formulaBarComponent"
-          v-model="formulaDraft"
-          :active-address="selectedCellAddress"
-          :readonly="app.gridReadOnly.value || !selectedCell"
-          :error-message="formulaError"
-          @begin-edit="formulaEditing = true"
-          @commit="commitFormulaBar"
-          @cancel="cancelFormulaEdit"
-          @request-help="openFormulaAssist('formulaBar', $event)"
-        />
-        <GridViewport
-          ref="gridViewportComponent"
-          :worksheet="activeWorksheet"
-          :formula-context="formulaContext"
-          :projection="projection"
-          :selected-cell-id="selectedCellId"
-          :selected-range="selectedRange"
-          :additional-ranges="additionalRanges"
-          :clipboard-range="clipboardSourceRange"
-          :highlighted-cell-ids="highlightedCellIds"
-          :selected-chart-id="chartDialog.selectedChartId.value"
-          :readonly="app.gridReadOnly.value"
-          :locale="app.activeGrid.value.settings.locale"
-          @select="selectCell"
-          @select-range="selectRange"
-          @add-range="addRange"
-          @clear-additional-ranges="clearAdditionalRanges"
-          @set-additional-ranges="setAdditionalRanges"
-          @commit="commitCell"
-          @clear-selection="clearSelectedCells"
-          @cell-context="openCellContextMenu"
-          @request-help="openFormulaAssist('inlineCell', $event)"
-          @edit-state="handleInlineEditState"
-          @clipboard-copy="handleGridClipboardCopy"
-          @clipboard-cut="handleGridClipboardCut"
-          @clipboard-paste="handleGridClipboardPaste"
-          @clipboard-clear="clearClipboardMarquee"
-          @resize-column="resizeColumn"
-          @resize-row="resizeRow"
-          @select-chart="selectChart"
-          @edit-chart="chartDialog.openChartProperties"
-          @chart-context="openChartContextMenu"
-          @resize-chart="chartDialog.setChartAnchor($event.chartId, $event.anchor)"
-          @delete-chart="deleteChart"
-        />
-        <WorksheetTabs
-          :grid="app.activeGrid.value"
-          :active-worksheet-id="activeWorksheet.id"
-          :readonly="app.gridReadOnly.value"
-          @select="activeWorksheetId = $event"
-          @add="addWorksheet"
-          @rename="renameWorksheet"
-          @delete="deleteWorksheet"
-        />
-        <ContextMenu ref="cellContextMenu" :model="cellContextMenuItems" />
-        <ContextMenu ref="chartContextMenu" :model="chartContextMenuItems" />
+          <FormulaBar
+            ref="formulaBarComponent"
+            v-model="formulaDraft"
+            :active-address="selectedCellAddress"
+            :readonly="app.gridReadOnly.value || !selectedCell"
+            :error-message="formulaError"
+            @begin-edit="formulaEditing = true"
+            @commit="commitFormulaBar"
+            @cancel="cancelFormulaEdit"
+            @request-help="openFormulaAssist('formulaBar', $event)"
+          />
+          <div class="workspace__grid">
+            <GridViewport
+              ref="gridViewportComponent"
+              :worksheet="activeWorksheet"
+              :formula-context="formulaContext"
+              :projection="projection"
+              :selected-cell-id="selectedCellId"
+              :selected-range="selectedRange"
+              :additional-ranges="additionalRanges"
+              :clipboard-range="clipboardSourceRange"
+              :highlighted-cell-ids="highlightedCellIds"
+              :selected-chart-id="chartDialog.selectedChartId.value"
+              :readonly="app.gridReadOnly.value"
+              :locale="app.activeGrid.value.settings.locale"
+              @select="selectCell"
+              @select-range="selectRange"
+              @add-range="addRange"
+              @clear-additional-ranges="clearAdditionalRanges"
+              @set-additional-ranges="setAdditionalRanges"
+              @commit="commitCell"
+              @clear-selection="clearSelectedCells"
+              @cell-context="openCellContextMenu"
+              @request-help="openFormulaAssist('inlineCell', $event)"
+              @edit-state="handleInlineEditState"
+              @clipboard-copy="handleGridClipboardCopy"
+              @clipboard-cut="handleGridClipboardCut"
+              @clipboard-paste="handleGridClipboardPaste"
+              @clipboard-clear="clearClipboardMarquee"
+              @resize-column="resizeColumn"
+              @resize-row="resizeRow"
+              @select-chart="selectChart"
+              @edit-chart="chartDialog.openChartProperties"
+              @chart-context="openChartContextMenu"
+              @resize-chart="chartDialog.setChartAnchor($event.chartId, $event.anchor)"
+              @delete-chart="deleteChart"
+            />
+          </div>
+          <WorksheetTabs
+            :grid="app.activeGrid.value"
+            :active-worksheet-id="activeWorksheet.id"
+            :readonly="app.gridReadOnly.value"
+            @select="activeWorksheetId = $event"
+            @add="addWorksheet"
+            @rename="renameWorksheet"
+            @delete="deleteWorksheet"
+          />
+          <ContextMenu ref="cellContextMenu" :model="cellContextMenuItems" />
+          <ContextMenu ref="chartContextMenu" :model="chartContextMenuItems" />
+        </div>
       </template>
       <section v-else class="empty-state">
         <h1>Collaborative spreadsheets</h1>

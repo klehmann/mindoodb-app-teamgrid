@@ -6,6 +6,9 @@ const EMUS_PER_PIXEL = 9525;
 const ROW_HEADER_WIDTH = 48;
 const COLUMN_HEADER_HEIGHT = 32;
 
+/** Matches `.grid-viewport__headers` (column letters), which sits outside the scroll body. */
+export type ChartLayoutOrigin = "viewport" | "body";
+
 export interface ChartRect {
   x: number;
   y: number;
@@ -13,7 +16,12 @@ export interface ChartRect {
   height: number;
 }
 
-export function chartAnchorToRect(anchor: TwoCellAnchor, worksheet: Worksheet, projection: GridProjection): ChartRect | null {
+export function chartAnchorToRect(
+  anchor: TwoCellAnchor,
+  worksheet: Worksheet,
+  projection: GridProjection,
+  origin: ChartLayoutOrigin = "viewport",
+): ChartRect | null {
   const fromColumnIndex = projection.columnIndexById.get(anchor.from.columnId);
   const toColumnIndex = projection.columnIndexById.get(anchor.to.columnId);
   const fromRowIndex = projection.rowIndexById.get(anchor.from.rowId);
@@ -23,8 +31,9 @@ export function chartAnchorToRect(anchor: TwoCellAnchor, worksheet: Worksheet, p
   }
   const x1 = ROW_HEADER_WIDTH + sumColumnWidths(projection, 0, fromColumnIndex) + emuToPixels(anchor.from.colOffsetEmu);
   const x2 = ROW_HEADER_WIDTH + sumColumnWidths(projection, 0, toColumnIndex) + emuToPixels(anchor.to.colOffsetEmu);
-  const y1 = COLUMN_HEADER_HEIGHT + sumRowHeights(worksheet, projection, 0, fromRowIndex) + emuToPixels(anchor.from.rowOffsetEmu);
-  const y2 = COLUMN_HEADER_HEIGHT + sumRowHeights(worksheet, projection, 0, toRowIndex) + emuToPixels(anchor.to.rowOffsetEmu);
+  const columnHeaderOffset = origin === "viewport" ? COLUMN_HEADER_HEIGHT : 0;
+  const y1 = columnHeaderOffset + sumRowHeights(worksheet, projection, 0, fromRowIndex) + emuToPixels(anchor.from.rowOffsetEmu);
+  const y2 = columnHeaderOffset + sumRowHeights(worksheet, projection, 0, toRowIndex) + emuToPixels(anchor.to.rowOffsetEmu);
   return {
     x: Math.min(x1, x2),
     y: Math.min(y1, y2),
@@ -33,9 +42,15 @@ export function chartAnchorToRect(anchor: TwoCellAnchor, worksheet: Worksheet, p
   };
 }
 
-export function rectToChartAnchor(rect: ChartRect, worksheet: Worksheet, projection: GridProjection): TwoCellAnchor | null {
-  const from = pixelPointToAnchor(rect.x - ROW_HEADER_WIDTH, rect.y - COLUMN_HEADER_HEIGHT, worksheet, projection);
-  const to = pixelPointToAnchor(rect.x + rect.width - ROW_HEADER_WIDTH, rect.y + rect.height - COLUMN_HEADER_HEIGHT, worksheet, projection);
+export function rectToChartAnchor(
+  rect: ChartRect,
+  worksheet: Worksheet,
+  projection: GridProjection,
+  origin: ChartLayoutOrigin = "viewport",
+): TwoCellAnchor | null {
+  const columnHeaderOffset = origin === "viewport" ? COLUMN_HEADER_HEIGHT : 0;
+  const from = pixelPointToAnchor(rect.x - ROW_HEADER_WIDTH, rect.y - columnHeaderOffset, worksheet, projection);
+  const to = pixelPointToAnchor(rect.x + rect.width - ROW_HEADER_WIDTH, rect.y + rect.height - columnHeaderOffset, worksheet, projection);
   return from && to ? { from, to } : null;
 }
 

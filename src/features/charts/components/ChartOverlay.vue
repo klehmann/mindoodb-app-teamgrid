@@ -5,19 +5,28 @@ import ColumnChart from "@/features/charts/components/charts/ColumnChart.vue";
 import LineChart from "@/features/charts/components/charts/LineChart.vue";
 import PieChart from "@/features/charts/components/charts/PieChart.vue";
 import { useChartsLayer } from "@/features/charts/composables/useChartsLayer";
-import { chartAnchorToRect, rectToChartAnchor, type ChartRect } from "@/features/charts/lib/chartGeometry";
+import {
+  chartAnchorToRect,
+  rectToChartAnchor,
+  type ChartLayoutOrigin,
+  type ChartRect,
+} from "@/features/charts/lib/chartGeometry";
 import { resolveChartData } from "@/features/charts/lib/chartDataResolution";
 import type { Chart, ChartId, TwoCellAnchor, Worksheet } from "@/features/document/lib/teamgridDocument";
 import type { FormulaContext } from "@/features/formulas/lib";
 import type { GridProjection } from "@/features/grid/lib/gridProjection";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   worksheet: Worksheet;
   projection: GridProjection;
   formulaContext: FormulaContext;
   selectedChartId: ChartId | null;
   readonly: boolean;
-}>();
+  /** `body` when the overlay lives inside the scrolling cell region (below column headers). */
+  layoutOrigin?: ChartLayoutOrigin;
+}>(), {
+  layoutOrigin: "body",
+});
 
 const emit = defineEmits<{
   select: [chartId: ChartId | null];
@@ -31,7 +40,7 @@ const worksheetRef = toRef(props, "worksheet");
 const charts = useChartsLayer(worksheetRef);
 const resizing = ref<{ chartId: ChartId; rect: ChartRect } | null>(null);
 const renderedCharts = computed(() => charts.value.flatMap((chart) => {
-  const rect = chartAnchorToRect(chart.anchor, props.worksheet, props.projection);
+  const rect = chartAnchorToRect(chart.anchor, props.worksheet, props.projection, props.layoutOrigin);
   if (!rect) {
     return [];
   }
@@ -106,7 +115,7 @@ function startResize(event: PointerEvent, chartId: ChartId, rect: ChartRect) {
     target?.releasePointerCapture(pointerId);
     const rectToCommit = resizing.value?.chartId === chartId ? resizing.value.rect : startRect;
     resizing.value = null;
-    const anchor = rectToChartAnchor(rectToCommit, props.worksheet, props.projection);
+    const anchor = rectToChartAnchor(rectToCommit, props.worksheet, props.projection, props.layoutOrigin);
     if (anchor) {
       emit("resize-chart", { chartId, anchor });
     }

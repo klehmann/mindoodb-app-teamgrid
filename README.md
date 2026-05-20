@@ -1,6 +1,6 @@
 # Mindoo TeamGrid
 
-TeamGrid is a collaborative spreadsheet sample app for MindooDB Haven. It stores one workbook in one MindooDB Automerge document and lets multiple users edit cells, rows, columns, worksheet tabs, formulas, and formatting at the same time, on the same device or on different devices, online or offline. When edits sync, Automerge merges them deterministically — formulas keep pointing at the cells the author meant, even if a row or column was inserted or removed concurrently.
+TeamGrid is a collaborative spreadsheet sample app for MindooDB Haven. It stores one workbook in one MindooDB Automerge document and lets multiple users edit cells, rows, columns, worksheet tabs, formulas, formatting, and embedded charts at the same time, on the same device or on different devices, online or offline. When edits sync, Automerge merges them deterministically — formulas keep pointing at the cells the author meant, even if a row or column was inserted or removed concurrently.
 
 The code is intentionally readable rather than feature-complete. It is meant as a tutorial-grade example for platform developers building document-style Haven apps that need granular structured editing.
 
@@ -86,6 +86,24 @@ The Format cells dialog (`CellFormatDialog.vue`, controlled by `useCellFormatDia
 
 Every action in the dialog is range-aware: it iterates over the active range plus any additional ranges from multi-selection (see below), so a single Apply mutates every selected rectangle in one granular operation rather than one cell at a time.
 
+## Charts
+
+TeamGrid supports the four chart types most spreadsheets use day to day:
+
+- **Column** charts (vertical bars)
+- **Bar** charts (horizontal bars)
+- **Line** charts
+- **Pie** charts
+
+Charts are first-class objects on each worksheet, stored beside `cellsById` in the stable-ID schema (`chartsById`, `chartOrder`). Each chart has a two-cell anchor on the sheet, a type, optional title, legend settings, category-axis range, and one or more series with name, values range, and optional color.
+
+- **Creating charts.** Select a data range and use `Insert` → Column / Bar / Line / Pie chart. TeamGrid infers category labels and value series from the selection layout (header row/column when present).
+- **Editing charts.** Double-click a chart or open Chart properties to change the title, chart type, chart data range, per-series name and values, legend position, series colors, palette colors, and value-axis gridlines.
+- **Rendering.** `ChartOverlay.vue` draws charts on top of the grid with D3 scales; bar, column, and line charts show a series legend (matching Excel’s right-side default); pie charts label slices from the category range.
+- **Excel round-trip.** `.xlsx` import reads OOXML chart and drawing parts into the stable-ID model; export writes charts back into the workbook’s drawing XML. Optional fields without a value (for example a series with no custom fill color) are omitted rather than stored as `undefined`, because Automerge rejects explicit `undefined` assignments.
+
+See `src/features/charts/` for overlay rendering, data resolution, geometry, and `src/features/xlsx/lib/chartImporter.ts` / `chartExporter.ts` for Excel interop.
+
 ## Selection & Editing
 
 Selection follows the same conventions as Excel and Google Sheets, with `useSelection` owning the reactive state, `useGridSelectionGestures` translating mouse and keyboard events into intent, and `useInlineCellEditor` handling the inline input field. The model tracks an active cell, a primary rectangular range, and a list of additional disjoint ranges so cells, rows, and columns can be mixed in one multi-selection.
@@ -138,6 +156,7 @@ src/
                   WorksheetTabs,CellFormatDialog}.vue
       lib/{gridProjection,cellFormatting}.ts
     formulas/lib/               parser, evaluator, dependency tracking, registry
+    charts/                     embedded charts (overlay, rendering, properties, Excel interop)
     clipboard/lib/              TeamGrid / Excel / TSV clipboard payloads
     xlsx/lib/                   .xlsx import and export
   assets/styles/main.css        design tokens, resets, app-shell layout only
@@ -161,4 +180,4 @@ Pointers into the most important modules:
 
 ## Current Scope
 
-This sample is deliberately small. It does not yet implement virtualization for very large sheets, named ranges in the UI, cross-workbook formulas, conditional formatting, charts, or every Excel formula edge case. We are actively exploring more advanced editors — both open source and commercial — to edit Office formats in a data-sovereign way with full concurrency support, but most packages we evaluated are not yet powerful enough for our requirements (in particular: a clean separation between presentation and a stable-ID data model, and being able to drive edits through granular CRDT-friendly operations rather than whole-document replacements). The pieces above can all be layered onto TeamGrid's stable-ID schema and JSON-patch save path without changing the core collaboration model.
+This sample is deliberately small. It does not yet implement virtualization for very large sheets, named ranges in the UI, cross-workbook formulas, conditional formatting, or every Excel formula and chart edge case. We are actively exploring more advanced editors — both open source and commercial — to edit Office formats in a data-sovereign way with full concurrency support, but most packages we evaluated are not yet powerful enough for our requirements (in particular: a clean separation between presentation and a stable-ID data model, and being able to drive edits through granular CRDT-friendly operations rather than whole-document replacements). The pieces above can all be layered onto TeamGrid's stable-ID schema and JSON-patch save path without changing the core collaboration model.
