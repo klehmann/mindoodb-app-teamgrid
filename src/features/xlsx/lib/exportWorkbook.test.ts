@@ -140,6 +140,7 @@ describe("Teamgrid XLSX export", () => {
         name: "Actual",
         values: { worksheetId: worksheet.id, startRowId: row2.id, endRowId: row3.id, startColumnId: colB.id, endColumnId: colB.id },
       }],
+      style: { colors: ["#4472C4"] },
       anchor: {
         from: { rowId: row1.id, columnId: colC.id, rowOffsetEmu: 0, colOffsetEmu: 0 },
         to: { rowId: row5.id, columnId: colD.id, rowOffsetEmu: 0, colOffsetEmu: 0 },
@@ -152,9 +153,19 @@ describe("Teamgrid XLSX export", () => {
     const drawingXml = readZipText(zip, "xl/drawings/drawing1.xml");
     const worksheetXml = readZipText(zip, "xl/worksheets/sheet1.xml");
 
+    expect(chartXml).toBeTruthy();
+    if (!chartXml) {
+      throw new Error("Expected chart XML to be exported.");
+    }
     expect(chartXml).toContain("<c:barDir val=\"col\"/>");
     expect(chartXml).toContain("'Budget Plan 2026'!A2:A3");
     expect(chartXml).toContain("'Budget Plan 2026'!B2:B3");
+    expect(chartXml).toContain("<a:srgbClr val=\"4472C4\"/>");
+    expect(chartXml).toContain("<c:axId val=\"123456\"/>");
+    expect(chartXml).toContain("<c:catAx>");
+    expect(chartXml).toContain("<c:valAx>");
+    expect(chartXml.indexOf("<c:spPr>")).toBeLessThan(chartXml.indexOf("<c:cat>"));
+    expect(chartXml.indexOf("<c:catAx>")).toBeGreaterThan(chartXml.indexOf("</c:barChart>"));
     expect(drawingXml).toContain("<xdr:twoCellAnchor>");
     expect(worksheetXml).toContain("<drawing r:id=");
   });

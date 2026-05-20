@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   createTeamGridDocument,
+  DEFAULT_WORKSHEET_COLUMNS,
+  DEFAULT_WORKSHEET_ROWS,
   getFirstVisibleWorksheet,
   isTeamGridEnvelope,
   migrateTeamGridDocument,
@@ -20,6 +22,8 @@ describe("teamgrid document schema", () => {
     expect("title" in envelope.teamgrid.workbook).toBe(false);
     const worksheet = getFirstVisibleWorksheet(envelope.teamgrid);
     expect(worksheet?.title).toBe("Sheet 1");
+    expect(worksheet?.rowOrder).toHaveLength(DEFAULT_WORKSHEET_ROWS);
+    expect(worksheet?.columnOrder).toHaveLength(DEFAULT_WORKSHEET_COLUMNS);
     expect(worksheet?.chartOrder).toEqual([]);
     expect(worksheet?.chartsById).toEqual({});
   });

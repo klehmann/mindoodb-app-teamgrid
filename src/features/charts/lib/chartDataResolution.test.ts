@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { resolveChartData } from "@/features/charts/lib/chartDataResolution";
+import { formatChartRange, parseChartRangeReference } from "@/features/charts/lib/chartRangeReferences";
 import { createCellId, createTeamGridDocument, type Chart } from "@/features/document/lib/teamgridDocument";
 import { createFormulaContext } from "@/features/formulas/lib";
 import { projectWorksheet } from "@/features/grid/lib/gridProjection";
@@ -38,5 +39,28 @@ describe("chart data resolution", () => {
 
     expect(data.labels).toEqual(["Q1", "Q2"]);
     expect(data.series).toEqual([{ id: "series_1", name: "Revenue", values: [12, 18], color: undefined }]);
+  });
+
+  it("formats and parses chart ranges through visible sheet names", () => {
+    const envelope = createTeamGridDocument();
+    const workbook = envelope.teamgrid.workbook;
+    const worksheet = workbook.worksheetsById[workbook.worksheetOrder[0]];
+    const projection = projectWorksheet(worksheet);
+    const [row1, row2] = projection.rows;
+    const [colA] = projection.columns;
+    const context = createFormulaContext(workbook);
+    const range = {
+      worksheetId: worksheet.id,
+      startRowId: row1.id,
+      endRowId: row2.id,
+      startColumnId: colA.id,
+      endColumnId: colA.id,
+    };
+
+    expect(formatChartRange(range, context)).toBe("'Sheet 1'!A1:A2");
+    expect(parseChartRangeReference("'Sheet 1'!A1:A2", worksheet.id, context)).toEqual({
+      ...range,
+      excelA1: "'Sheet 1'!A1:A2",
+    });
   });
 });

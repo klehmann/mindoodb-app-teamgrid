@@ -3,7 +3,7 @@ import { createFormulaCellKey, createFormulaContext, evaluateFormula, parseFormu
 import { SUPPORTED_FORMULA_NAMES } from "@/features/formulas/lib/fastFormulaParserAdapter";
 import { FUNCTION_REGISTRY, suggestFunctions } from "@/features/formulas/lib/functionRegistry";
 import { projectWorksheet } from "@/features/grid/lib/gridProjection";
-import { createCellId, createId, createTeamGridDocument, getFirstVisibleWorksheet, type Worksheet } from "@/features/document/lib/teamgridDocument";
+import { createCellId, createId, createTeamGridDocument, DEFAULT_WORKSHEET_ROWS, getFirstVisibleWorksheet, type Worksheet } from "@/features/document/lib/teamgridDocument";
 
 describe("formula subsystem", () => {
   it("exposes every supported formula in content assist", () => {
@@ -176,7 +176,7 @@ describe("formula subsystem", () => {
     firstWorksheet.rowsById[insertedRowId] = { id: insertedRowId };
     const renamedContext = createFormulaContext(envelope.teamgrid.workbook);
     expect(renderFormulaSource({ source: "=sum(Sheet 1!C10:C11)", segments: evaluated.segments }, secondWorksheet.id, renamedContext)).toBe("=sum('Renamed Sheet'!C11:C12)");
-    expect(secondProjection.rows).toHaveLength(24);
+    expect(secondProjection.rows).toHaveLength(DEFAULT_WORKSHEET_ROWS);
   });
 
   it("does not highlight local ranges for unquoted cross-sheet names with spaces", () => {
@@ -200,7 +200,7 @@ describe("formula subsystem", () => {
       endColumnId: secondProjection.columns[2].id,
     }]);
     expect("references" in parsed ? parsed.references[0]?.worksheetId : null).not.toBe(firstWorksheet.id);
-    expect(firstProjection.rows).toHaveLength(24);
+    expect(firstProjection.rows).toHaveLength(DEFAULT_WORKSHEET_ROWS);
   });
 });
 

@@ -15,6 +15,8 @@ import {
   createCellId,
   createId,
   createTeamGridDocument,
+  DEFAULT_WORKSHEET_COLUMNS,
+  DEFAULT_WORKSHEET_ROWS,
   type Cell,
   type CellBorder,
   type CellBorderSide,
@@ -32,8 +34,6 @@ import {
   type Worksheet,
 } from "@/features/document/lib/teamgridDocument";
 
-const DEFAULT_IMPORTED_ROWS = 24;
-const DEFAULT_IMPORTED_COLUMNS = 12;
 const EXCEL_INDEXED_COLORS = [
   "000000", "ffffff", "ff0000", "00ff00", "0000ff", "ffff00", "ff00ff", "00ffff",
   "000000", "ffffff", "ff0000", "00ff00", "0000ff", "ffff00", "ff00ff", "00ffff",
@@ -85,8 +85,8 @@ export function createTeamGridDocumentFromExcelWorkbook(workbook: ExcelJS.Workbo
 
 function importWorksheet(excelWorksheet: ExcelJS.Worksheet): Worksheet {
   const worksheetId = createId("sheet");
-  const maxRow = Math.max(DEFAULT_IMPORTED_ROWS, excelWorksheet.actualRowCount || excelWorksheet.rowCount || 1);
-  const maxColumn = Math.max(DEFAULT_IMPORTED_COLUMNS, excelWorksheet.actualColumnCount || excelWorksheet.columnCount || 1);
+  const maxRow = Math.max(DEFAULT_WORKSHEET_ROWS, excelWorksheet.actualRowCount || excelWorksheet.rowCount || 1);
+  const maxColumn = Math.max(DEFAULT_WORKSHEET_COLUMNS, excelWorksheet.actualColumnCount || excelWorksheet.columnCount || 1);
   const rowOrder = Array.from({ length: maxRow }, () => createId("row"));
   const columnOrder = Array.from({ length: maxColumn }, () => createId("col"));
   const rowsById = Object.fromEntries(rowOrder.map((id, index) => [id, importRowMeta(excelWorksheet.getRow(index + 1), id)] satisfies [RowId, RowMeta]));

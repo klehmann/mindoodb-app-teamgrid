@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { createCategoryScale, createValueScale } from "@/features/charts/lib/d3Scales";
 import { valueAxisTicks } from "@/features/charts/lib/d3Axes";
 import { chartSeriesColor } from "@/features/charts/lib/excelPalette";
+import { chartLegendTransform, chartMarginWithLegend, shouldShowSeriesLegend } from "@/features/charts/lib/chartLegend";
 import type { ResolvedChartData } from "@/features/charts/lib/types";
 
 const props = defineProps<{
@@ -11,10 +12,16 @@ const props = defineProps<{
   height: number;
 }>();
 
-const margin = { top: 36, right: 18, bottom: 44, left: 48 };
+const margin = computed(() => chartMarginWithLegend(
+  { top: 36, right: 18, bottom: 44, left: 48 },
+  props.data.chart.legend?.position,
+  props.data.series.length,
+));
+const showLegend = computed(() => shouldShowSeriesLegend(props.data.chart.legend?.position, props.data.series.length));
+const legendTransform = computed(() => chartLegendTransform(props.width, props.height, props.data.chart.legend?.position, props.data.series.length));
 const plot = computed(() => ({
-  width: Math.max(1, props.width - margin.left - margin.right),
-  height: Math.max(1, props.height - margin.top - margin.bottom),
+  width: Math.max(1, props.width - margin.value.left - margin.value.right),
+  height: Math.max(1, props.height - margin.value.top - margin.value.bottom),
 }));
 const x = computed(() => createCategoryScale(props.data.labels, plot.value.width));
 const y = computed(() => createValueScale(props.data.series.flatMap((series) => series.values), plot.value.height));
@@ -29,6 +36,7 @@ const seriesWidth = computed(() => Math.max(1, groupWidth.value / Math.max(1, pr
     <text v-if="data.chart.title" :x="width / 2" y="20" text-anchor="middle" class="chart-title">{{ data.chart.title }}</text>
     <g :transform="`translate(${margin.left}, ${margin.top})`">
       <line
+        v-if="data.chart.style?.showGridlines !== false"
         v-for="tick in ticks"
         :key="tick.value"
         x1="0"
@@ -53,7 +61,7 @@ const seriesWidth = computed(() => Math.max(1, groupWidth.value / Math.max(1, pr
           :y="y(Math.max(0, value))"
           :width="Math.max(1, seriesWidth - 2)"
           :height="Math.abs(y(value) - y(0))"
-          :fill="chartSeriesColor(seriesIndex, series.color)"
+          :fill="chartSeriesColor(seriesIndex, series.color ?? data.chart.style?.colors?.[seriesIndex])"
         />
       </g>
       <line x1="0" :x2="plot.width" :y1="y(0)" :y2="y(0)" class="chart-axis" />
@@ -66,6 +74,12 @@ const seriesWidth = computed(() => Math.max(1, groupWidth.value / Math.max(1, pr
         class="chart-axis-label"
       >{{ label }}</text>
     </g>
+    <g v-if="showLegend" :transform="legendTransform">
+      <g v-for="(series, index) in data.series" :key="`legend-${series.id}`" :transform="`translate(0, ${index * 18})`">
+        <rect width="10" height="10" :fill="chartSeriesColor(index, series.color ?? data.chart.style?.colors?.[index])" />
+        <text x="16" y="9" class="chart-legend-label">{{ series.name }}</text>
+      </g>
+    </g>
   </svg>
 </template>
 
@@ -75,4 +89,5 @@ const seriesWidth = computed(() => Math.max(1, groupWidth.value / Math.max(1, pr
 .chart-gridline { stroke: #d9e2f3; stroke-width: 1; }
 .chart-axis { stroke: #6b7280; stroke-width: 1; }
 .chart-axis-label { font-size: 10px; fill: #4b5563; }
+.chart-legend-label { font-size: 10px; fill: #4b5563; }
 </style>

@@ -7,6 +7,8 @@ import { ref } from "vue";
 import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
 import {
   createId,
+  DEFAULT_WORKSHEET_COLUMNS,
+  DEFAULT_WORKSHEET_ROWS,
   getFirstVisibleWorksheet,
   type TeamGridDocumentV1,
   type WorksheetId,
@@ -26,14 +28,14 @@ export function useWorksheetDialogs(options: UseWorksheetDialogsOptions) {
   const renameDraft = ref("");
 
   /**
-   * Append a new worksheet to the workbook seeded with 24 rows x 12 columns
-   * (a reasonable Excel-like default) and switch the UI to the new tab.
+   * Append a new worksheet to the workbook seeded with the standard blank
+   * worksheet dimensions and switch the UI to the new tab.
    */
   function addWorksheet() {
     app.updateGrid((grid) => {
       const worksheetId = createId("sheet");
-      const rowOrder = Array.from({ length: 24 }, () => createId("row"));
-      const columnOrder = Array.from({ length: 12 }, () => createId("col"));
+      const rowOrder = Array.from({ length: DEFAULT_WORKSHEET_ROWS }, () => createId("row"));
+      const columnOrder = Array.from({ length: DEFAULT_WORKSHEET_COLUMNS }, () => createId("col"));
       const worksheet = {
         id: worksheetId,
         title: nextWorksheetTitle(grid),

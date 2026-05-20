@@ -20,6 +20,7 @@ import type {
   ChartLegend,
   ChartSeries,
   ChartStyle,
+  SeriesRange,
   ColumnId,
   ColumnMeta,
   RowId,
@@ -64,6 +65,7 @@ export type TeamGridOperation =
   | { type: "setChartTitle"; worksheetId: WorksheetId; chartId: ChartId; title: string | undefined }
   | { type: "setChartType"; worksheetId: WorksheetId; chartId: ChartId; chartType: Chart["type"] }
   | { type: "setChartSeries"; worksheetId: WorksheetId; chartId: ChartId; series: ChartSeries[] }
+  | { type: "setChartCategoryAxis"; worksheetId: WorksheetId; chartId: ChartId; categoryAxis: SeriesRange | undefined }
   | { type: "setChartLegend"; worksheetId: WorksheetId; chartId: ChartId; legend: ChartLegend | undefined }
   | { type: "setChartStyle"; worksheetId: WorksheetId; chartId: ChartId; style: ChartStyle | undefined }
   | { type: "setDocumentProperties"; subject: string; tags: string[] };
@@ -137,6 +139,9 @@ export function serializeTeamGridOperations(
         break;
       case "setChartSeries":
         pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "series"], operation.series);
+        break;
+      case "setChartCategoryAxis":
+        pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "categoryAxis"], operation.categoryAxis);
         break;
       case "setChartLegend":
         pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "legend"], operation.legend);

@@ -34,6 +34,7 @@ import DocumentRevisionDialog from "@/features/document/components/DocumentRevis
 import DocumentPropertiesDialog from "@/features/document/components/DocumentPropertiesDialog.vue";
 import DeleteSpreadsheetDialog from "@/features/document/components/DeleteSpreadsheetDialog.vue";
 import ErrorDialog from "@/features/document/components/ErrorDialog.vue";
+import ChartPropertiesDialog from "@/features/charts/components/ChartPropertiesDialog.vue";
 import FormulaAssistPanel from "@/features/grid/components/FormulaAssistPanel.vue";
 import FormulaBar from "@/features/grid/components/FormulaBar.vue";
 import GridViewport from "@/features/grid/components/GridViewport.vue";
@@ -54,6 +55,7 @@ import { useFormulaAssistRouter } from "@/features/grid/composables/useFormulaAs
 import { useFormulaBarEditing } from "@/features/grid/composables/useFormulaBarEditing";
 import { useGridClipboard } from "@/features/grid/composables/useGridClipboard";
 import { useCellFormatDialog } from "@/features/grid/composables/useCellFormatDialog";
+import { useChartPropertiesDialog } from "@/features/charts/composables/useChartPropertiesDialog";
 
 import {
   coerceInputToCellValue,
@@ -67,6 +69,7 @@ import {
   getFirstVisibleWorksheet,
   type Cell,
   type Chart,
+  type ChartId,
   type ChartType,
   type ColumnId,
   type RowId,
@@ -83,6 +86,7 @@ const app = useTeamGridDocument();
 const { updateAvailable, updateReloading, reloadForUpdate } = useTeamGridAppUpdate();
 
 const cellContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
+const chartContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
 const formulaBarComponent = ref<InstanceType<typeof FormulaBar> | null>(null);
 const gridViewportComponent = ref<InstanceType<typeof GridViewport> | null>(null);
 const xlsxImportInput = ref<HTMLInputElement | null>(null);
@@ -198,6 +202,12 @@ const formatDialog = useCellFormatDialog({
   boundsForRange,
 });
 const { openCellFormatDialog } = formatDialog;
+
+const chartDialog = useChartPropertiesDialog({
+  app,
+  activeWorksheet,
+  formulaContext,
+});
 
 const openDialog = useOpenDialog({
   app,
@@ -401,6 +411,21 @@ const cellContextMenuItems = computed<MenuItem[]>(() => [
   },
 ]);
 
+const chartContextMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: "Chart properties...",
+    icon: "pi pi-sliders-h",
+    disabled: app.gridReadOnly.value || !chartDialog.selectedChart.value,
+    command: () => chartDialog.selectedChartId.value && chartDialog.openChartProperties(chartDialog.selectedChartId.value),
+  },
+  {
+    label: "Delete chart",
+    icon: "pi pi-trash",
+    disabled: app.gridReadOnly.value || !chartDialog.selectedChart.value,
+    command: chartDialog.removeSelectedChart,
+  },
+]);
+
 /** Export the current workbook as a local .xlsx download. */
 async function exportCurrentWorkbook() {
   const grid = app.activeGrid.value;
@@ -508,6 +533,7 @@ function selectCell(cell: Cell, address: string) {
     formulaDraft.value = appendPickedAddress(formulaDraft.value, address);
     return;
   }
+  chartDialog.selectChart(null);
   formulaEditing.value = false;
   formulaAssistOpen.value = false;
   selectedCellId.value = cell.id;
@@ -525,6 +551,7 @@ function selectRange(range: CellSelectionRange) {
   if (formulaEditing.value) {
     return;
   }
+  chartDialog.selectChart(null);
   selectedRange.value = range;
 }
 
@@ -565,6 +592,7 @@ function setAdditionalRanges(ranges: CellSelectionRange[]) {
 
 /** Open the cell context menu, preserving an existing range when right-clicked inside it. */
 function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: string; range: CellSelectionRange }) {
+  chartDialog.selectChart(null);
   if (!selectedRange.value || selectedRange.value.startCellId !== payload.range.startCellId || selectedRange.value.endCellId !== payload.range.endCellId) {
     formulaEditing.value = false;
     formulaAssistOpen.value = false;
@@ -575,6 +603,29 @@ function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: 
   }
   cellContextRange.value = payload.range;
   cellContextMenu.value?.show(payload.event);
+}
+
+function selectChart(chartId: ChartId | null) {
+  chartDialog.selectChart(chartId);
+  if (!chartId) {
+    return;
+  }
+  formulaEditing.value = false;
+  formulaAssistOpen.value = false;
+  selectedCellId.value = null;
+  selectedCellAddress.value = "";
+  selectedRange.value = null;
+  additionalRanges.value = [];
+}
+
+function openChartContextMenu(payload: { event: MouseEvent; chartId: ChartId }) {
+  selectChart(payload.chartId);
+  chartContextMenu.value?.show(payload.event);
+}
+
+function deleteChart(chartId: ChartId) {
+  chartDialog.selectChart(chartId);
+  chartDialog.removeSelectedChart();
 }
 
 async function saveCurrentDocument() {
@@ -974,6 +1025,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
           :additional-ranges="additionalRanges"
           :clipboard-range="clipboardSourceRange"
           :highlighted-cell-ids="highlightedCellIds"
+          :selected-chart-id="chartDialog.selectedChartId.value"
           :readonly="app.gridReadOnly.value"
           :locale="app.activeGrid.value.settings.locale"
           @select="selectCell"
@@ -992,6 +1044,11 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
           @clipboard-clear="clearClipboardMarquee"
           @resize-column="resizeColumn"
           @resize-row="resizeRow"
+          @select-chart="selectChart"
+          @edit-chart="chartDialog.openChartProperties"
+          @chart-context="openChartContextMenu"
+          @resize-chart="chartDialog.setChartAnchor($event.chartId, $event.anchor)"
+          @delete-chart="deleteChart"
         />
         <WorksheetTabs
           :grid="app.activeGrid.value"
@@ -1003,6 +1060,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
           @delete="deleteWorksheet"
         />
         <ContextMenu ref="cellContextMenu" :model="cellContextMenuItems" />
+        <ContextMenu ref="chartContextMenu" :model="chartContextMenuItems" />
       </template>
       <section v-else class="empty-state">
         <h1>Collaborative spreadsheets</h1>
@@ -1017,6 +1075,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
     <footer class="status-line">{{ statusLineText }}</footer>
 
     <CellFormatDialog :controller="formatDialog" :read-only="app.gridReadOnly.value" />
+    <ChartPropertiesDialog :controller="chartDialog" :read-only="app.gridReadOnly.value" />
 
     <ErrorDialog
       :controller="errorDialog"

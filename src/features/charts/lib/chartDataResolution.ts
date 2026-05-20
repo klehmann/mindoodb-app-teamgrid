@@ -1,5 +1,4 @@
 import {
-  createCellId,
   type CellValue,
   type Chart,
   type ChartSeries,
@@ -7,13 +6,14 @@ import {
 } from "@/features/document/lib/teamgridDocument";
 import { getProjectionForWorksheet, type FormulaContext } from "@/features/formulas/lib";
 import { getCell } from "@/features/grid/lib/gridProjection";
+import { formatChartRange } from "@/features/charts/lib/chartRangeReferences";
 import type { ResolvedChartData, ResolvedChartSeries } from "@/features/charts/lib/types";
 
 export function resolveChartData(chart: Chart, context: FormulaContext): ResolvedChartData {
   const labels = chart.categoryAxis
     ? readRangeValues(chart.categoryAxis, context).flat().map(formatLabel)
     : inferDefaultLabels(chart, context);
-  const series = chart.series.map((item, index) => resolveSeries(item, context, index));
+  const series = chart.series.map((item, index) => resolveSeries(chart, item, context, index));
   const maxLength = Math.max(labels.length, ...series.map((item) => item.values.length), 0);
   return {
     chart,
@@ -58,23 +58,15 @@ export function readRangeValues(range: SeriesRange, context: FormulaContext): Ce
 }
 
 export function formatSeriesRange(range: SeriesRange, context: FormulaContext) {
-  const projection = getProjectionForWorksheet(range.worksheetId, context);
-  const sheetName = context.sheetNameById.get(range.worksheetId) ?? "#REF";
-  const start = projection.cellAddressById.get(createCellId(range.startRowId, range.startColumnId));
-  const end = projection.cellAddressById.get(createCellId(range.endRowId, range.endColumnId));
-  if (!start || !end) {
-    return "#REF!";
-  }
-  const reference = start === end ? start : `${start}:${end}`;
-  return `'${sheetName.replace(/'/g, "''")}'!${reference}`;
+  return formatChartRange(range, context);
 }
 
-function resolveSeries(series: ChartSeries, context: FormulaContext, index: number): ResolvedChartSeries {
+function resolveSeries(chart: Chart, series: ChartSeries, context: FormulaContext, index: number): ResolvedChartSeries {
   return {
     id: series.id,
     name: resolveSeriesName(series, context, index),
     values: readRangeValues(series.values, context).flat().map(numberValue),
-    color: series.color,
+    color: series.color ?? chart.style?.colors?.[index],
   };
 }
 

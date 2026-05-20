@@ -3,6 +3,8 @@ import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
 export const TEAMGRID_DOCUMENT_KIND = "mindoodb.teamgrid";
 export const TEAMGRID_DOCUMENT_FORM = "teamgrid";
 export const TEAMGRID_SCHEMA_VERSION = 2;
+export const DEFAULT_WORKSHEET_ROWS = 100;
+export const DEFAULT_WORKSHEET_COLUMNS = 12;
 
 export type WorkbookId = string;
 export type WorksheetId = string;
@@ -237,8 +239,8 @@ export interface NamedExpression {
 
 export function createTeamGridDocument(title = "Untitled spreadsheet", tags: string[] = []): TeamGridDocumentEnvelope {
   const worksheetId = createId("sheet");
-  const rowOrder = Array.from({ length: 24 }, () => createId("row"));
-  const columnOrder = Array.from({ length: 12 }, () => createId("col"));
+  const rowOrder = Array.from({ length: DEFAULT_WORKSHEET_ROWS }, () => createId("row"));
+  const columnOrder = Array.from({ length: DEFAULT_WORKSHEET_COLUMNS }, () => createId("col"));
 
   return {
     subject: title,

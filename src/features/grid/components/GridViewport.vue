@@ -46,8 +46,10 @@ import {
   type CellBorder,
   type CellBorderSide,
   type CellId,
+  type ChartId,
   type ColumnId,
   type RowId,
+  type TwoCellAnchor,
   type Worksheet,
 } from "@/features/document/lib/teamgridDocument";
 import { useInlineCellEditor } from "@/features/grid/composables/useInlineCellEditor";
@@ -87,10 +89,12 @@ const props = withDefaults(defineProps<{
   additionalRanges?: CellSelectionRange[];
   clipboardRange: GridClipboardRange | null;
   highlightedCellIds: string[];
+  selectedChartId?: ChartId | null;
   readonly: boolean;
   locale: string;
 }>(), {
   additionalRanges: () => [],
+  selectedChartId: null,
 });
 
 const emit = defineEmits<{
@@ -109,6 +113,11 @@ const emit = defineEmits<{
   "clipboard-clear": [];
   "resize-column": [payload: { columnId: ColumnId; width: number }];
   "resize-row": [payload: { rowId: RowId; height: number }];
+  "select-chart": [chartId: ChartId | null];
+  "edit-chart": [chartId: ChartId];
+  "chart-context": [payload: { event: MouseEvent; chartId: ChartId }];
+  "resize-chart": [payload: { chartId: ChartId; anchor: TwoCellAnchor }];
+  "delete-chart": [chartId: ChartId];
   /**
    * Delete/Backspace pressed while more than one cell is selected.
    * The parent is expected to clear every selected cell in a single
@@ -536,6 +545,13 @@ export type { CellId };
       :worksheet="worksheet"
       :projection="projection"
       :formula-context="formulaContextRef"
+      :selected-chart-id="selectedChartId"
+      :readonly="readonly"
+      @select="emit('select-chart', $event)"
+      @edit="emit('edit-chart', $event)"
+      @chart-context="emit('chart-context', $event)"
+      @resize-chart="emit('resize-chart', $event)"
+      @delete-chart="emit('delete-chart', $event)"
     />
   </div>
 </template>

@@ -20,6 +20,8 @@ const NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationship
 const NS_XDR = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
 const NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const NS_C = "http://schemas.openxmlformats.org/drawingml/2006/chart";
+const CATEGORY_AXIS_ID = 123456;
+const VALUE_AXIS_ID = 123457;
 
 interface SheetExportPart {
   worksheetId: WorksheetId;
@@ -118,9 +120,12 @@ function createChartXml(chart: Chart, context: ReturnType<typeof createFormulaCo
     ? '<c:barDir val="bar"/><c:grouping val="clustered"/>'
     : chart.type === "column"
       ? '<c:barDir val="col"/><c:grouping val="clustered"/>'
+      : chart.type === "line"
+        ? '<c:grouping val="standard"/>'
       : "";
-  const series = chart.series.map((item, index) => createSeriesXml(chart, itemName(item.name, context), formatSeriesRange(item.values, context), index)).join("");
+  const series = chart.series.map((item, index) => createSeriesXml(chart, itemName(item.name, context), formatSeriesRange(item.values, context), index, item.color ?? chart.style?.colors?.[index])).join("");
   const categories = chart.categoryAxis ? `<c:cat><c:strRef><c:f>${escapeXml(formatSeriesRange(chart.categoryAxis, context))}</c:f></c:strRef></c:cat>` : "";
+  const axisRefs = chart.type === "pie" ? "" : `<c:axId val="${CATEGORY_AXIS_ID}"/><c:axId val="${VALUE_AXIS_ID}"/>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <c:chartSpace xmlns:c="${NS_C}" xmlns:a="${NS_A}" xmlns:r="${NS_R}">
   <c:chart>
@@ -128,9 +133,11 @@ function createChartXml(chart: Chart, context: ReturnType<typeof createFormulaCo
     <c:plotArea>
       <${typeTag}>
         ${typeSpecific}
-        ${series.replaceAll("<c:cat/>", categories)}
         ${chart.type === "pie" ? '<c:varyColors val="1"/>' : ""}
+        ${series.replaceAll("<c:cat/>", categories)}
+        ${axisRefs}
       </${typeTag}>
+      ${chart.type === "pie" ? "" : createAxisXml(chart)}
     </c:plotArea>
     ${chart.legend?.position && chart.legend.position !== "none" ? `<c:legend><c:legendPos val="${legendPosition(chart.legend.position)}"/></c:legend>` : ""}
     <c:plotVisOnly val="1"/>
@@ -138,14 +145,46 @@ function createChartXml(chart: Chart, context: ReturnType<typeof createFormulaCo
 </c:chartSpace>`;
 }
 
-function createSeriesXml(chart: Chart, name: string, values: string, index: number) {
+function createSeriesXml(chart: Chart, name: string, values: string, index: number, color: string | undefined) {
   const category = chart.categoryAxis ? "<c:cat/>" : "";
+  const shapeProperties = color ? `<c:spPr><a:solidFill><a:srgbClr val="${escapeXml(color.replace(/^#/, ""))}"/></a:solidFill></c:spPr>` : "";
   return `<c:ser>
     <c:idx val="${index}"/><c:order val="${index}"/>
     <c:tx><c:v>${escapeXml(name)}</c:v></c:tx>
+    ${shapeProperties}
     ${category}
     <c:val><c:numRef><c:f>${escapeXml(values)}</c:f></c:numRef></c:val>
   </c:ser>`;
+}
+
+function createAxisXml(chart: Chart) {
+  const categoryPosition = chart.type === "bar" ? "l" : "b";
+  const valuePosition = chart.type === "bar" ? "b" : "l";
+  const gridlines = chart.style?.showGridlines === false ? "" : "<c:majorGridlines/>";
+  return `<c:catAx>
+    <c:axId val="${CATEGORY_AXIS_ID}"/>
+    <c:scaling><c:orientation val="minMax"/></c:scaling>
+    <c:delete val="0"/>
+    <c:axPos val="${categoryPosition}"/>
+    <c:tickLblPos val="nextTo"/>
+    <c:crossAx val="${VALUE_AXIS_ID}"/>
+    <c:crosses val="autoZero"/>
+    <c:auto val="1"/>
+    <c:lblAlgn val="ctr"/>
+    <c:lblOffset val="100"/>
+  </c:catAx>
+  <c:valAx>
+    <c:axId val="${VALUE_AXIS_ID}"/>
+    <c:scaling><c:orientation val="minMax"/></c:scaling>
+    <c:delete val="0"/>
+    <c:axPos val="${valuePosition}"/>
+    ${gridlines}
+    <c:numFmt formatCode="General" sourceLinked="1"/>
+    <c:tickLblPos val="nextTo"/>
+    <c:crossAx val="${CATEGORY_AXIS_ID}"/>
+    <c:crosses val="autoZero"/>
+    <c:crossBetween val="between"/>
+  </c:valAx>`;
 }
 
 function itemName(name: Chart["series"][number]["name"], context: ReturnType<typeof createFormulaContext>) {

@@ -11,6 +11,19 @@ const center = computed(() => ({ x: props.width / 2, y: props.height / 2 + 8 }))
 const values = computed(() => props.data.series[0]?.values ?? []);
 const slices = computed(() => pie<number>().sort(null).value((value) => Math.max(0, value))(values.value));
 const path = computed(() => arc<PieArcDatum<number>>().innerRadius(0).outerRadius(radius.value));
+const legendTransform = computed(() => {
+  switch (props.data.chart.legend?.position) {
+    case "left":
+      return "translate(12, 40)";
+    case "top":
+      return "translate(12, 32)";
+    case "bottom":
+      return `translate(12, ${Math.max(40, props.height - Math.min(80, props.data.labels.length * 18 + 8))})`;
+    case "right":
+    default:
+      return `translate(${Math.max(12, props.width - 120)}, 40)`;
+  }
+});
 </script>
 
 <template>
@@ -22,14 +35,17 @@ const path = computed(() => arc<PieArcDatum<number>>().innerRadius(0).outerRadiu
         v-for="(slice, index) in slices"
         :key="index"
         :d="path(slice) ?? ''"
-        :fill="chartSeriesColor(index, data.series[0]?.color)"
+        :fill="chartSeriesColor(index, data.chart.style?.colors?.[index] ?? data.series[0]?.color)"
         stroke="#fff"
         stroke-width="1"
       />
     </g>
-    <g :transform="`translate(${Math.max(12, width - 120)}, 40)`">
+    <g
+      v-if="data.chart.legend?.position !== 'none'"
+      :transform="legendTransform"
+    >
       <g v-for="(label, index) in data.labels" :key="label" :transform="`translate(0, ${index * 18})`">
-        <rect width="10" height="10" :fill="chartSeriesColor(index)" />
+        <rect width="10" height="10" :fill="chartSeriesColor(index, data.chart.style?.colors?.[index])" />
         <text x="16" y="9" class="chart-legend-label">{{ label }}</text>
       </g>
     </g>
