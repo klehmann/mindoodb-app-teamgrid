@@ -29,7 +29,60 @@ describe("XLSX chart importer", () => {
     });
     expect(chart.anchor.from).toMatchObject({ rowId: worksheet.rowOrder[0], columnId: worksheet.columnOrder[3] });
   });
+
+  it("omits optional series fields instead of importing them as undefined", () => {
+    const envelope = createTeamGridDocument();
+    const worksheet = envelope.teamgrid.workbook.worksheetsById[envelope.teamgrid.workbook.worksheetOrder[0]];
+
+    importChartsFromXlsx(createBarChartWithoutSeriesColorZip(), envelope.teamgrid.workbook);
+
+    const chart = worksheet.chartsById[worksheet.chartOrder[0]];
+    expect(chart.series[0].values).toBeTruthy();
+    expect("color" in chart.series[0]).toBe(false);
+    expect(hasExplicitUndefined(chart)).toBe(false);
+  });
 });
+
+function hasExplicitUndefined(value: unknown): boolean {
+  if (value === undefined) {
+    return true;
+  }
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some(hasExplicitUndefined);
+  }
+  return Object.values(value).some(hasExplicitUndefined);
+}
+
+function createBarChartWithoutSeriesColorZip() {
+  const zip: OoxmlZip = {};
+  writeZipText(zip, "xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="Sheet 1" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`);
+  writeZipText(zip, "xl/_rels/workbook.xml.rels", relationships(`<Relationship Id="rId1" Type="worksheet" Target="worksheets/sheet1.xml"/>`));
+  writeZipText(zip, "xl/worksheets/sheet1.xml", "<worksheet/>");
+  writeZipText(zip, "xl/worksheets/_rels/sheet1.xml.rels", relationships(`<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>`));
+  writeZipText(zip, "xl/drawings/drawing1.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <xdr:twoCellAnchor>
+    <xdr:from><xdr:col>3</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>
+    <xdr:to><xdr:col>8</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>10</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>
+    <xdr:graphicFrame><a:graphic><a:graphicData><c:chart r:id="rId1"/></a:graphicData></a:graphic></xdr:graphicFrame>
+  </xdr:twoCellAnchor>
+</xdr:wsDr>`);
+  writeZipText(zip, "xl/drawings/_rels/drawing1.xml.rels", relationships(`<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>`));
+  writeZipText(zip, "xl/charts/chart1.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <c:chart>
+    <c:plotArea><c:barChart><c:barDir val="bar"/><c:ser><c:tx><c:v>2025er-Zahlen</c:v></c:tx><c:cat><c:strRef><c:f>'Sheet 1'!$E$5:$F$5</c:f></c:strRef></c:cat><c:val><c:numRef><c:f>'Sheet 1'!$E$6:$F$6</c:f></c:numRef></c:val></c:ser></c:barChart></c:plotArea>
+    <c:legend><c:legendPos val="r"/></c:legend>
+  </c:chart>
+</c:chartSpace>`);
+  return writeOoxmlZip(zip);
+}
 
 function createChartWorkbookZip() {
   const zip: OoxmlZip = {};

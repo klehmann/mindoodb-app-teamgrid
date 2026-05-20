@@ -112,14 +112,13 @@ function parseChart(
     return null;
   }
   const categoryAxis = readSeriesFormula(children(chartTypeElement, "ser")[0] ? child(children(chartTypeElement, "ser")[0], "cat") : null, currentWorksheetId, context);
+  const title = readChartTitle(chartDocument);
+  const legend = readLegend(chartDocument);
   return {
     id: createId("chart"),
     type,
-    title: readChartTitle(chartDocument) ?? undefined,
     series,
-    categoryAxis: categoryAxis ?? undefined,
     anchor,
-    legend: readLegend(chartDocument) ?? undefined,
     raw: {
       chartXml,
       drawingXml,
@@ -129,6 +128,9 @@ function parseChart(
       worksheetRelPath,
       relationshipId,
     },
+    ...(title ? { title } : {}),
+    ...(categoryAxis ? { categoryAxis } : {}),
+    ...(legend ? { legend } : {}),
   };
 }
 
@@ -178,11 +180,12 @@ function parseSeries(seriesElement: Element, index: number, currentWorksheetId: 
   const nameRange = readSeriesFormula(tx, currentWorksheetId, context);
   const literalName = textOf(child(tx ?? seriesElement, "strRef"), "v") ?? textOf(tx ?? seriesElement, "v");
   const color = readSeriesColor(seriesElement);
+  const name = nameRange ?? literalName ?? undefined;
   return [{
     id: `series_${index + 1}`,
-    name: nameRange ?? literalName ?? undefined,
     values,
-    color: color ?? undefined,
+    ...(name !== undefined ? { name } : {}),
+    ...(color ? { color } : {}),
   }];
 }
 

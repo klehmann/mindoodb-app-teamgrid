@@ -11,6 +11,7 @@ import {
 } from "@/features/grid/lib/cellFormatting";
 import { createFormulaContext, evaluateFormula, parseFormula, renderFormulaSource } from "@/features/formulas/lib";
 import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
+import { withoutUndefinedProperties } from "@/shared/lib/withoutUndefinedProperties";
 import {
   createCellId,
   createId,
@@ -68,7 +69,7 @@ export async function importTeamGridWorkbookBuffer(buffer: ArrayBuffer, title = 
   await workbook.xlsx.load(buffer);
   const envelope = createTeamGridDocumentFromExcelWorkbook(workbook, title);
   importChartsFromXlsx(buffer, envelope.teamgrid.workbook);
-  return envelope;
+  return withoutUndefinedProperties(envelope);
 }
 
 export function createTeamGridDocumentFromExcelWorkbook(workbook: ExcelJS.Workbook, title = "Imported spreadsheet"): TeamGridDocumentEnvelope {
@@ -424,16 +425,3 @@ function pointsToPixels(points: number) {
   return Math.max(1, Math.round(points / 0.75));
 }
 
-function withoutUndefinedProperties<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map(withoutUndefinedProperties) as T;
-  }
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).flatMap(([key, nested]) => (
-        nested === undefined ? [] : [[key, withoutUndefinedProperties(nested)]]
-      )),
-    ) as T;
-  }
-  return value;
-}

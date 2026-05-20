@@ -140,9 +140,14 @@ export function useChartPropertiesDialog(options: UseChartPropertiesDialogOption
       }
       chart.series = nextSeries;
       operations.push({ type: "setChartSeries", worksheetId: targetWorksheet.id, chartId, series: nextSeries });
-      if (dataRangeChanged) {
-        chart.categoryAxis = rebuilt?.categoryAxis;
-        operations.push({ type: "setChartCategoryAxis", worksheetId: targetWorksheet.id, chartId, categoryAxis: chart.categoryAxis });
+      if (dataRangeChanged && rebuilt) {
+        if (rebuilt.categoryAxis) {
+          chart.categoryAxis = rebuilt.categoryAxis;
+          operations.push({ type: "setChartCategoryAxis", worksheetId: targetWorksheet.id, chartId, categoryAxis: rebuilt.categoryAxis });
+        } else {
+          delete chart.categoryAxis;
+          operations.push({ type: "setChartCategoryAxis", worksheetId: targetWorksheet.id, chartId, categoryAxis: undefined });
+        }
         chartDraftDataRangeSource.value = chartDraftDataRange.value.trim();
       }
       chart.legend = legend;
@@ -213,12 +218,7 @@ export function useChartPropertiesDialog(options: UseChartPropertiesDialogOption
       if (!values) {
         return [];
       }
-      return [{
-        id: draft.id || createId("series"),
-        name: draft.name,
-        values,
-        color: draft.color,
-      } satisfies ChartSeries];
+      return [toChartSeries(draft.id || createId("series"), values, draft.name, draft.color)];
     });
     if (series.length !== chartDraftSeries.value.length || series.length === 0) {
       chartDraftError.value = "Every series needs a valid values range, for example Sheet 1!B2:B5.";
@@ -283,6 +283,20 @@ function normalizeColor(value: string) {
   return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed : "";
 }
 
+function toChartSeries(
+  id: string,
+  values: SeriesRange,
+  name?: string | SeriesRange,
+  color?: string,
+): ChartSeries {
+  return {
+    id,
+    values,
+    ...(name !== undefined ? { name } : {}),
+    ...(color ? { color } : {}),
+  };
+}
+
 function formatChartDataRange(chart: Chart, context: FormulaContext) {
   const ranges = chart.series.flatMap((series) => [
     series.values,
@@ -320,10 +334,10 @@ function buildSeriesFromDataRange(
   draftMetadata: Array<{ id: string; name: string | SeriesRange | undefined; color: string | undefined }>,
   currentWorksheetId: string,
   context: FormulaContext,
-): { series: ChartSeries[]; categoryAxis: SeriesRange | undefined } | null {
+): { series: ChartSeries[]; categoryAxis?: SeriesRange } | null {
   const trimmed = source.trim();
   if (!trimmed) {
-    return { series: chart.series, categoryAxis: undefined };
+    return { series: chart.series };
   }
   const range = parseChartRangeReference(trimmed, currentWorksheetId, context);
   const indexed = range ? indexedRange(range, context) : null;
@@ -349,14 +363,17 @@ function buildRowSeriesFromDataRange(
     if (!values) {
       continue;
     }
-    series.push({
-      id: draftMetadata[seriesIndex]?.id || chart.series[seriesIndex]?.id || createId("series"),
-      name: draftMetadata[seriesIndex]?.name,
+    series.push(toChartSeries(
+      draftMetadata[seriesIndex]?.id || chart.series[seriesIndex]?.id || createId("series"),
       values,
-      color: draftMetadata[seriesIndex]?.color ?? chart.series[seriesIndex]?.color,
-    });
+      draftMetadata[seriesIndex]?.name,
+      draftMetadata[seriesIndex]?.color ?? chart.series[seriesIndex]?.color,
+    ));
   }
-  return { series, categoryAxis: categoryAxis ?? undefined };
+  return {
+    series,
+    ...(categoryAxis ? { categoryAxis } : {}),
+  };
 }
 
 function buildColumnSeriesFromDataRange(
@@ -373,15 +390,18 @@ function buildColumnSeriesFromDataRange(
     if (!values) {
       continue;
     }
-    const headerName = rangeFromIndexes(range.worksheetId, range.minRow, columnIndex, range.minRow, columnIndex, context) ?? undefined;
-    series.push({
-      id: draftMetadata[seriesIndex]?.id || chart.series[seriesIndex]?.id || createId("series"),
-      name: draftMetadata[seriesIndex]?.name ?? headerName,
+    const headerName = rangeFromIndexes(range.worksheetId, range.minRow, columnIndex, range.minRow, columnIndex, context);
+    series.push(toChartSeries(
+      draftMetadata[seriesIndex]?.id || chart.series[seriesIndex]?.id || createId("series"),
       values,
-      color: draftMetadata[seriesIndex]?.color ?? chart.series[seriesIndex]?.color,
-    });
+      draftMetadata[seriesIndex]?.name ?? headerName ?? undefined,
+      draftMetadata[seriesIndex]?.color ?? chart.series[seriesIndex]?.color,
+    ));
   }
-  return { series, categoryAxis: categoryAxis ?? undefined };
+  return {
+    series,
+    ...(categoryAxis ? { categoryAxis } : {}),
+  };
 }
 
 function usesRowsAsSeries(chart: Chart, context: FormulaContext) {
