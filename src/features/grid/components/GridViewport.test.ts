@@ -511,6 +511,67 @@ describe("GridViewport editor navigation", () => {
   });
 });
 
+describe("GridViewport keyboard delete", () => {
+  it("emits clear-selection when Delete is pressed with a multi-cell range", async () => {
+    const { wrapper, firstCellId, secondRowSecondCellId } = mountGrid();
+    await wrapper.setProps({
+      selectedRange: { startCellId: firstCellId, endCellId: secondRowSecondCellId },
+    });
+
+    await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "Delete" });
+
+    expect(wrapper.emitted("clear-selection")).toHaveLength(1);
+    expect(wrapper.find("textarea.grid-cell__editor").exists()).toBe(false);
+  });
+
+  it("emits clear-selection when Backspace is pressed with a multi-cell range", async () => {
+    const { wrapper, firstCellId, secondRowSecondCellId } = mountGrid();
+    await wrapper.setProps({
+      selectedRange: { startCellId: firstCellId, endCellId: secondRowSecondCellId },
+    });
+
+    await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "Backspace" });
+
+    expect(wrapper.emitted("clear-selection")).toHaveLength(1);
+    expect(wrapper.find("textarea.grid-cell__editor").exists()).toBe(false);
+  });
+
+  it("emits clear-selection when Delete is pressed with disjoint additional ranges", async () => {
+    const { wrapper, firstCellId, secondRowSecondCellId } = mountGrid();
+    await wrapper.setProps({
+      selectedCellId: firstCellId,
+      selectedRange: { startCellId: firstCellId, endCellId: firstCellId },
+      additionalRanges: [{ startCellId: secondRowSecondCellId, endCellId: secondRowSecondCellId }],
+    });
+
+    await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "Delete" });
+
+    expect(wrapper.emitted("clear-selection")).toHaveLength(1);
+    expect(wrapper.find("textarea.grid-cell__editor").exists()).toBe(false);
+  });
+
+  it("opens the inline editor with an empty draft on Delete for a single-cell selection", async () => {
+    const { wrapper, firstCellId } = mountGrid();
+
+    await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "Delete" });
+
+    expect(wrapper.emitted("clear-selection")).toBeUndefined();
+    expect(wrapper.find("textarea.grid-cell__editor").exists()).toBe(true);
+    expect((wrapper.find("textarea.grid-cell__editor").element as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("does not emit clear-selection when read-only", async () => {
+    const { wrapper, firstCellId, secondRowSecondCellId } = mountGrid({ readonly: true });
+    await wrapper.setProps({
+      selectedRange: { startCellId: firstCellId, endCellId: secondRowSecondCellId },
+    });
+
+    await wrapper.find(`[data-test-cell-id="${firstCellId}"]`).trigger("keydown", { key: "Delete" });
+
+    expect(wrapper.emitted("clear-selection")).toBeUndefined();
+  });
+});
+
 describe("GridViewport keyboard selection", () => {
   it("moves the selected cell with arrow keys", async () => {
     const { wrapper, firstCellId, secondCellId } = mountGrid();

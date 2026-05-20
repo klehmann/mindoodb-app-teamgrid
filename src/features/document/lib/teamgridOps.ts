@@ -15,10 +15,16 @@ import type {
   Cell,
   CellId,
   CellStyle,
+  Chart,
+  ChartId,
+  ChartLegend,
+  ChartSeries,
+  ChartStyle,
   ColumnId,
   ColumnMeta,
   RowId,
   RowMeta,
+  TwoCellAnchor,
   Worksheet,
   WorksheetId,
 } from "@/features/document/lib/teamgridDocument";
@@ -52,6 +58,14 @@ export type TeamGridOperation =
   | { type: "addWorksheet"; worksheet: Worksheet; index: number }
   | { type: "renameWorksheet"; worksheetId: WorksheetId; title: string }
   | { type: "tombstoneWorksheet"; worksheetId: WorksheetId; deletedAt: string }
+  | { type: "addChart"; worksheetId: WorksheetId; chart: Chart; index: number }
+  | { type: "removeChart"; worksheetId: WorksheetId; chartId: ChartId; deletedAt: string }
+  | { type: "setChartAnchor"; worksheetId: WorksheetId; chartId: ChartId; anchor: TwoCellAnchor }
+  | { type: "setChartTitle"; worksheetId: WorksheetId; chartId: ChartId; title: string | undefined }
+  | { type: "setChartType"; worksheetId: WorksheetId; chartId: ChartId; chartType: Chart["type"] }
+  | { type: "setChartSeries"; worksheetId: WorksheetId; chartId: ChartId; series: ChartSeries[] }
+  | { type: "setChartLegend"; worksheetId: WorksheetId; chartId: ChartId; legend: ChartLegend | undefined }
+  | { type: "setChartStyle"; worksheetId: WorksheetId; chartId: ChartId; style: ChartStyle | undefined }
   | { type: "setDocumentProperties"; subject: string; tags: string[] };
 
 /**
@@ -105,6 +119,31 @@ export function serializeTeamGridOperations(
       case "tombstoneWorksheet":
         pushSet(json, [...worksheetPath(operation.worksheetId), "deletedAt"], operation.deletedAt);
         break;
+      case "addChart":
+        pushSet(json, chartPath(operation.worksheetId, operation.chart.id), operation.chart);
+        pushListInsert(json, [...worksheetPath(operation.worksheetId), "chartOrder"], operation.index, [operation.chart.id]);
+        break;
+      case "removeChart":
+        pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "deletedAt"], operation.deletedAt);
+        break;
+      case "setChartAnchor":
+        pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "anchor"], operation.anchor);
+        break;
+      case "setChartTitle":
+        pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "title"], operation.title);
+        break;
+      case "setChartType":
+        pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "type"], operation.chartType);
+        break;
+      case "setChartSeries":
+        pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "series"], operation.series);
+        break;
+      case "setChartLegend":
+        pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "legend"], operation.legend);
+        break;
+      case "setChartStyle":
+        pushSet(json, [...chartPath(operation.worksheetId, operation.chartId), "style"], operation.style);
+        break;
       case "setDocumentProperties":
         pushSet(json, ["subject"], operation.subject);
         pushSet(json, ["tags"], operation.tags);
@@ -127,6 +166,10 @@ function worksheetPath(worksheetId: WorksheetId) {
 /** Path inside the persisted document that points at one cell's record. */
 function cellPath(worksheetId: WorksheetId, cellId: CellId) {
   return [...worksheetPath(worksheetId), "cellsById", cellId];
+}
+
+function chartPath(worksheetId: WorksheetId, chartId: ChartId) {
+  return [...worksheetPath(worksheetId), "chartsById", chartId];
 }
 
 function withMergedStyle(cell: Cell, style: CellStyle): Cell {

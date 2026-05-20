@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 
+import { importChartsFromXlsx } from "@/features/xlsx/lib/chartImporter";
 import {
   excelSerialToIsoDate,
   formulaResultToCellValue,
@@ -65,7 +66,9 @@ type ExcelPatternFill = ExcelJS.Fill & {
 export async function importTeamGridWorkbookBuffer(buffer: ArrayBuffer, title = "Imported spreadsheet") {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
-  return createTeamGridDocumentFromExcelWorkbook(workbook, title);
+  const envelope = createTeamGridDocumentFromExcelWorkbook(workbook, title);
+  importChartsFromXlsx(buffer, envelope.teamgrid.workbook);
+  return envelope;
 }
 
 export function createTeamGridDocumentFromExcelWorkbook(workbook: ExcelJS.Workbook, title = "Imported spreadsheet"): TeamGridDocumentEnvelope {
@@ -96,6 +99,8 @@ function importWorksheet(excelWorksheet: ExcelJS.Worksheet): Worksheet {
     rowsById,
     columnsById,
     cellsById: {},
+    chartOrder: [],
+    chartsById: {},
   };
 
   for (let rowIndex = 1; rowIndex <= maxRow; rowIndex += 1) {

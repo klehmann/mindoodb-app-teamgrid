@@ -38,6 +38,7 @@
  *   document before another operation runs.
  */
 import { computed, nextTick, ref, toRef, watch, type CSSProperties } from "vue";
+import ChartOverlay from "@/features/charts/components/ChartOverlay.vue";
 import { cssFontFamily, effectiveHorizontalAlign, indentPaddingRem, mergeCellStyle } from "@/features/grid/lib/cellFormatting";
 import { getCell, type GridProjection } from "@/features/grid/lib/gridProjection";
 import {
@@ -108,6 +109,12 @@ const emit = defineEmits<{
   "clipboard-clear": [];
   "resize-column": [payload: { columnId: ColumnId; width: number }];
   "resize-row": [payload: { rowId: RowId; height: number }];
+  /**
+   * Delete/Backspace pressed while more than one cell is selected.
+   * The parent is expected to clear every selected cell in a single
+   * `updateGrid` mutation.
+   */
+  "clear-selection": [];
 }>();
 
 const BORDER_SIDES: CellBorderSide[] = ["top", "right", "bottom", "left"];
@@ -182,6 +189,7 @@ const {
   onClearAdditionalRanges: () => emit("clear-additional-ranges"),
   onSetAdditionalRanges: (ranges) => emit("set-additional-ranges", ranges),
   onCellContext: (payload) => emit("cell-context", payload),
+  onClearSelectedCells: () => emit("clear-selection"),
 });
 
 const {
@@ -523,6 +531,12 @@ export type { CellId };
         </tr>
       </tbody>
     </table>
+    <ChartOverlay
+      v-if="formulaContextRef"
+      :worksheet="worksheet"
+      :projection="projection"
+      :formula-context="formulaContextRef"
+    />
   </div>
 </template>
 
@@ -531,6 +545,7 @@ export type { CellId };
   overflow: auto;
   min-height: 0;
   flex: 1 1 auto;
+  position: relative;
 }
 
 .grid-table {

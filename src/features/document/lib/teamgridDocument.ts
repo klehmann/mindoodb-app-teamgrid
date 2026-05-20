@@ -2,13 +2,14 @@ import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
 
 export const TEAMGRID_DOCUMENT_KIND = "mindoodb.teamgrid";
 export const TEAMGRID_DOCUMENT_FORM = "teamgrid";
-export const TEAMGRID_SCHEMA_VERSION = 1;
+export const TEAMGRID_SCHEMA_VERSION = 2;
 
 export type WorkbookId = string;
 export type WorksheetId = string;
 export type RowId = string;
 export type ColumnId = string;
 export type CellId = string;
+export type ChartId = string;
 
 export type NumberFormat = "general" | "integer" | "decimal" | "currency" | "percent";
 export type DateFormat = "date" | "dateTime" | "time";
@@ -66,7 +67,71 @@ export interface Worksheet {
   rowsById: Record<RowId, RowMeta>;
   columnsById: Record<ColumnId, ColumnMeta>;
   cellsById: Record<CellId, Cell>;
+  chartOrder: ChartId[];
+  chartsById: Record<ChartId, Chart>;
   deletedAt?: string;
+}
+
+export type ChartType = "column" | "bar" | "line" | "pie";
+
+export interface Chart {
+  id: ChartId;
+  type: ChartType;
+  title?: string;
+  series: ChartSeries[];
+  categoryAxis?: SeriesRange;
+  anchor: TwoCellAnchor;
+  legend?: ChartLegend;
+  style?: ChartStyle;
+  raw?: ChartRawParts;
+  deletedAt?: string;
+}
+
+export interface ChartSeries {
+  id: string;
+  name?: string | SeriesRange;
+  values: SeriesRange;
+  color?: string;
+}
+
+export interface SeriesRange {
+  worksheetId: WorksheetId;
+  startRowId: RowId;
+  endRowId: RowId;
+  startColumnId: ColumnId;
+  endColumnId: ColumnId;
+  excelA1?: string;
+}
+
+export interface TwoCellAnchor {
+  from: ChartAnchorPoint;
+  to: ChartAnchorPoint;
+}
+
+export interface ChartAnchorPoint {
+  rowId: RowId;
+  columnId: ColumnId;
+  rowOffsetEmu: number;
+  colOffsetEmu: number;
+}
+
+export interface ChartLegend {
+  position: "right" | "bottom" | "top" | "left" | "none";
+}
+
+export interface ChartStyle {
+  colors?: string[];
+  showGridlines?: boolean;
+}
+
+export interface ChartRawParts {
+  chartXml: string;
+  drawingXml: string;
+  chartPath?: string;
+  drawingPath?: string;
+  drawingRelPath?: string;
+  worksheetRelPath?: string;
+  relationshipId?: string;
 }
 
 export interface RowMeta {
@@ -194,6 +259,8 @@ export function createTeamGridDocument(title = "Untitled spreadsheet", tags: str
             rowsById: Object.fromEntries(rowOrder.map((id) => [id, { id }] satisfies [RowId, RowMeta])),
             columnsById: Object.fromEntries(columnOrder.map((id) => [id, { id, width: DEFAULT_COLUMN_WIDTH }] satisfies [ColumnId, ColumnMeta])),
             cellsById: {},
+            chartOrder: [],
+            chartsById: {},
           },
         },
       },
@@ -234,7 +301,9 @@ export function isTeamGridDocument(data: unknown): data is TeamGridDocumentV1 {
     return false;
   }
   const candidate = data as Partial<TeamGridDocumentV1>;
-  return candidate.schemaVersion === TEAMGRID_SCHEMA_VERSION
+  return typeof candidate.schemaVersion === "number"
+    && candidate.schemaVersion >= 1
+    && candidate.schemaVersion <= TEAMGRID_SCHEMA_VERSION
     && Boolean(candidate.workbook)
     && typeof candidate.workbook === "object"
     && Array.isArray(candidate.workbook.worksheetOrder)
@@ -265,6 +334,11 @@ export function cloneTeamGridDocument(document: TeamGridDocumentV1): TeamGridDoc
     workbook: Workbook & { title?: string };
   };
   delete clone.workbook.title;
+  clone.schemaVersion = TEAMGRID_SCHEMA_VERSION;
+  for (const worksheet of Object.values(clone.workbook.worksheetsById)) {
+    worksheet.chartOrder ??= [];
+    worksheet.chartsById ??= {};
+  }
   return clone;
 }
 

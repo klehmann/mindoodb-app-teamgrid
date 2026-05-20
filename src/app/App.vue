@@ -66,8 +66,12 @@ import {
   createId,
   getFirstVisibleWorksheet,
   type Cell,
+  type Chart,
+  type ChartType,
   type ColumnId,
   type RowId,
+  type SeriesRange,
+  type TwoCellAnchor,
   type WorksheetId,
 } from "@/features/document/lib/teamgridDocument";
 import { projectWorksheet } from "@/features/grid/lib/gridProjection";
@@ -300,6 +304,15 @@ const menuItems = computed<MenuItem[]>(() => [
       { separator: true },
       { label: "Delete row", icon: "pi pi-minus", disabled: app.gridReadOnly.value || !selectedCell.value, command: deleteSelectedRow },
       { label: "Delete column", icon: "pi pi-minus", disabled: app.gridReadOnly.value || !selectedCell.value, command: deleteSelectedColumn },
+    ],
+  },
+  {
+    label: "Insert",
+    items: [
+      { label: "Column chart", icon: "pi pi-chart-bar", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("column") },
+      { label: "Bar chart", icon: "pi pi-chart-bar", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("bar") },
+      { label: "Line chart", icon: "pi pi-chart-line", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("line") },
+      { label: "Pie chart", icon: "pi pi-chart-pie", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("pie") },
     ],
   },
   {
@@ -590,6 +603,42 @@ async function saveCurrentDocument() {
  * `coerceInputToCellValue` so a column-typed cell still keeps its
  * preferred shape.
  */
+/**
+ * Clear the contents of every cell in the current selection (primary
+ * range plus every disjoint Ctrl/Meta+click range) in a single granular
+ * `updateGrid` mutation.
+ *
+ * Wired to {@link GridViewport}'s `clear-selection` event, which fires
+ * when the user presses Delete/Backspace while more than one cell is
+ * selected. Cells that are already empty (no value and no formula) are
+ * skipped so we do not emit no-op `setCell` operations into the patch
+ * history.
+ */
+function clearSelectedCells() {
+  if (!activeWorksheet.value || app.gridReadOnly.value) {
+    return;
+  }
+  const cellsToClear = selectedCells.value;
+  if (cellsToClear.length === 0) {
+    return;
+  }
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const operations: TeamGridOperation[] = [];
+    for (const cell of cellsToClear) {
+      const existing = worksheet.cellsById[cell.id] ?? cell;
+      if (existing.value.kind === "empty" && !existing.formula) {
+        continue;
+      }
+      const emptyCell: Cell = { ...existing, value: { kind: "empty" }, formula: undefined };
+      worksheet.cellsById[cell.id] = emptyCell;
+      operations.push({ type: "setCell", worksheetId: worksheet.id, cell: emptyCell });
+    }
+    return operations;
+  });
+  formulaError.value = null;
+}
+
 function commitCell(cell: Cell, rawValue: string) {
   if (!activeWorksheet.value || !projection.value) {
     return;
@@ -694,6 +743,104 @@ function deleteSelectedColumn() {
     worksheet.columnsById[selectedCell.value!.columnId].deletedAt = deletedAt;
     return [{ type: "tombstoneColumn", worksheetId: worksheet.id, columnId: selectedCell.value!.columnId, deletedAt }];
   });
+}
+
+function insertChart(type: ChartType) {
+  if (!activeWorksheet.value || !projection.value || !selectedRange.value) return;
+  const bounds = boundsForRange(selectedRange.value);
+  if (!bounds) return;
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const chart = createChartFromSelection(type, worksheet.id, bounds);
+    if (!chart) {
+      return [];
+    }
+    worksheet.chartsById[chart.id] = chart;
+    worksheet.chartOrder.push(chart.id);
+    return [{ type: "addChart", worksheetId: worksheet.id, chart, index: worksheet.chartOrder.length - 1 }];
+  });
+}
+
+function createChartFromSelection(type: ChartType, worksheetId: WorksheetId, bounds: NonNullable<ReturnType<typeof boundsForRange>>): Chart | null {
+  if (!projection.value) {
+    return null;
+  }
+  const hasHeaderRow = bounds.maxRow > bounds.minRow;
+  const valueStartRow = hasHeaderRow ? bounds.minRow + 1 : bounds.minRow;
+  const hasCategoryColumn = bounds.maxCol > bounds.minCol;
+  const firstValueColumn = hasCategoryColumn ? bounds.minCol + 1 : bounds.minCol;
+  const series: Chart["series"] = [];
+  for (let columnIndex = firstValueColumn; columnIndex <= bounds.maxCol; columnIndex += 1) {
+    const values = rangeFromIndexes(worksheetId, valueStartRow, columnIndex, bounds.maxRow, columnIndex);
+    if (!values) {
+      continue;
+    }
+    series.push({
+      id: createId("series"),
+      name: hasHeaderRow ? (rangeFromIndexes(worksheetId, bounds.minRow, columnIndex, bounds.minRow, columnIndex) ?? undefined) : undefined,
+      values,
+    });
+  }
+  if (series.length === 0) {
+    return null;
+  }
+  const categoryAxis = hasCategoryColumn
+    ? rangeFromIndexes(worksheetId, valueStartRow, bounds.minCol, bounds.maxRow, bounds.minCol) ?? undefined
+    : undefined;
+  const anchor = createDefaultChartAnchor(bounds);
+  if (!anchor) {
+    return null;
+  }
+  return {
+    id: createId("chart"),
+    type,
+    title: `${type[0].toUpperCase()}${type.slice(1)} chart`,
+    series,
+    categoryAxis,
+    anchor,
+    legend: { position: "right" },
+  };
+}
+
+function rangeFromIndexes(worksheetId: WorksheetId, startRow: number, startColumn: number, endRow: number, endColumn: number): SeriesRange | null {
+  if (!projection.value) {
+    return null;
+  }
+  const startRowItem = projection.value.rows[startRow];
+  const endRowItem = projection.value.rows[endRow];
+  const startColumnItem = projection.value.columns[startColumn];
+  const endColumnItem = projection.value.columns[endColumn];
+  if (!startRowItem || !endRowItem || !startColumnItem || !endColumnItem) {
+    return null;
+  }
+  return {
+    worksheetId,
+    startRowId: startRowItem.id,
+    endRowId: endRowItem.id,
+    startColumnId: startColumnItem.id,
+    endColumnId: endColumnItem.id,
+  };
+}
+
+function createDefaultChartAnchor(bounds: NonNullable<ReturnType<typeof boundsForRange>>): TwoCellAnchor | null {
+  if (!projection.value) {
+    return null;
+  }
+  const fromColumnIndex = Math.min(projection.value.columns.length - 1, bounds.maxCol + 1);
+  const fromRowIndex = bounds.minRow;
+  const toColumnIndex = Math.min(projection.value.columns.length - 1, fromColumnIndex + 5);
+  const toRowIndex = Math.min(projection.value.rows.length - 1, fromRowIndex + 9);
+  const fromRow = projection.value.rows[fromRowIndex];
+  const toRow = projection.value.rows[toRowIndex];
+  const fromColumn = projection.value.columns[fromColumnIndex];
+  const toColumn = projection.value.columns[toColumnIndex];
+  if (!fromRow || !toRow || !fromColumn || !toColumn) {
+    return null;
+  }
+  return {
+    from: { rowId: fromRow.id, columnId: fromColumn.id, rowOffsetEmu: 0, colOffsetEmu: 0 },
+    to: { rowId: toRow.id, columnId: toColumn.id, rowOffsetEmu: 0, colOffsetEmu: 0 },
+  };
 }
 
 /** Commit a released header drag into the local dirty document. */
@@ -835,6 +982,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
           @clear-additional-ranges="clearAdditionalRanges"
           @set-additional-ranges="setAdditionalRanges"
           @commit="commitCell"
+          @clear-selection="clearSelectedCells"
           @cell-context="openCellContextMenu"
           @request-help="openFormulaAssist('inlineCell', $event)"
           @edit-state="handleInlineEditState"

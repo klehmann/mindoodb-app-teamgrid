@@ -42,6 +42,8 @@ export function useWorksheetDialogs(options: UseWorksheetDialogsOptions) {
         rowsById: Object.fromEntries(rowOrder.map((id) => [id, { id }])),
         columnsById: Object.fromEntries(columnOrder.map((id) => [id, { id, width: DEFAULT_COLUMN_WIDTH }])),
         cellsById: {},
+        chartOrder: [],
+        chartsById: {},
       };
       grid.workbook.worksheetOrder.push(worksheetId);
       grid.workbook.worksheetsById[worksheetId] = worksheet;

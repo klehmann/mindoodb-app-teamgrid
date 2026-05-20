@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createTeamGridExcelWorkbook } from "@/features/xlsx/lib/exportWorkbook";
+import { createTeamGridExcelWorkbook, writeTeamGridExcelBuffer } from "@/features/xlsx/lib/exportWorkbook";
 import { createCellId, createTeamGridDocument, type TeamGridDocumentV1, type Worksheet } from "@/features/document/lib/teamgridDocument";
 import { getCell, projectWorksheet } from "@/features/grid/lib/gridProjection";
 import { createTeamGridDocumentFromExcelWorkbook } from "@/features/xlsx/lib/importWorkbook";
 import { createFormulaContext, evaluateFormula, renderFormulaSource } from "@/features/formulas/lib";
+import { readOoxmlZip, readZipText } from "@/features/xlsx/lib/ooxmlZip";
 
 describe("Teamgrid XLSX export", () => {
   it("exports visible worksheets with typed values, formulas, dimensions, and merged styles", () => {
@@ -121,6 +122,41 @@ describe("Teamgrid XLSX export", () => {
       format: "date",
       excelNumFmt: "mmm d, yyyy",
     });
+  });
+
+  it("injects TeamGrid charts into exported XLSX drawing parts", async () => {
+    const document = createExportFixture();
+    const worksheet = firstVisibleWorksheet(document);
+    const projection = projectWorksheet(worksheet);
+    const [row1, row2, row3, row4, row5] = projection.rows;
+    const [colA, colB, colC, colD] = projection.columns;
+    worksheet.chartsById.chart_1 = {
+      id: "chart_1",
+      type: "column",
+      title: "Revenue",
+      categoryAxis: { worksheetId: worksheet.id, startRowId: row2.id, endRowId: row3.id, startColumnId: colA.id, endColumnId: colA.id },
+      series: [{
+        id: "series_1",
+        name: "Actual",
+        values: { worksheetId: worksheet.id, startRowId: row2.id, endRowId: row3.id, startColumnId: colB.id, endColumnId: colB.id },
+      }],
+      anchor: {
+        from: { rowId: row1.id, columnId: colC.id, rowOffsetEmu: 0, colOffsetEmu: 0 },
+        to: { rowId: row5.id, columnId: colD.id, rowOffsetEmu: 0, colOffsetEmu: 0 },
+      },
+    };
+    worksheet.chartOrder.push("chart_1");
+
+    const zip = readOoxmlZip(await writeTeamGridExcelBuffer(document));
+    const chartXml = readZipText(zip, "xl/charts/chart1.xml");
+    const drawingXml = readZipText(zip, "xl/drawings/drawing1.xml");
+    const worksheetXml = readZipText(zip, "xl/worksheets/sheet1.xml");
+
+    expect(chartXml).toContain("<c:barDir val=\"col\"/>");
+    expect(chartXml).toContain("'Budget Plan 2026'!A2:A3");
+    expect(chartXml).toContain("'Budget Plan 2026'!B2:B3");
+    expect(drawingXml).toContain("<xdr:twoCellAnchor>");
+    expect(worksheetXml).toContain("<drawing r:id=");
   });
 });
 

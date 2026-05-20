@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 
+import { injectChartsIntoXlsxBuffer } from "@/features/xlsx/lib/chartExporter";
 import { createFormulaContext, renderFormulaSource, type FormulaContext } from "@/features/formulas/lib";
 import { mergeCellStyle } from "@/features/grid/lib/cellFormatting";
 import { DEFAULT_ROW_HEIGHT } from "@/shared/lib/gridDimensions";
@@ -68,7 +69,7 @@ export function createTeamGridExcelWorkbook(document: TeamGridDocumentV1) {
 export async function writeTeamGridExcelBuffer(document: TeamGridDocumentV1) {
   const workbook = createTeamGridExcelWorkbook(document);
   const buffer = await workbook.xlsx.writeBuffer() as ArrayBuffer | Uint8Array;
-  return toArrayBuffer(buffer);
+  return injectChartsIntoXlsxBuffer(toArrayBuffer(buffer), document);
 }
 
 function appendWorksheet(workbook: ExcelJS.Workbook, teamgridWorksheet: Worksheet, sheetName: string, formulaContext: FormulaContext) {

@@ -226,4 +226,48 @@ describe("teamgrid operation serialization", () => {
       },
     });
   });
+
+  it("serializes chart creation and anchor edits by stable ID", () => {
+    const chart = {
+      id: "chart_1",
+      type: "column" as const,
+      title: "Revenue",
+      series: [{
+        id: "series_1",
+        values: {
+          worksheetId: "sheet_1",
+          startRowId: "row_2",
+          endRowId: "row_3",
+          startColumnId: "col_2",
+          endColumnId: "col_2",
+        },
+      }],
+      anchor: {
+        from: { rowId: "row_1", columnId: "col_4", rowOffsetEmu: 0, colOffsetEmu: 0 },
+        to: { rowId: "row_10", columnId: "col_8", rowOffsetEmu: 0, colOffsetEmu: 0 },
+      },
+    };
+
+    expect(serializeTeamGridOperations([{
+      type: "addChart",
+      worksheetId: "sheet_1",
+      chart,
+      index: 0,
+    }, {
+      type: "setChartAnchor",
+      worksheetId: "sheet_1",
+      chartId: "chart_1",
+      anchor: chart.anchor,
+    }]).json).toMatchObject({
+      set: [
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1"], value: chart },
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1", "anchor"], value: chart.anchor },
+      ],
+      listInsert: [{
+        path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartOrder"],
+        index: 0,
+        values: ["chart_1"],
+      }],
+    });
+  });
 });
