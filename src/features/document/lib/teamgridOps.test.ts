@@ -212,6 +212,36 @@ describe("teamgrid operation serialization", () => {
     });
   });
 
+  it("serializes row and column hide state by stable ID", () => {
+    expect(serializeTeamGridOperations([
+      {
+        type: "setColumnHidden",
+        worksheetId: "sheet_1",
+        columnId: "col_1",
+        hidden: true,
+      },
+      {
+        type: "setRowHidden",
+        worksheetId: "sheet_1",
+        rowId: "row_1",
+        hidden: false,
+      },
+    ])).toEqual({
+      json: {
+        set: [
+          {
+            path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "columnsById", "col_1", "hidden"],
+            value: true,
+          },
+          {
+            path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "rowsById", "row_1", "hidden"],
+            value: false,
+          },
+        ],
+      },
+    });
+  });
+
   it("serializes document properties and locale patches", () => {
     expect(serializeTeamGridOperations([{
       type: "setDocumentProperties",

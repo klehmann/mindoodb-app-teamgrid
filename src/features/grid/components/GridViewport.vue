@@ -117,6 +117,7 @@ const emit = defineEmits<{
   "clipboard-clear": [];
   "resize-column": [payload: { columnId: ColumnId; width: number }];
   "resize-row": [payload: { rowId: RowId; height: number }];
+  "axis-context": [payload: { event: MouseEvent; kind: "row" | "column" }];
   "select-chart": [chartId: ChartId | null];
   "edit-chart": [chartId: ChartId];
   "chart-context": [payload: { event: MouseEvent; chartId: ChartId }];
@@ -356,11 +357,26 @@ function cellDisplayStyle(cell: Cell): CSSProperties {
 
 function columnHeaderStyle(column: GridProjection["columns"][number]) {
   const width = columnPixelWidth(column);
-  return { width: `${width}px`, minWidth: `${width}px` };
+  return { width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` };
 }
 
 function rowStyle(row: GridProjection["rows"][number]) {
-  return { height: `${rowPixelHeight(row)}px` };
+  const height = rowPixelHeight(row);
+  return { height: `${height}px`, maxHeight: `${height}px` };
+}
+
+function openColumnHeaderContextMenu(event: MouseEvent, columnId: ColumnId) {
+  if (!isWholeColumnSelected(columnId)) {
+    selectWholeColumn(event, columnId);
+  }
+  emit("axis-context", { event, kind: "column" });
+}
+
+function openRowHeaderContextMenu(event: MouseEvent, rowId: RowId) {
+  if (!isWholeRowSelected(rowId)) {
+    selectWholeRow(event, rowId);
+  }
+  emit("axis-context", { event, kind: "row" });
 }
 
 /**
@@ -484,13 +500,14 @@ export type { CellId };
               v-for="column in projection.columns"
               :key="column.id"
               class="grid-column-header"
-              :class="{ 'grid-axis-header--selected': isWholeColumnSelected(column.id) }"
+              :class="{ 'grid-axis-header--selected': isWholeColumnSelected(column.id), 'grid-axis-header--hidden': column.hidden }"
               scope="col"
               @mousedown.prevent="selectWholeColumn($event, column.id)"
+              @contextmenu.prevent.stop="openColumnHeaderContextMenu($event, column.id)"
             >
               <span class="grid-axis-header__label">{{ column.label }}</span>
               <span
-                v-if="!readonly"
+                v-if="!readonly && !column.hidden"
                 class="grid-resize-handle grid-resize-handle--column"
                 role="separator"
                 :aria-label="`Resize column ${column.label}`"
@@ -515,16 +532,22 @@ export type { CellId };
             >
           </colgroup>
           <tbody>
-            <tr v-for="row in projection.rows" :key="row.id" :style="rowStyle(row)">
+            <tr
+              v-for="row in projection.rows"
+              :key="row.id"
+              :class="{ 'grid-row--hidden': row.hidden }"
+              :style="rowStyle(row)"
+            >
               <th
                 class="grid-row-header"
-                :class="{ 'grid-axis-header--selected': isWholeRowSelected(row.id) }"
+                :class="{ 'grid-axis-header--selected': isWholeRowSelected(row.id), 'grid-axis-header--hidden': row.hidden }"
                 scope="row"
                 @mousedown.prevent="selectWholeRow($event, row.id)"
+                @contextmenu.prevent.stop="openRowHeaderContextMenu($event, row.id)"
               >
                 <span class="grid-axis-header__label">{{ row.label }}</span>
                 <span
-                  v-if="!readonly"
+                  v-if="!readonly && !row.hidden"
                   class="grid-resize-handle grid-resize-handle--row"
                   role="separator"
                   :aria-label="`Resize row ${row.label}`"
@@ -542,6 +565,7 @@ export type { CellId };
                   'grid-cell--highlighted': highlighted.has(getCell(worksheet, row.id, column.id).id),
                   'grid-cell--formula': Boolean(getCell(worksheet, row.id, column.id).formula),
                   'grid-cell--clipboard-source': isInClipboardRange(row.index, column.index),
+                  'grid-cell--hidden-axis': row.hidden || column.hidden,
                 }"
                 :style="cellStyle(getCell(worksheet, row.id, column.id))"
                 :data-cell-id="getCell(worksheet, row.id, column.id).id"
@@ -738,6 +762,15 @@ export type { CellId };
   color: var(--text);
 }
 
+.grid-axis-header--hidden {
+  overflow: hidden;
+  padding: 0;
+}
+
+.grid-axis-header--hidden .grid-axis-header__label {
+  display: none;
+}
+
 .grid-cell {
   position: relative;
   height: 2rem;
@@ -747,6 +780,21 @@ export type { CellId };
   background: var(--grid-cell-bg);
   white-space: nowrap;
   cursor: cell;
+}
+
+.grid-row--hidden .grid-row-header,
+.grid-row--hidden .grid-cell,
+.grid-cell--hidden-axis {
+  height: 0;
+  overflow: hidden;
+  border-top-width: 0;
+  border-bottom-width: 0;
+}
+
+.grid-cell--hidden-axis .grid-cell__value,
+.grid-cell--hidden-axis .grid-cell__editor,
+.grid-cell--hidden-axis .grid-cell__border-overlay {
+  display: none;
 }
 
 .grid-cell--selected {

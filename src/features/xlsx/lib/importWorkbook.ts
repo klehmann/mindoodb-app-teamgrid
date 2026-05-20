@@ -120,16 +120,21 @@ function importWorksheet(excelWorksheet: ExcelJS.Worksheet): Worksheet {
 
 function importRowMeta(row: ExcelJS.Row, id: RowId): RowMeta {
   const meta: RowMeta = { id };
-  if (row.height != null) {
+  if (row.hidden || row.height === 0) {
+    meta.hidden = true;
+  }
+  if (row.height != null && row.height > 0) {
     meta.height = pointsToPixels(row.height);
   }
   return meta;
 }
 
 function importColumnMeta(column: ExcelJS.Column, id: ColumnId): ColumnMeta {
+  const hidden = Boolean(column.hidden || column.width === 0);
   return {
     id,
-    width: column.width == null ? DEFAULT_COLUMN_WIDTH : excelWidthToPixels(column.width),
+    width: column.width == null || column.width === 0 ? DEFAULT_COLUMN_WIDTH : excelWidthToPixels(column.width),
+    hidden: hidden || undefined,
   };
 }
 

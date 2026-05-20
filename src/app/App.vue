@@ -88,6 +88,7 @@ const app = useTeamGridDocument();
 const { updateAvailable, updateReloading, reloadForUpdate } = useTeamGridAppUpdate();
 
 const cellContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
+const axisContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
 const chartContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
 const formulaBarComponent = ref<InstanceType<typeof FormulaBar> | null>(null);
 const gridViewportComponent = ref<InstanceType<typeof GridViewport> | null>(null);
@@ -100,6 +101,7 @@ const viewSheetRefreshInFlight = ref(false);
 
 const activeWorksheetId = ref<WorksheetId | null>(null);
 const cellContextRange = ref<CellSelectionRange | null>(null);
+const axisContextKind = ref<"row" | "column" | null>(null);
 
 /**
  * The worksheet currently displayed in the grid.
@@ -324,6 +326,11 @@ const menuItems = computed<MenuItem[]>(() => [
       { separator: true },
       { label: "Delete row", icon: "pi pi-minus", disabled: app.gridReadOnly.value || !selectedCell.value, command: deleteSelectedRow },
       { label: "Delete column", icon: "pi pi-minus", disabled: app.gridReadOnly.value || !selectedCell.value, command: deleteSelectedColumn },
+      { separator: true },
+      { label: "Hide rows", icon: "pi pi-eye-slash", disabled: app.gridReadOnly.value || selectedRowIdsFromSelection().length === 0, command: () => setSelectedRowsHidden(true) },
+      { label: "Unhide rows", icon: "pi pi-eye", disabled: app.gridReadOnly.value || !selectionHasHiddenRows(), command: () => setSelectedRowsHidden(false) },
+      { label: "Hide columns", icon: "pi pi-eye-slash", disabled: app.gridReadOnly.value || selectedColumnIdsFromSelection().length === 0, command: () => setSelectedColumnsHidden(true) },
+      { label: "Unhide columns", icon: "pi pi-eye", disabled: app.gridReadOnly.value || !selectionHasHiddenColumns(), command: () => setSelectedColumnsHidden(false) },
     ],
   },
   {
@@ -367,6 +374,27 @@ const menuItems = computed<MenuItem[]>(() => [
     ],
   },
 ]);
+
+const axisContextMenuItems = computed<MenuItem[]>(() => {
+  const isRowMenu = axisContextKind.value === "row";
+  const hideLabel = isRowMenu ? "Hide rows" : "Hide columns";
+  const unhideLabel = isRowMenu ? "Unhide rows" : "Unhide columns";
+  const hasHidden = isRowMenu ? selectionHasHiddenRows() : selectionHasHiddenColumns();
+  return [
+    {
+      label: hideLabel,
+      icon: "pi pi-eye-slash",
+      disabled: app.gridReadOnly.value,
+      command: () => isRowMenu ? setSelectedRowsHidden(true) : setSelectedColumnsHidden(true),
+    },
+    {
+      label: unhideLabel,
+      icon: "pi pi-eye",
+      disabled: app.gridReadOnly.value || !hasHidden,
+      command: () => isRowMenu ? setSelectedRowsHidden(false) : setSelectedColumnsHidden(false),
+    },
+  ];
+});
 
 const cellContextMenuItems = computed<MenuItem[]>(() => [
   {
@@ -418,6 +446,31 @@ const cellContextMenuItems = computed<MenuItem[]>(() => [
     icon: "pi pi-arrow-right",
     disabled: app.gridReadOnly.value || !selectedCell.value,
     command: () => insertColumn("after"),
+  },
+  { separator: true },
+  {
+    label: "Hide rows",
+    icon: "pi pi-eye-slash",
+    disabled: app.gridReadOnly.value || selectedRowIdsFromSelection().length === 0,
+    command: () => setSelectedRowsHidden(true),
+  },
+  {
+    label: "Unhide rows",
+    icon: "pi pi-eye",
+    disabled: app.gridReadOnly.value || !selectionHasHiddenRows(),
+    command: () => setSelectedRowsHidden(false),
+  },
+  {
+    label: "Hide columns",
+    icon: "pi pi-eye-slash",
+    disabled: app.gridReadOnly.value || selectedColumnIdsFromSelection().length === 0,
+    command: () => setSelectedColumnsHidden(true),
+  },
+  {
+    label: "Unhide columns",
+    icon: "pi pi-eye",
+    disabled: app.gridReadOnly.value || !selectionHasHiddenColumns(),
+    command: () => setSelectedColumnsHidden(false),
   },
 ]);
 
@@ -652,6 +705,14 @@ function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: 
   cellContextMenu.value?.show(payload.event);
 }
 
+function openAxisContextMenu(payload: { event: MouseEvent; kind: "row" | "column" }) {
+  chartDialog.selectChart(null);
+  formulaEditing.value = false;
+  formulaAssistOpen.value = false;
+  axisContextKind.value = payload.kind;
+  axisContextMenu.value?.show(payload.event);
+}
+
 function selectChart(chartId: ChartId | null) {
   chartDialog.selectChart(chartId);
   if (!chartId) {
@@ -841,6 +902,131 @@ function deleteSelectedColumn() {
     worksheet.columnsById[selectedCell.value!.columnId].deletedAt = deletedAt;
     return [{ type: "tombstoneColumn", worksheetId: worksheet.id, columnId: selectedCell.value!.columnId, deletedAt }];
   });
+}
+
+function selectedRowIdsFromSelection() {
+  const range = selectedRowIndexRange();
+  if (!projection.value || !range) {
+    return [];
+  }
+  return projection.value.rows
+    .slice(range.min, range.max + 1)
+    .map((row) => row.id);
+}
+
+function selectedColumnIdsFromSelection() {
+  const range = selectedColumnIndexRange();
+  if (!projection.value || !range) {
+    return [];
+  }
+  return projection.value.columns
+    .slice(range.min, range.max + 1)
+    .map((column) => column.id);
+}
+
+function selectionHasHiddenRows() {
+  return rowIdsToUnhideAroundSelection().length > 0;
+}
+
+function selectionHasHiddenColumns() {
+  return columnIdsToUnhideAroundSelection().length > 0;
+}
+
+function setSelectedRowsHidden(hidden: boolean) {
+  if (!activeWorksheet.value || app.gridReadOnly.value) return;
+  const rowIds = hidden ? selectedRowIdsFromSelection() : rowIdsToUnhideAroundSelection();
+  if (rowIds.length === 0) return;
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const operations: TeamGridOperation[] = [];
+    for (const rowId of rowIds) {
+      const row = worksheet.rowsById[rowId];
+      if (!row || Boolean(row.hidden) === hidden) {
+        continue;
+      }
+      row.hidden = hidden;
+      operations.push({ type: "setRowHidden", worksheetId: worksheet.id, rowId, hidden });
+    }
+    return operations;
+  });
+}
+
+function setSelectedColumnsHidden(hidden: boolean) {
+  if (!activeWorksheet.value || app.gridReadOnly.value) return;
+  const columnIds = hidden ? selectedColumnIdsFromSelection() : columnIdsToUnhideAroundSelection();
+  if (columnIds.length === 0) return;
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const operations: TeamGridOperation[] = [];
+    for (const columnId of columnIds) {
+      const column = worksheet.columnsById[columnId];
+      if (!column || Boolean(column.hidden) === hidden) {
+        continue;
+      }
+      column.hidden = hidden;
+      operations.push({ type: "setColumnHidden", worksheetId: worksheet.id, columnId, hidden });
+    }
+    return operations;
+  });
+}
+
+function selectedRowIndexRange() {
+  const bounds = boundsForRange(selectedRange.value);
+  if (bounds) {
+    return { min: bounds.minRow, max: bounds.maxRow };
+  }
+  const coordinates = selectedCell.value ? findCellCoordinates(selectedCell.value.id) : null;
+  return coordinates ? { min: coordinates.rowIndex, max: coordinates.rowIndex } : null;
+}
+
+function selectedColumnIndexRange() {
+  const bounds = boundsForRange(selectedRange.value);
+  if (bounds) {
+    return { min: bounds.minCol, max: bounds.maxCol };
+  }
+  const coordinates = selectedCell.value ? findCellCoordinates(selectedCell.value.id) : null;
+  return coordinates ? { min: coordinates.columnIndex, max: coordinates.columnIndex } : null;
+}
+
+function rowIdsToUnhideAroundSelection() {
+  const worksheet = activeWorksheet.value;
+  const rows = projection.value?.rows;
+  const range = selectedRowIndexRange();
+  if (!worksheet || !rows || !range) {
+    return [];
+  }
+  return hiddenAxisIdsAroundRange(rows, range, (rowId) => Boolean(worksheet.rowsById[rowId]?.hidden));
+}
+
+function columnIdsToUnhideAroundSelection() {
+  const worksheet = activeWorksheet.value;
+  const columns = projection.value?.columns;
+  const range = selectedColumnIndexRange();
+  if (!worksheet || !columns || !range) {
+    return [];
+  }
+  return hiddenAxisIdsAroundRange(columns, range, (columnId) => Boolean(worksheet.columnsById[columnId]?.hidden));
+}
+
+function hiddenAxisIdsAroundRange<Id extends string, T extends { id: Id }>(
+  axes: T[],
+  range: { min: number; max: number },
+  isHidden: (id: Id) => boolean,
+) {
+  const ids: Id[] = [];
+  for (let index = range.min; index <= range.max; index += 1) {
+    const axis = axes[index];
+    if (axis && isHidden(axis.id)) {
+      ids.push(axis.id);
+    }
+  }
+  for (let index = range.min - 1; index >= 0 && axes[index] && isHidden(axes[index].id); index -= 1) {
+    ids.unshift(axes[index].id);
+  }
+  for (let index = range.max + 1; index < axes.length && axes[index] && isHidden(axes[index].id); index += 1) {
+    ids.push(axes[index].id);
+  }
+  return ids;
 }
 
 function insertChart(type: ChartType) {
@@ -1036,7 +1222,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
       >
         {{ statusBadgeLabel }}
       </button>
-      <span v-else class="toolbar__status-badge">{{ statusBadgeLabel }}</span>
+      <span v-else-if="app.currentDocument.value" class="toolbar__status-badge">{{ statusBadgeLabel }}</span>
     </header>
 
     <section class="workspace">
@@ -1087,6 +1273,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
               @commit="commitCell"
               @clear-selection="clearSelectedCells"
               @cell-context="openCellContextMenu"
+              @axis-context="openAxisContextMenu"
               @request-help="openFormulaAssist('inlineCell', $event)"
               @edit-state="handleInlineEditState"
               @clipboard-copy="handleGridClipboardCopy"
@@ -1115,6 +1302,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
             @delete="deleteWorksheet"
           />
           <ContextMenu ref="cellContextMenu" :model="cellContextMenuItems" />
+          <ContextMenu ref="axisContextMenu" :model="axisContextMenuItems" />
           <ContextMenu ref="chartContextMenu" :model="chartContextMenuItems" />
         </div>
       </template>

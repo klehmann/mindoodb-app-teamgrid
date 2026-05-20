@@ -17,8 +17,10 @@ describe("Teamgrid XLSX export", () => {
     expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(["Budget Plan 2026"]);
     expect(worksheet).toBeDefined();
     expect(worksheet!.getColumn(1).width).toBeCloseTo(20, 2);
+    expect(worksheet!.getColumn(2).hidden).toBe(true);
     expect(worksheet!.getRow(1).height).toBe(24);
     expect(worksheet!.getRow(2).height).toBe(24);
+    expect(worksheet!.getRow(2).hidden).toBe(true);
 
     expect(worksheet!.getCell("A1").value).toBe(12);
     expect(worksheet!.getCell("A1").numFmt).toBe("$0.00");
@@ -158,6 +160,8 @@ describe("Teamgrid XLSX export", () => {
     const projection = projectWorksheet(importedWorksheet);
     const cellB2 = getCell(importedWorksheet, projection.rows[1].id, projection.columns[1].id);
 
+    expect(importedWorksheet.rowsById[projection.rows[1].id].hidden).toBe(true);
+    expect(importedWorksheet.columnsById[projection.columns[1].id].hidden).toBe(true);
     expect(cellB2.value).toMatchObject({
       kind: "date",
       isoDate: "2026-05-12T00:00:00.000Z",
@@ -224,8 +228,10 @@ function createExportFixture() {
   worksheet.title = "Budget/Plan*2026";
   worksheet.rowsById[row1].height = 32;
   worksheet.rowsById[row1].defaultStyle = { bold: true, verticalAlign: "bottom" };
+  worksheet.rowsById[row2].hidden = true;
   worksheet.columnsById[columnA].width = 145;
   worksheet.columnsById[columnA].defaultStyle = { backgroundColor: "#111827", horizontalAlign: "center" };
+  worksheet.columnsById[columnB].hidden = true;
 
   worksheet.cellsById[createCellId(row1, columnA)] = {
     id: createCellId(row1, columnA),

@@ -162,6 +162,7 @@ export interface ChartRawParts {
 export interface RowMeta {
   id: RowId;
   height?: number;
+  hidden?: boolean;
   defaultStyle?: CellStyle;
   deletedAt?: string;
 }
@@ -169,6 +170,7 @@ export interface RowMeta {
 export interface ColumnMeta {
   id: ColumnId;
   width?: number;
+  hidden?: boolean;
   defaultStyle?: CellStyle;
   defaultValueKind?: Exclude<CellValue["kind"], "empty">;
   deletedAt?: string;

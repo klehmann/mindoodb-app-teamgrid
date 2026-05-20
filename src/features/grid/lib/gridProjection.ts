@@ -26,7 +26,7 @@ import {
   type RowId,
   type Worksheet,
 } from "@/features/document/lib/teamgridDocument";
-import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
+import { DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT } from "@/shared/lib/gridDimensions";
 
 /** One column slot in the projected grid (after dedupe and tombstone filtering). */
 export interface VisibleColumn {
@@ -34,6 +34,7 @@ export interface VisibleColumn {
   index: number;
   label: string;
   width: number;
+  hidden: boolean;
 }
 
 /** One row slot in the projected grid (after dedupe and tombstone filtering). */
@@ -41,7 +42,8 @@ export interface VisibleRow {
   id: RowId;
   index: number;
   label: string;
-  height?: number;
+  height: number;
+  hidden: boolean;
 }
 
 /**
@@ -70,7 +72,8 @@ export function projectWorksheet(worksheet: Worksheet): GridProjection {
       id,
       index,
       label: String(index + 1),
-      height: worksheet.rowsById[id]?.height,
+      height: worksheet.rowsById[id]?.hidden ? 0 : worksheet.rowsById[id]?.height ?? DEFAULT_ROW_HEIGHT,
+      hidden: Boolean(worksheet.rowsById[id]?.hidden),
     }));
 
   const columns = dedupeIds(worksheet.columnOrder)
@@ -79,7 +82,8 @@ export function projectWorksheet(worksheet: Worksheet): GridProjection {
       id,
       index,
       label: columnIndexToLabel(index),
-      width: worksheet.columnsById[id]?.width ?? DEFAULT_COLUMN_WIDTH,
+      width: worksheet.columnsById[id]?.hidden ? 0 : worksheet.columnsById[id]?.width ?? DEFAULT_COLUMN_WIDTH,
+      hidden: Boolean(worksheet.columnsById[id]?.hidden),
     }));
 
   const rowIndexById = new Map(rows.map((row) => [row.id, row.index] as const));

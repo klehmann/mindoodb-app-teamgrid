@@ -40,6 +40,7 @@ import type {
  * - `setCellsStyle` rewrites style on a contiguous selection while keeping
  *   each cell's value/formula intact.
  * - `setColumnWidth` / `setRowHeight` update display dimensions by stable ID.
+ * - `setColumnHidden` / `setRowHidden` toggle Excel-compatible hide state.
  * - `insertRow` / `insertColumn` add a new ordered slot.
  * - `tombstoneRow` / `tombstoneColumn` / `tombstoneWorksheet` mark an entity
  *   deleted without physically removing it, so formulas can still report
@@ -52,6 +53,8 @@ export type TeamGridOperation =
   | { type: "setCellsStyle"; worksheetId: WorksheetId; cells: Cell[]; style: CellStyle }
   | { type: "setColumnWidth"; worksheetId: WorksheetId; columnId: ColumnId; width: number }
   | { type: "setRowHeight"; worksheetId: WorksheetId; rowId: RowId; height: number }
+  | { type: "setColumnHidden"; worksheetId: WorksheetId; columnId: ColumnId; hidden: boolean }
+  | { type: "setRowHidden"; worksheetId: WorksheetId; rowId: RowId; hidden: boolean }
   | { type: "insertRow"; worksheetId: WorksheetId; rowId: RowId; row: RowMeta; index: number }
   | { type: "tombstoneRow"; worksheetId: WorksheetId; rowId: RowId; deletedAt: string }
   | { type: "insertColumn"; worksheetId: WorksheetId; columnId: ColumnId; column: ColumnMeta; index: number }
@@ -97,6 +100,12 @@ export function serializeTeamGridOperations(
         break;
       case "setRowHeight":
         pushSet(json, [...worksheetPath(operation.worksheetId), "rowsById", operation.rowId, "height"], operation.height);
+        break;
+      case "setColumnHidden":
+        pushSet(json, [...worksheetPath(operation.worksheetId), "columnsById", operation.columnId, "hidden"], operation.hidden);
+        break;
+      case "setRowHidden":
+        pushSet(json, [...worksheetPath(operation.worksheetId), "rowsById", operation.rowId, "hidden"], operation.hidden);
         break;
       case "insertRow":
         pushSet(json, [...worksheetPath(operation.worksheetId), "rowsById", operation.rowId], operation.row);

@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { injectChartsIntoXlsxBuffer } from "@/features/xlsx/lib/chartExporter";
 import { createFormulaContext, renderFormulaSource, type FormulaContext } from "@/features/formulas/lib";
 import { mergeCellStyle } from "@/features/grid/lib/cellFormatting";
-import { DEFAULT_ROW_HEIGHT } from "@/shared/lib/gridDimensions";
+import { DEFAULT_COLUMN_WIDTH, DEFAULT_ROW_HEIGHT } from "@/shared/lib/gridDimensions";
 import { getCell, projectWorksheet } from "@/features/grid/lib/gridProjection";
 import type {
   Cell,
@@ -77,12 +77,15 @@ function appendWorksheet(workbook: ExcelJS.Workbook, teamgridWorksheet: Workshee
   const worksheet = workbook.addWorksheet(sheetName);
 
   projection.columns.forEach((column) => {
-    worksheet.getColumn(column.index + 1).width = pixelsToExcelWidth(column.width);
+    const excelColumn = worksheet.getColumn(column.index + 1);
+    excelColumn.width = pixelsToExcelWidth(teamgridWorksheet.columnsById[column.id]?.width ?? DEFAULT_COLUMN_WIDTH);
+    excelColumn.hidden = column.hidden;
   });
 
   projection.rows.forEach((row) => {
     const excelRow = worksheet.getRow(row.index + 1);
-    excelRow.height = pixelsToPoints(row.height ?? DEFAULT_ROW_HEIGHT);
+    excelRow.height = pixelsToPoints(teamgridWorksheet.rowsById[row.id]?.height ?? DEFAULT_ROW_HEIGHT);
+    excelRow.hidden = row.hidden;
 
     projection.columns.forEach((column) => {
       const cell = getCell(teamgridWorksheet, row.id, column.id);

@@ -9,7 +9,9 @@ describe("Teamgrid XLSX import", () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Budget Plan");
     worksheet.getColumn(1).width = 20;
+    worksheet.getColumn(5).hidden = true;
     worksheet.getRow(1).height = 24;
+    worksheet.getRow(3).hidden = true;
     worksheet.getCell("A1").value = 12;
     worksheet.getCell("A1").numFmt = "$#,##0.00";
     worksheet.getCell("A1").font = {
@@ -59,7 +61,11 @@ describe("Teamgrid XLSX import", () => {
     expect(firstWorksheet.title).toBe("Budget Plan");
     expect(secondWorksheet.title).toBe("Second Sheet");
     expect(firstWorksheet.columnsById[projection.columns[0].id].width).toBe(145);
+    expect(firstWorksheet.columnsById[projection.columns[4].id].hidden).toBe(true);
+    expect(projection.columns[4]).toMatchObject({ label: "E", width: 0, hidden: true });
     expect(firstWorksheet.rowsById[projection.rows[0].id].height).toBe(32);
+    expect(firstWorksheet.rowsById[projection.rows[2].id].hidden).toBe(true);
+    expect(projection.rows[2]).toMatchObject({ label: "3", height: 0, hidden: true });
     expect(cellA1.value).toEqual({ kind: "number", value: 12, format: "currency", currencyCode: "USD", excelNumFmt: "$#,##0.00" });
     expect(cellA1.style).toMatchObject({
       fontFamily: "Inter",

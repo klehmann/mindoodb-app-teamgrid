@@ -410,6 +410,37 @@ describe("GridViewport row and column header selection", () => {
       endCellId: createCellId(secondRow.id, lastColumn.id),
     });
   });
+
+  it("emits axis context events from row and column headers", async () => {
+    const { wrapper } = mountGrid();
+
+    await wrapper.find(".grid-column-header").trigger("contextmenu");
+    await wrapper.find(".grid-row-header").trigger("contextmenu");
+
+    expect(wrapper.emitted("axis-context")).toEqual([
+      [expect.objectContaining({ kind: "column" })],
+      [expect.objectContaining({ kind: "row" })],
+    ]);
+  });
+
+  it("preserves an existing column range when opening the header context menu", async () => {
+    const { wrapper, firstRow, lastRow, firstColumn, thirdColumn } = mountGrid(({ worksheet, secondColumn }) => {
+      worksheet.columnsById[secondColumn.id].hidden = true;
+    });
+    const range = {
+      startCellId: createCellId(firstRow.id, firstColumn.id),
+      endCellId: createCellId(lastRow.id, thirdColumn.id),
+    };
+    await wrapper.setProps({
+      selectedCellId: range.startCellId,
+      selectedRange: range,
+    });
+
+    await wrapper.findAll(".grid-column-header")[2].trigger("contextmenu");
+
+    expect(wrapper.emitted("axis-context")).toEqual([[expect.objectContaining({ kind: "column" })]]);
+    expect(wrapper.emitted("select-range")).toBeUndefined();
+  });
 });
 
 describe("GridViewport editor navigation", () => {
@@ -680,6 +711,20 @@ describe("GridViewport resizing", () => {
     expect(wrapper.find(".grid-resize-handle--row").exists()).toBe(false);
     expect(wrapper.emitted("resize-column")).toBeUndefined();
     expect(wrapper.emitted("resize-row")).toBeUndefined();
+  });
+});
+
+describe("GridViewport hidden rows and columns", () => {
+  it("renders hidden axes at zero size and suppresses resize handles", () => {
+    const { wrapper } = mountGrid(({ worksheet, firstRow, firstColumn }) => {
+      worksheet.rowsById[firstRow.id].hidden = true;
+      worksheet.columnsById[firstColumn.id].hidden = true;
+    });
+
+    expect(wrapper.find(".grid-row--hidden").exists()).toBe(true);
+    expect(wrapper.find(".grid-axis-header--hidden").exists()).toBe(true);
+    expect(wrapper.findAll(".grid-resize-handle--row")).toHaveLength(99);
+    expect(wrapper.findAll(".grid-resize-handle--column")).toHaveLength(11);
   });
 });
 
