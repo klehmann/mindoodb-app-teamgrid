@@ -62,6 +62,15 @@ export interface UseGridSelectionGesturesOptions {
    */
   onSetAdditionalRanges: (ranges: CellSelectionRange[]) => void;
   onCellContext: (payload: { event: MouseEvent; cell: Cell; address: string; range: CellSelectionRange }) => void;
+  /**
+   * Clear the contents of every currently-selected cell (primary range
+   * plus every disjoint Ctrl/Meta+click range) in a single granular
+   * mutation. Invoked by Delete/Backspace when the selection spans more
+   * than one cell so the keystroke matches Excel / Sheets' "wipe the
+   * whole selection" behaviour instead of only blanking the active
+   * cell.
+   */
+  onClearSelectedCells: () => void;
 }
 
 export function useGridSelectionGestures(options: UseGridSelectionGesturesOptions) {
@@ -427,9 +436,11 @@ export function useGridSelectionGestures(options: UseGridSelectionGesturesOption
    * 2. Arrow keys move (or extend with Shift) the selection regardless
    *    of `readonly`.
    * 3. After that we gate on `readonly`: Enter/F2 enters edit mode,
-   *    Backspace/Delete enters edit mode with an empty draft, and any
-   *    printable key enters edit mode using that key as the first
-   *    character.
+   *    Backspace/Delete clears the entire selection in place when more
+   *    than one cell is selected (matching Excel / Sheets) and falls
+   *    back to opening the inline editor with an empty draft for a
+   *    single-cell selection, and any printable key enters edit mode
+   *    using that key as the first character.
    */
   function handleEditKey(event: KeyboardEvent, rowId: RowId, columnId: ColumnId) {
     if (options.editingCellId.value) {
@@ -448,6 +459,10 @@ export function useGridSelectionGestures(options: UseGridSelectionGesturesOption
     }
     if (event.key === "Backspace" || event.key === "Delete") {
       event.preventDefault();
+      if (selectedRangeIds.value.size > 1) {
+        options.onClearSelectedCells();
+        return;
+      }
       void options.startEditing(rowId, columnId, "");
       return;
     }

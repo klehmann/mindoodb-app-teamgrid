@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   createTeamGridDocument,
+  DEFAULT_WORKSHEET_COLUMNS,
+  DEFAULT_WORKSHEET_ROWS,
   getFirstVisibleWorksheet,
   isTeamGridEnvelope,
   migrateTeamGridDocument,
@@ -18,7 +20,12 @@ describe("teamgrid document schema", () => {
     expect(isTeamGridEnvelope(envelope)).toBe(true);
     expect(envelope.teamgrid.workbook.worksheetOrder).toHaveLength(1);
     expect("title" in envelope.teamgrid.workbook).toBe(false);
-    expect(getFirstVisibleWorksheet(envelope.teamgrid)?.title).toBe("Sheet 1");
+    const worksheet = getFirstVisibleWorksheet(envelope.teamgrid);
+    expect(worksheet?.title).toBe("Sheet 1");
+    expect(worksheet?.rowOrder).toHaveLength(DEFAULT_WORKSHEET_ROWS);
+    expect(worksheet?.columnOrder).toHaveLength(DEFAULT_WORKSHEET_COLUMNS);
+    expect(worksheet?.chartOrder).toEqual([]);
+    expect(worksheet?.chartsById).toEqual({});
   });
 
   it("migrates unknown document data into a Teamgrid envelope", () => {
@@ -47,6 +54,7 @@ describe("teamgrid document schema", () => {
     expect(migrated.subject).toBe("Planning");
     expect(migrated.tags).toEqual(["Work\\Q1", "Personal"]);
     expect("title" in migrated.teamgrid.workbook).toBe(false);
+    expect(getFirstVisibleWorksheet(migrated.teamgrid)?.chartOrder).toEqual([]);
   });
 
   it("reads and normalizes tags defensively", () => {

@@ -226,4 +226,99 @@ describe("teamgrid operation serialization", () => {
       },
     });
   });
+
+  it("serializes chart creation and anchor edits by stable ID", () => {
+    const chart = {
+      id: "chart_1",
+      type: "column" as const,
+      title: "Revenue",
+      series: [{
+        id: "series_1",
+        values: {
+          worksheetId: "sheet_1",
+          startRowId: "row_2",
+          endRowId: "row_3",
+          startColumnId: "col_2",
+          endColumnId: "col_2",
+        },
+      }],
+      anchor: {
+        from: { rowId: "row_1", columnId: "col_4", rowOffsetEmu: 0, colOffsetEmu: 0 },
+        to: { rowId: "row_10", columnId: "col_8", rowOffsetEmu: 0, colOffsetEmu: 0 },
+      },
+    };
+
+    expect(serializeTeamGridOperations([{
+      type: "addChart",
+      worksheetId: "sheet_1",
+      chart,
+      index: 0,
+    }, {
+      type: "setChartAnchor",
+      worksheetId: "sheet_1",
+      chartId: "chart_1",
+      anchor: chart.anchor,
+    }]).json).toMatchObject({
+      set: [
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1"], value: chart },
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1", "anchor"], value: chart.anchor },
+      ],
+      listInsert: [{
+        path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartOrder"],
+        index: 0,
+        values: ["chart_1"],
+      }],
+    });
+  });
+
+  it("serializes chart property edits by stable ID", () => {
+    const categoryAxis = {
+      worksheetId: "sheet_1",
+      startRowId: "row_2",
+      endRowId: "row_3",
+      startColumnId: "col_1",
+      endColumnId: "col_1",
+    };
+
+    expect(serializeTeamGridOperations([{
+      type: "setChartTitle",
+      worksheetId: "sheet_1",
+      chartId: "chart_1",
+      title: "Pipeline",
+    }, {
+      type: "setChartType",
+      worksheetId: "sheet_1",
+      chartId: "chart_1",
+      chartType: "line",
+    }, {
+      type: "setChartCategoryAxis",
+      worksheetId: "sheet_1",
+      chartId: "chart_1",
+      categoryAxis,
+    }, {
+      type: "setChartLegend",
+      worksheetId: "sheet_1",
+      chartId: "chart_1",
+      legend: { position: "bottom" },
+    }, {
+      type: "setChartStyle",
+      worksheetId: "sheet_1",
+      chartId: "chart_1",
+      style: { showGridlines: false, colors: ["#4472C4"] },
+    }, {
+      type: "removeChart",
+      worksheetId: "sheet_1",
+      chartId: "chart_1",
+      deletedAt: "2026-05-20T12:00:00.000Z",
+    }]).json).toMatchObject({
+      set: [
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1", "title"], value: "Pipeline" },
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1", "type"], value: "line" },
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1", "categoryAxis"], value: categoryAxis },
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1", "legend"], value: { position: "bottom" } },
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1", "style"], value: { showGridlines: false, colors: ["#4472C4"] } },
+        { path: ["teamgrid", "workbook", "worksheetsById", "sheet_1", "chartsById", "chart_1", "deletedAt"], value: "2026-05-20T12:00:00.000Z" },
+      ],
+    });
+  });
 });

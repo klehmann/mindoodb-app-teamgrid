@@ -34,6 +34,7 @@ import DocumentRevisionDialog from "@/features/document/components/DocumentRevis
 import DocumentPropertiesDialog from "@/features/document/components/DocumentPropertiesDialog.vue";
 import DeleteSpreadsheetDialog from "@/features/document/components/DeleteSpreadsheetDialog.vue";
 import ErrorDialog from "@/features/document/components/ErrorDialog.vue";
+import ChartPropertiesDialog from "@/features/charts/components/ChartPropertiesDialog.vue";
 import FormulaAssistPanel from "@/features/grid/components/FormulaAssistPanel.vue";
 import FormulaBar from "@/features/grid/components/FormulaBar.vue";
 import GridViewport from "@/features/grid/components/GridViewport.vue";
@@ -54,6 +55,7 @@ import { useFormulaAssistRouter } from "@/features/grid/composables/useFormulaAs
 import { useFormulaBarEditing } from "@/features/grid/composables/useFormulaBarEditing";
 import { useGridClipboard } from "@/features/grid/composables/useGridClipboard";
 import { useCellFormatDialog } from "@/features/grid/composables/useCellFormatDialog";
+import { useChartPropertiesDialog } from "@/features/charts/composables/useChartPropertiesDialog";
 
 import {
   coerceInputToCellValue,
@@ -66,8 +68,13 @@ import {
   createId,
   getFirstVisibleWorksheet,
   type Cell,
+  type Chart,
+  type ChartId,
+  type ChartType,
   type ColumnId,
   type RowId,
+  type SeriesRange,
+  type TwoCellAnchor,
   type WorksheetId,
 } from "@/features/document/lib/teamgridDocument";
 import { projectWorksheet } from "@/features/grid/lib/gridProjection";
@@ -79,6 +86,7 @@ const app = useTeamGridDocument();
 const { updateAvailable, updateReloading, reloadForUpdate } = useTeamGridAppUpdate();
 
 const cellContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
+const chartContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
 const formulaBarComponent = ref<InstanceType<typeof FormulaBar> | null>(null);
 const gridViewportComponent = ref<InstanceType<typeof GridViewport> | null>(null);
 const xlsxImportInput = ref<HTMLInputElement | null>(null);
@@ -195,6 +203,12 @@ const formatDialog = useCellFormatDialog({
 });
 const { openCellFormatDialog } = formatDialog;
 
+const chartDialog = useChartPropertiesDialog({
+  app,
+  activeWorksheet,
+  formulaContext,
+});
+
 const openDialog = useOpenDialog({
   app,
   onError: (error) => showAppError(error),
@@ -303,6 +317,15 @@ const menuItems = computed<MenuItem[]>(() => [
     ],
   },
   {
+    label: "Insert",
+    items: [
+      { label: "Column chart", icon: "pi pi-chart-bar", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("column") },
+      { label: "Bar chart", icon: "pi pi-chart-bar", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("bar") },
+      { label: "Line chart", icon: "pi pi-chart-line", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("line") },
+      { label: "Pie chart", icon: "pi pi-chart-pie", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("pie") },
+    ],
+  },
+  {
     label: "Format",
     items: [
       { label: "Format cells...", icon: "pi pi-sliders-h", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => openCellFormatDialog(selectedRange.value) },
@@ -385,6 +408,21 @@ const cellContextMenuItems = computed<MenuItem[]>(() => [
     icon: "pi pi-arrow-right",
     disabled: app.gridReadOnly.value || !selectedCell.value,
     command: () => insertColumn("after"),
+  },
+]);
+
+const chartContextMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: "Chart properties...",
+    icon: "pi pi-sliders-h",
+    disabled: app.gridReadOnly.value || !chartDialog.selectedChart.value,
+    command: () => chartDialog.selectedChartId.value && chartDialog.openChartProperties(chartDialog.selectedChartId.value),
+  },
+  {
+    label: "Delete chart",
+    icon: "pi pi-trash",
+    disabled: app.gridReadOnly.value || !chartDialog.selectedChart.value,
+    command: chartDialog.removeSelectedChart,
   },
 ]);
 
@@ -495,6 +533,7 @@ function selectCell(cell: Cell, address: string) {
     formulaDraft.value = appendPickedAddress(formulaDraft.value, address);
     return;
   }
+  chartDialog.selectChart(null);
   formulaEditing.value = false;
   formulaAssistOpen.value = false;
   selectedCellId.value = cell.id;
@@ -512,6 +551,7 @@ function selectRange(range: CellSelectionRange) {
   if (formulaEditing.value) {
     return;
   }
+  chartDialog.selectChart(null);
   selectedRange.value = range;
 }
 
@@ -552,6 +592,7 @@ function setAdditionalRanges(ranges: CellSelectionRange[]) {
 
 /** Open the cell context menu, preserving an existing range when right-clicked inside it. */
 function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: string; range: CellSelectionRange }) {
+  chartDialog.selectChart(null);
   if (!selectedRange.value || selectedRange.value.startCellId !== payload.range.startCellId || selectedRange.value.endCellId !== payload.range.endCellId) {
     formulaEditing.value = false;
     formulaAssistOpen.value = false;
@@ -562,6 +603,29 @@ function openCellContextMenu(payload: { event: MouseEvent; cell: Cell; address: 
   }
   cellContextRange.value = payload.range;
   cellContextMenu.value?.show(payload.event);
+}
+
+function selectChart(chartId: ChartId | null) {
+  chartDialog.selectChart(chartId);
+  if (!chartId) {
+    return;
+  }
+  formulaEditing.value = false;
+  formulaAssistOpen.value = false;
+  selectedCellId.value = null;
+  selectedCellAddress.value = "";
+  selectedRange.value = null;
+  additionalRanges.value = [];
+}
+
+function openChartContextMenu(payload: { event: MouseEvent; chartId: ChartId }) {
+  selectChart(payload.chartId);
+  chartContextMenu.value?.show(payload.event);
+}
+
+function deleteChart(chartId: ChartId) {
+  chartDialog.selectChart(chartId);
+  chartDialog.removeSelectedChart();
 }
 
 async function saveCurrentDocument() {
@@ -590,6 +654,42 @@ async function saveCurrentDocument() {
  * `coerceInputToCellValue` so a column-typed cell still keeps its
  * preferred shape.
  */
+/**
+ * Clear the contents of every cell in the current selection (primary
+ * range plus every disjoint Ctrl/Meta+click range) in a single granular
+ * `updateGrid` mutation.
+ *
+ * Wired to {@link GridViewport}'s `clear-selection` event, which fires
+ * when the user presses Delete/Backspace while more than one cell is
+ * selected. Cells that are already empty (no value and no formula) are
+ * skipped so we do not emit no-op `setCell` operations into the patch
+ * history.
+ */
+function clearSelectedCells() {
+  if (!activeWorksheet.value || app.gridReadOnly.value) {
+    return;
+  }
+  const cellsToClear = selectedCells.value;
+  if (cellsToClear.length === 0) {
+    return;
+  }
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const operations: TeamGridOperation[] = [];
+    for (const cell of cellsToClear) {
+      const existing = worksheet.cellsById[cell.id] ?? cell;
+      if (existing.value.kind === "empty" && !existing.formula) {
+        continue;
+      }
+      const emptyCell: Cell = { ...existing, value: { kind: "empty" }, formula: undefined };
+      worksheet.cellsById[cell.id] = emptyCell;
+      operations.push({ type: "setCell", worksheetId: worksheet.id, cell: emptyCell });
+    }
+    return operations;
+  });
+  formulaError.value = null;
+}
+
 function commitCell(cell: Cell, rawValue: string) {
   if (!activeWorksheet.value || !projection.value) {
     return;
@@ -696,6 +796,104 @@ function deleteSelectedColumn() {
   });
 }
 
+function insertChart(type: ChartType) {
+  if (!activeWorksheet.value || !projection.value || !selectedRange.value) return;
+  const bounds = boundsForRange(selectedRange.value);
+  if (!bounds) return;
+  app.updateGrid((grid) => {
+    const worksheet = grid.workbook.worksheetsById[activeWorksheet.value!.id];
+    const chart = createChartFromSelection(type, worksheet.id, bounds);
+    if (!chart) {
+      return [];
+    }
+    worksheet.chartsById[chart.id] = chart;
+    worksheet.chartOrder.push(chart.id);
+    return [{ type: "addChart", worksheetId: worksheet.id, chart, index: worksheet.chartOrder.length - 1 }];
+  });
+}
+
+function createChartFromSelection(type: ChartType, worksheetId: WorksheetId, bounds: NonNullable<ReturnType<typeof boundsForRange>>): Chart | null {
+  if (!projection.value) {
+    return null;
+  }
+  const hasHeaderRow = bounds.maxRow > bounds.minRow;
+  const valueStartRow = hasHeaderRow ? bounds.minRow + 1 : bounds.minRow;
+  const hasCategoryColumn = bounds.maxCol > bounds.minCol;
+  const firstValueColumn = hasCategoryColumn ? bounds.minCol + 1 : bounds.minCol;
+  const series: Chart["series"] = [];
+  for (let columnIndex = firstValueColumn; columnIndex <= bounds.maxCol; columnIndex += 1) {
+    const values = rangeFromIndexes(worksheetId, valueStartRow, columnIndex, bounds.maxRow, columnIndex);
+    if (!values) {
+      continue;
+    }
+    series.push({
+      id: createId("series"),
+      name: hasHeaderRow ? (rangeFromIndexes(worksheetId, bounds.minRow, columnIndex, bounds.minRow, columnIndex) ?? undefined) : undefined,
+      values,
+    });
+  }
+  if (series.length === 0) {
+    return null;
+  }
+  const categoryAxis = hasCategoryColumn
+    ? rangeFromIndexes(worksheetId, valueStartRow, bounds.minCol, bounds.maxRow, bounds.minCol) ?? undefined
+    : undefined;
+  const anchor = createDefaultChartAnchor(bounds);
+  if (!anchor) {
+    return null;
+  }
+  return {
+    id: createId("chart"),
+    type,
+    title: `${type[0].toUpperCase()}${type.slice(1)} chart`,
+    series,
+    categoryAxis,
+    anchor,
+    legend: { position: "right" },
+  };
+}
+
+function rangeFromIndexes(worksheetId: WorksheetId, startRow: number, startColumn: number, endRow: number, endColumn: number): SeriesRange | null {
+  if (!projection.value) {
+    return null;
+  }
+  const startRowItem = projection.value.rows[startRow];
+  const endRowItem = projection.value.rows[endRow];
+  const startColumnItem = projection.value.columns[startColumn];
+  const endColumnItem = projection.value.columns[endColumn];
+  if (!startRowItem || !endRowItem || !startColumnItem || !endColumnItem) {
+    return null;
+  }
+  return {
+    worksheetId,
+    startRowId: startRowItem.id,
+    endRowId: endRowItem.id,
+    startColumnId: startColumnItem.id,
+    endColumnId: endColumnItem.id,
+  };
+}
+
+function createDefaultChartAnchor(bounds: NonNullable<ReturnType<typeof boundsForRange>>): TwoCellAnchor | null {
+  if (!projection.value) {
+    return null;
+  }
+  const fromColumnIndex = Math.min(projection.value.columns.length - 1, bounds.maxCol + 1);
+  const fromRowIndex = bounds.minRow;
+  const toColumnIndex = Math.min(projection.value.columns.length - 1, fromColumnIndex + 5);
+  const toRowIndex = Math.min(projection.value.rows.length - 1, fromRowIndex + 9);
+  const fromRow = projection.value.rows[fromRowIndex];
+  const toRow = projection.value.rows[toRowIndex];
+  const fromColumn = projection.value.columns[fromColumnIndex];
+  const toColumn = projection.value.columns[toColumnIndex];
+  if (!fromRow || !toRow || !fromColumn || !toColumn) {
+    return null;
+  }
+  return {
+    from: { rowId: fromRow.id, columnId: fromColumn.id, rowOffsetEmu: 0, colOffsetEmu: 0 },
+    to: { rowId: toRow.id, columnId: toColumn.id, rowOffsetEmu: 0, colOffsetEmu: 0 },
+  };
+}
+
 /** Commit a released header drag into the local dirty document. */
 function resizeColumn(payload: { columnId: ColumnId; width: number }) {
   if (!activeWorksheet.value || app.gridReadOnly.value) return;
@@ -796,65 +994,77 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
 
     <section class="workspace">
       <template v-if="app.activeGrid.value && activeWorksheet && projection">
-        <div v-if="app.isTimeTravelActive.value" class="history-banner">
-          <i class="pi pi-clock" aria-hidden="true" />
-          <span>Time travel mode is active as of {{ app.timeTravelDateLabel.value }} - read-only.</span>
-        </div>
-        <div v-if="app.isViewingHistorical.value" class="history-banner">
-          <i class="pi pi-history" aria-hidden="true" />
-          <span>You're viewing a historical revision - read-only.</span>
-          <button type="button" @click="app.returnToCurrent">Return to current</button>
-        </div>
+        <div class="workspace__sheet">
+          <div v-if="app.isTimeTravelActive.value" class="history-banner">
+            <i class="pi pi-clock" aria-hidden="true" />
+            <span>Time travel mode is active as of {{ app.timeTravelDateLabel.value }} - read-only.</span>
+          </div>
+          <div v-if="app.isViewingHistorical.value" class="history-banner">
+            <i class="pi pi-history" aria-hidden="true" />
+            <span>You're viewing a historical revision - read-only.</span>
+            <button type="button" @click="app.returnToCurrent">Return to current</button>
+          </div>
 
-        <FormulaBar
-          ref="formulaBarComponent"
-          v-model="formulaDraft"
-          :active-address="selectedCellAddress"
-          :readonly="app.gridReadOnly.value || !selectedCell"
-          :error-message="formulaError"
-          @begin-edit="formulaEditing = true"
-          @commit="commitFormulaBar"
-          @cancel="cancelFormulaEdit"
-          @request-help="openFormulaAssist('formulaBar', $event)"
-        />
-        <GridViewport
-          ref="gridViewportComponent"
-          :worksheet="activeWorksheet"
-          :formula-context="formulaContext"
-          :projection="projection"
-          :selected-cell-id="selectedCellId"
-          :selected-range="selectedRange"
-          :additional-ranges="additionalRanges"
-          :clipboard-range="clipboardSourceRange"
-          :highlighted-cell-ids="highlightedCellIds"
-          :readonly="app.gridReadOnly.value"
-          :locale="app.activeGrid.value.settings.locale"
-          @select="selectCell"
-          @select-range="selectRange"
-          @add-range="addRange"
-          @clear-additional-ranges="clearAdditionalRanges"
-          @set-additional-ranges="setAdditionalRanges"
-          @commit="commitCell"
-          @cell-context="openCellContextMenu"
-          @request-help="openFormulaAssist('inlineCell', $event)"
-          @edit-state="handleInlineEditState"
-          @clipboard-copy="handleGridClipboardCopy"
-          @clipboard-cut="handleGridClipboardCut"
-          @clipboard-paste="handleGridClipboardPaste"
-          @clipboard-clear="clearClipboardMarquee"
-          @resize-column="resizeColumn"
-          @resize-row="resizeRow"
-        />
-        <WorksheetTabs
-          :grid="app.activeGrid.value"
-          :active-worksheet-id="activeWorksheet.id"
-          :readonly="app.gridReadOnly.value"
-          @select="activeWorksheetId = $event"
-          @add="addWorksheet"
-          @rename="renameWorksheet"
-          @delete="deleteWorksheet"
-        />
-        <ContextMenu ref="cellContextMenu" :model="cellContextMenuItems" />
+          <FormulaBar
+            ref="formulaBarComponent"
+            v-model="formulaDraft"
+            :active-address="selectedCellAddress"
+            :readonly="app.gridReadOnly.value || !selectedCell"
+            :error-message="formulaError"
+            @begin-edit="formulaEditing = true"
+            @commit="commitFormulaBar"
+            @cancel="cancelFormulaEdit"
+            @request-help="openFormulaAssist('formulaBar', $event)"
+          />
+          <div class="workspace__grid">
+            <GridViewport
+              ref="gridViewportComponent"
+              :worksheet="activeWorksheet"
+              :formula-context="formulaContext"
+              :projection="projection"
+              :selected-cell-id="selectedCellId"
+              :selected-range="selectedRange"
+              :additional-ranges="additionalRanges"
+              :clipboard-range="clipboardSourceRange"
+              :highlighted-cell-ids="highlightedCellIds"
+              :selected-chart-id="chartDialog.selectedChartId.value"
+              :readonly="app.gridReadOnly.value"
+              :locale="app.activeGrid.value.settings.locale"
+              @select="selectCell"
+              @select-range="selectRange"
+              @add-range="addRange"
+              @clear-additional-ranges="clearAdditionalRanges"
+              @set-additional-ranges="setAdditionalRanges"
+              @commit="commitCell"
+              @clear-selection="clearSelectedCells"
+              @cell-context="openCellContextMenu"
+              @request-help="openFormulaAssist('inlineCell', $event)"
+              @edit-state="handleInlineEditState"
+              @clipboard-copy="handleGridClipboardCopy"
+              @clipboard-cut="handleGridClipboardCut"
+              @clipboard-paste="handleGridClipboardPaste"
+              @clipboard-clear="clearClipboardMarquee"
+              @resize-column="resizeColumn"
+              @resize-row="resizeRow"
+              @select-chart="selectChart"
+              @edit-chart="chartDialog.openChartProperties"
+              @chart-context="openChartContextMenu"
+              @resize-chart="chartDialog.setChartAnchor($event.chartId, $event.anchor)"
+              @delete-chart="deleteChart"
+            />
+          </div>
+          <WorksheetTabs
+            :grid="app.activeGrid.value"
+            :active-worksheet-id="activeWorksheet.id"
+            :readonly="app.gridReadOnly.value"
+            @select="activeWorksheetId = $event"
+            @add="addWorksheet"
+            @rename="renameWorksheet"
+            @delete="deleteWorksheet"
+          />
+          <ContextMenu ref="cellContextMenu" :model="cellContextMenuItems" />
+          <ContextMenu ref="chartContextMenu" :model="chartContextMenuItems" />
+        </div>
       </template>
       <section v-else class="empty-state">
         <h1>Collaborative spreadsheets</h1>
@@ -869,6 +1079,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
     <footer class="status-line">{{ statusLineText }}</footer>
 
     <CellFormatDialog :controller="formatDialog" :read-only="app.gridReadOnly.value" />
+    <ChartPropertiesDialog :controller="chartDialog" :read-only="app.gridReadOnly.value" />
 
     <ErrorDialog
       :controller="errorDialog"

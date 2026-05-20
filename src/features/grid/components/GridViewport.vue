@@ -38,6 +38,7 @@
  *   document before another operation runs.
  */
 import { computed, nextTick, ref, toRef, watch, type CSSProperties } from "vue";
+import ChartOverlay from "@/features/charts/components/ChartOverlay.vue";
 import { cssFontFamily, effectiveHorizontalAlign, indentPaddingRem, mergeCellStyle } from "@/features/grid/lib/cellFormatting";
 import { getCell, type GridProjection } from "@/features/grid/lib/gridProjection";
 import {
@@ -45,8 +46,10 @@ import {
   type CellBorder,
   type CellBorderSide,
   type CellId,
+  type ChartId,
   type ColumnId,
   type RowId,
+  type TwoCellAnchor,
   type Worksheet,
 } from "@/features/document/lib/teamgridDocument";
 import { useInlineCellEditor } from "@/features/grid/composables/useInlineCellEditor";
@@ -86,10 +89,12 @@ const props = withDefaults(defineProps<{
   additionalRanges?: CellSelectionRange[];
   clipboardRange: GridClipboardRange | null;
   highlightedCellIds: string[];
+  selectedChartId?: ChartId | null;
   readonly: boolean;
   locale: string;
 }>(), {
   additionalRanges: () => [],
+  selectedChartId: null,
 });
 
 const emit = defineEmits<{
@@ -108,11 +113,32 @@ const emit = defineEmits<{
   "clipboard-clear": [];
   "resize-column": [payload: { columnId: ColumnId; width: number }];
   "resize-row": [payload: { rowId: RowId; height: number }];
+  "select-chart": [chartId: ChartId | null];
+  "edit-chart": [chartId: ChartId];
+  "chart-context": [payload: { event: MouseEvent; chartId: ChartId }];
+  "resize-chart": [payload: { chartId: ChartId; anchor: TwoCellAnchor }];
+  "delete-chart": [chartId: ChartId];
+  /**
+   * Delete/Backspace pressed while more than one cell is selected.
+   * The parent is expected to clear every selected cell in a single
+   * `updateGrid` mutation.
+   */
+  "clear-selection": [];
 }>();
 
 const BORDER_SIDES: CellBorderSide[] = ["top", "right", "bottom", "left"];
 
 const gridViewport = ref<HTMLElement | null>(null);
+const gridHeaderStrip = ref<HTMLElement | null>(null);
+const gridBodyScroll = ref<HTMLElement | null>(null);
+
+function syncHeaderScroll() {
+  const header = gridHeaderStrip.value;
+  const body = gridBodyScroll.value;
+  if (header && body) {
+    header.scrollLeft = body.scrollLeft;
+  }
+}
 
 const worksheetRef = toRef(props, "worksheet");
 const formulaContextRef = computed(() => props.formulaContext ?? createSingleWorksheetFormulaContext(props.worksheet));
@@ -182,6 +208,7 @@ const {
   onClearAdditionalRanges: () => emit("clear-additional-ranges"),
   onSetAdditionalRanges: (ranges) => emit("set-additional-ranges", ranges),
   onCellContext: (payload) => emit("cell-context", payload),
+  onClearSelectedCells: () => emit("clear-selection"),
 });
 
 const {
@@ -407,16 +434,10 @@ export type { CellId };
 <!--
   Template structure
   ──────────────────
-  The grid is a single semantic <table>:
-    - <thead> holds the top-left corner spacer and the column headers
-      (each with a resize handle at the right edge).
-    - <tbody> is one <tr> per visible row. Each row starts with a
-      sticky <th> row header (with a row-resize handle) and one <td>
-      per visible column.
-    - The active cell either renders an `<input class="grid-cell__editor">`
-      or a `<span class="grid-cell__value">`, never both.
-  The viewport <div> owns the native clipboard listeners so paste/copy
-  shortcuts work no matter which cell has focus.
+  Column letters sit in a fixed header strip; only the body region scrolls
+  vertically. Horizontal scroll on the body is mirrored to the header strip
+  so A/B/C stay aligned with the data columns. Row numbers live in the body
+  table and stay sticky on the left while scrolling sideways.
 -->
 <template>
   <div
@@ -428,124 +449,192 @@ export type { CellId };
     @paste="handleViewportPaste"
     @keydown="handleViewportKeydown"
   >
-    <table class="grid-table" aria-label="Spreadsheet grid">
-      <thead>
-        <tr>
-          <th class="grid-corner" scope="col" />
-          <th
+    <div ref="gridHeaderStrip" class="grid-viewport__headers">
+      <table class="grid-table grid-table--headers" aria-hidden="true">
+        <colgroup>
+          <col class="grid-col-row-header">
+          <col
             v-for="column in projection.columns"
-            :key="column.id"
-            class="grid-column-header"
-            :class="{ 'grid-axis-header--selected': isWholeColumnSelected(column.id) }"
-            scope="col"
+            :key="`header-col-${column.id}`"
             :style="columnHeaderStyle(column)"
-            @mousedown.prevent="selectWholeColumn($event, column.id)"
           >
-            <span class="grid-axis-header__label">{{ column.label }}</span>
-            <span
-              v-if="!readonly"
-              class="grid-resize-handle grid-resize-handle--column"
-              role="separator"
-              :aria-label="`Resize column ${column.label}`"
-              aria-orientation="vertical"
-              @pointerdown="startColumnResize($event, column.id, columnPixelWidth(column))"
-            />
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="row in projection.rows" :key="row.id" :style="rowStyle(row)">
-          <th
-            class="grid-row-header"
-            :class="{ 'grid-axis-header--selected': isWholeRowSelected(row.id) }"
-            scope="row"
-            @mousedown.prevent="selectWholeRow($event, row.id)"
-          >
-            <span class="grid-axis-header__label">{{ row.label }}</span>
-            <span
-              v-if="!readonly"
-              class="grid-resize-handle grid-resize-handle--row"
-              role="separator"
-              :aria-label="`Resize row ${row.label}`"
-              aria-orientation="horizontal"
-              @pointerdown="startRowResize($event, row.id, rowPixelHeight(row))"
-            />
-          </th>
-          <td
-            v-for="column in projection.columns"
-            :key="column.id"
-            class="grid-cell"
-            :class="{
-              'grid-cell--selected': getCell(worksheet, row.id, column.id).id === selectedCellId,
-              'grid-cell--range-selected': selectedRangeIds.has(getCell(worksheet, row.id, column.id).id),
-              'grid-cell--highlighted': highlighted.has(getCell(worksheet, row.id, column.id).id),
-              'grid-cell--formula': Boolean(getCell(worksheet, row.id, column.id).formula),
-              'grid-cell--clipboard-source': isInClipboardRange(row.index, column.index),
-            }"
-            :style="cellStyle(getCell(worksheet, row.id, column.id))"
-            :data-cell-id="getCell(worksheet, row.id, column.id).id"
-            tabindex="0"
-            @mousedown.self.prevent="startRangeSelection($event, row.id, column.id)"
-            @contextmenu.prevent="openCellContextMenu($event, row.id, column.id)"
-            @mouseenter="extendRangeSelection(row.id, column.id)"
-            @dblclick="startEditing(row.id, column.id)"
-            @keydown="handleEditKey($event, row.id, column.id)"
-          >
-            <span
-              v-for="side in BORDER_SIDES"
-              :key="side"
-              class="grid-cell__border-overlay"
-              :class="`grid-cell__border-overlay--${side}`"
-              :style="cellBorderOverlayStyle(getCell(worksheet, row.id, column.id), side)"
-              aria-hidden="true"
-            />
-            <textarea
-              v-if="editingCellId === getCell(worksheet, row.id, column.id).id"
-              ref="editorInputEl"
-              v-model="editDraft"
-              class="grid-cell__editor"
-              autofocus
-              rows="1"
-              wrap="soft"
-              spellcheck="false"
-              @input="onEditorInput($event, getCell(worksheet, row.id, column.id))"
-              @keydown="handleEditorKeydown($event, getCell(worksheet, row.id, column.id))"
-              @blur="commitEditFromBlur(getCell(worksheet, row.id, column.id))"
-            />
-            <span
-              v-else
-              class="grid-cell__value"
-              :style="cellDisplayStyle(getCell(worksheet, row.id, column.id))"
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="grid-corner" scope="col" />
+            <th
+              v-for="column in projection.columns"
+              :key="column.id"
+              class="grid-column-header"
+              :class="{ 'grid-axis-header--selected': isWholeColumnSelected(column.id) }"
+              scope="col"
+              @mousedown.prevent="selectWholeColumn($event, column.id)"
             >
-              {{ displayCell(getCell(worksheet, row.id, column.id)) }}
-            </span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+              <span class="grid-axis-header__label">{{ column.label }}</span>
+              <span
+                v-if="!readonly"
+                class="grid-resize-handle grid-resize-handle--column"
+                role="separator"
+                :aria-label="`Resize column ${column.label}`"
+                aria-orientation="vertical"
+                @pointerdown="startColumnResize($event, column.id, columnPixelWidth(column))"
+              />
+            </th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+
+    <div ref="gridBodyScroll" class="grid-viewport__body" @scroll="syncHeaderScroll">
+      <div class="grid-viewport__body-content">
+        <table class="grid-table grid-table--body" aria-label="Spreadsheet grid">
+          <colgroup>
+            <col class="grid-col-row-header">
+            <col
+              v-for="column in projection.columns"
+              :key="`body-col-${column.id}`"
+              :style="columnHeaderStyle(column)"
+            >
+          </colgroup>
+          <tbody>
+            <tr v-for="row in projection.rows" :key="row.id" :style="rowStyle(row)">
+              <th
+                class="grid-row-header"
+                :class="{ 'grid-axis-header--selected': isWholeRowSelected(row.id) }"
+                scope="row"
+                @mousedown.prevent="selectWholeRow($event, row.id)"
+              >
+                <span class="grid-axis-header__label">{{ row.label }}</span>
+                <span
+                  v-if="!readonly"
+                  class="grid-resize-handle grid-resize-handle--row"
+                  role="separator"
+                  :aria-label="`Resize row ${row.label}`"
+                  aria-orientation="horizontal"
+                  @pointerdown="startRowResize($event, row.id, rowPixelHeight(row))"
+                />
+              </th>
+              <td
+                v-for="column in projection.columns"
+                :key="column.id"
+                class="grid-cell"
+                :class="{
+                  'grid-cell--selected': getCell(worksheet, row.id, column.id).id === selectedCellId,
+                  'grid-cell--range-selected': selectedRangeIds.has(getCell(worksheet, row.id, column.id).id),
+                  'grid-cell--highlighted': highlighted.has(getCell(worksheet, row.id, column.id).id),
+                  'grid-cell--formula': Boolean(getCell(worksheet, row.id, column.id).formula),
+                  'grid-cell--clipboard-source': isInClipboardRange(row.index, column.index),
+                }"
+                :style="cellStyle(getCell(worksheet, row.id, column.id))"
+                :data-cell-id="getCell(worksheet, row.id, column.id).id"
+                tabindex="0"
+                @mousedown.self.prevent="startRangeSelection($event, row.id, column.id)"
+                @contextmenu.prevent="openCellContextMenu($event, row.id, column.id)"
+                @mouseenter="extendRangeSelection(row.id, column.id)"
+                @dblclick="startEditing(row.id, column.id)"
+                @keydown="handleEditKey($event, row.id, column.id)"
+              >
+                <span
+                  v-for="side in BORDER_SIDES"
+                  :key="side"
+                  class="grid-cell__border-overlay"
+                  :class="`grid-cell__border-overlay--${side}`"
+                  :style="cellBorderOverlayStyle(getCell(worksheet, row.id, column.id), side)"
+                  aria-hidden="true"
+                />
+                <textarea
+                  v-if="editingCellId === getCell(worksheet, row.id, column.id).id"
+                  ref="editorInputEl"
+                  v-model="editDraft"
+                  class="grid-cell__editor"
+                  autofocus
+                  rows="1"
+                  wrap="soft"
+                  spellcheck="false"
+                  @input="onEditorInput($event, getCell(worksheet, row.id, column.id))"
+                  @keydown="handleEditorKeydown($event, getCell(worksheet, row.id, column.id))"
+                  @blur="commitEditFromBlur(getCell(worksheet, row.id, column.id))"
+                />
+                <span
+                  v-else
+                  class="grid-cell__value"
+                  :style="cellDisplayStyle(getCell(worksheet, row.id, column.id))"
+                >
+                  {{ displayCell(getCell(worksheet, row.id, column.id)) }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <ChartOverlay
+          v-if="formulaContextRef"
+          :worksheet="worksheet"
+          :projection="projection"
+          :formula-context="formulaContextRef"
+          :selected-chart-id="selectedChartId"
+          :readonly="readonly"
+          layout-origin="body"
+          @select="emit('select-chart', $event)"
+          @edit="emit('edit-chart', $event)"
+          @chart-context="emit('chart-context', $event)"
+          @resize-chart="emit('resize-chart', $event)"
+          @delete-chart="emit('delete-chart', $event)"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .grid-viewport {
-  overflow: auto;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.grid-viewport__headers {
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-bottom: 1px solid var(--grid-border);
+}
+
+.grid-viewport__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.grid-viewport__body-content {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
 }
 
 .grid-table {
-  border-collapse: collapse;
+  /*
+   * `border-collapse: collapse` breaks `position: sticky` on <th>/<td> in
+   * most browsers. Separate borders keep the Excel-style grid lines while
+   * row numbers can stick on horizontal scroll inside the body region.
+   */
+  border-collapse: separate;
+  border-spacing: 0;
   width: max-content;
   min-width: 100%;
   table-layout: fixed;
   font-size: 0.92rem;
 }
 
+.grid-col-row-header {
+  width: 3rem;
+}
+
 .grid-corner,
 .grid-column-header,
 .grid-row-header {
-  position: sticky;
-  z-index: 2;
   border: 1px solid var(--grid-border);
   background: var(--grid-header-bg);
   color: var(--muted);
@@ -553,23 +642,15 @@ export type { CellId };
   user-select: none;
 }
 
-.grid-corner {
-  top: 0;
-  left: 0;
-  z-index: 3;
-  width: 3rem;
-  min-width: 3rem;
-}
-
 .grid-column-header {
-  top: 0;
+  position: relative;
   height: 2rem;
 }
 
 .grid-row-header {
+  position: sticky;
   left: 0;
-  width: 3rem;
-  min-width: 3rem;
+  z-index: 3;
 }
 
 .grid-column-header,

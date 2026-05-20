@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 
+import { importChartsFromXlsx } from "@/features/xlsx/lib/chartImporter";
 import {
   excelSerialToIsoDate,
   formulaResultToCellValue,
@@ -10,10 +11,13 @@ import {
 } from "@/features/grid/lib/cellFormatting";
 import { createFormulaContext, evaluateFormula, parseFormula, renderFormulaSource } from "@/features/formulas/lib";
 import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
+import { withoutUndefinedProperties } from "@/shared/lib/withoutUndefinedProperties";
 import {
   createCellId,
   createId,
   createTeamGridDocument,
+  DEFAULT_WORKSHEET_COLUMNS,
+  DEFAULT_WORKSHEET_ROWS,
   type Cell,
   type CellBorder,
   type CellBorderSide,
@@ -31,8 +35,6 @@ import {
   type Worksheet,
 } from "@/features/document/lib/teamgridDocument";
 
-const DEFAULT_IMPORTED_ROWS = 24;
-const DEFAULT_IMPORTED_COLUMNS = 12;
 const EXCEL_INDEXED_COLORS = [
   "000000", "ffffff", "ff0000", "00ff00", "0000ff", "ffff00", "ff00ff", "00ffff",
   "000000", "ffffff", "ff0000", "00ff00", "0000ff", "ffff00", "ff00ff", "00ffff",
@@ -65,7 +67,9 @@ type ExcelPatternFill = ExcelJS.Fill & {
 export async function importTeamGridWorkbookBuffer(buffer: ArrayBuffer, title = "Imported spreadsheet") {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
-  return createTeamGridDocumentFromExcelWorkbook(workbook, title);
+  const envelope = createTeamGridDocumentFromExcelWorkbook(workbook, title);
+  importChartsFromXlsx(buffer, envelope.teamgrid.workbook);
+  return withoutUndefinedProperties(envelope);
 }
 
 export function createTeamGridDocumentFromExcelWorkbook(workbook: ExcelJS.Workbook, title = "Imported spreadsheet"): TeamGridDocumentEnvelope {
@@ -82,8 +86,8 @@ export function createTeamGridDocumentFromExcelWorkbook(workbook: ExcelJS.Workbo
 
 function importWorksheet(excelWorksheet: ExcelJS.Worksheet): Worksheet {
   const worksheetId = createId("sheet");
-  const maxRow = Math.max(DEFAULT_IMPORTED_ROWS, excelWorksheet.actualRowCount || excelWorksheet.rowCount || 1);
-  const maxColumn = Math.max(DEFAULT_IMPORTED_COLUMNS, excelWorksheet.actualColumnCount || excelWorksheet.columnCount || 1);
+  const maxRow = Math.max(DEFAULT_WORKSHEET_ROWS, excelWorksheet.actualRowCount || excelWorksheet.rowCount || 1);
+  const maxColumn = Math.max(DEFAULT_WORKSHEET_COLUMNS, excelWorksheet.actualColumnCount || excelWorksheet.columnCount || 1);
   const rowOrder = Array.from({ length: maxRow }, () => createId("row"));
   const columnOrder = Array.from({ length: maxColumn }, () => createId("col"));
   const rowsById = Object.fromEntries(rowOrder.map((id, index) => [id, importRowMeta(excelWorksheet.getRow(index + 1), id)] satisfies [RowId, RowMeta]));
@@ -96,6 +100,8 @@ function importWorksheet(excelWorksheet: ExcelJS.Worksheet): Worksheet {
     rowsById,
     columnsById,
     cellsById: {},
+    chartOrder: [],
+    chartsById: {},
   };
 
   for (let rowIndex = 1; rowIndex <= maxRow; rowIndex += 1) {
@@ -419,16 +425,3 @@ function pointsToPixels(points: number) {
   return Math.max(1, Math.round(points / 0.75));
 }
 
-function withoutUndefinedProperties<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map(withoutUndefinedProperties) as T;
-  }
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).flatMap(([key, nested]) => (
-        nested === undefined ? [] : [[key, withoutUndefinedProperties(nested)]]
-      )),
-    ) as T;
-  }
-  return value;
-}
