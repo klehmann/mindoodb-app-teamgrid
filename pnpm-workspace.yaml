@@ -13,3 +13,10 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+
+# First-party packages are published by us during release workflows, so they
+# do not need pnpm's minimum release age delay in Cloudflare Pages builds.
+minimumReleaseAgeExclude:
+  - mindoodb
+  - mindoodb-app-sdk
+  - mindoodb-view-language
