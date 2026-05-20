@@ -15,13 +15,16 @@ afterEach(() => {
 function makeController(documents: OpenDocumentRow[]) {
   return {
     openDialogVisible: ref(true),
+    openDialogMode: ref<"open" | "template">("open"),
     selectedOpenDocId: ref(""),
+    selectedOpenSpreadsheetType: ref("noTemplates"),
     selectedOpenCategoryKey: ref("__all__"),
     openCategoryNodes: ref<OpenCategoryNode[]>([
       { key: "__all__", label: "All", count: documents.length, children: [] } as OpenCategoryNode,
     ]),
     openDialogDocuments: ref(documents),
     handleOpenDatabaseChange: vi.fn(),
+    handleOpenSpreadsheetTypeChange: vi.fn(),
     selectOpenCategory: vi.fn(),
     openSelectedDocument: vi.fn(),
     disposeOpenNavigator: vi.fn(),
@@ -83,5 +86,26 @@ describe("OpenSpreadsheetDialog", () => {
 
     expect(document.body.textContent).toContain("No spreadsheets in this category.");
     expect(findButtonByLabel("Open")?.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("shows template mode labels when creating from a template", async () => {
+    const controller = makeController([
+      { id: "template-1", key: "template-1", title: "Budget template", detail: "Templates", tags: [] } as OpenDocumentRow,
+    ]);
+    (controller as unknown as { openDialogMode: { value: "open" | "template" } }).openDialogMode.value = "template";
+    (controller as unknown as { selectedOpenDocId: { value: string } }).selectedOpenDocId.value = "template-1";
+    mount(OpenSpreadsheetDialog, {
+      props: {
+        controller,
+        selectedDatabaseId: ref("db-a"),
+        readableDatabases: ref([]),
+      },
+      global: { plugins: [PrimeVue] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(document.body.textContent).toContain("New from template");
+    expect(findButtonByLabel("Create")?.hasAttribute("disabled")).toBe(false);
   });
 });

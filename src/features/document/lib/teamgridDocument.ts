@@ -2,9 +2,19 @@ import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
 
 export const TEAMGRID_DOCUMENT_KIND = "mindoodb.teamgrid";
 export const TEAMGRID_DOCUMENT_FORM = "teamgrid";
-export const TEAMGRID_SCHEMA_VERSION = 2;
+export const TEAMGRID_SCHEMA_VERSION = 3;
 export const DEFAULT_WORKSHEET_ROWS = 100;
 export const DEFAULT_WORKSHEET_COLUMNS = 12;
+export const DEFAULT_TEAMGRID_LOCALE = "en-US";
+
+const TEAMGRID_BASE_LOCALE_DEFAULTS: Record<string, string> = {
+  en: "en-US",
+  de: "de-DE",
+  fr: "fr-FR",
+  it: "it-IT",
+  es: "es-ES",
+  nl: "nl-NL",
+};
 
 export type WorkbookId = string;
 export type WorksheetId = string;
@@ -32,6 +42,7 @@ export type CellBorderSide = "top" | "right" | "bottom" | "left";
 export interface TeamGridDocumentEnvelope {
   subject: string;
   tags: string[];
+  istemplate: boolean;
   form: typeof TEAMGRID_DOCUMENT_FORM;
   kind: typeof TEAMGRID_DOCUMENT_KIND;
   teamgrid: TeamGridDocumentV1;
@@ -71,7 +82,19 @@ export interface Worksheet {
   cellsById: Record<CellId, Cell>;
   chartOrder: ChartId[];
   chartsById: Record<ChartId, Chart>;
+  viewBinding?: ViewSheetBinding;
   deletedAt?: string;
+}
+
+export interface ViewSheetBinding {
+  kind: "mindoodbView";
+  viewId: string;
+  viewTitle: string;
+  showDocuments: boolean;
+  showCategories: boolean;
+  rootCategoryPath: string[];
+  lastRefreshedAt?: string;
+  lastViewCursor?: string | null;
 }
 
 export type ChartType = "column" | "bar" | "line" | "pie";
@@ -237,7 +260,12 @@ export interface NamedExpression {
   reference: FormulaReference;
 }
 
-export function createTeamGridDocument(title = "Untitled spreadsheet", tags: string[] = []): TeamGridDocumentEnvelope {
+export function createTeamGridDocument(
+  title = "Untitled spreadsheet",
+  tags: string[] = [],
+  locale = defaultTeamGridLocale(),
+  isTemplate = false,
+): TeamGridDocumentEnvelope {
   const worksheetId = createId("sheet");
   const rowOrder = Array.from({ length: DEFAULT_WORKSHEET_ROWS }, () => createId("row"));
   const columnOrder = Array.from({ length: DEFAULT_WORKSHEET_COLUMNS }, () => createId("col"));
@@ -245,6 +273,7 @@ export function createTeamGridDocument(title = "Untitled spreadsheet", tags: str
   return {
     subject: title,
     tags: normalizeTags(tags),
+    istemplate: Boolean(isTemplate),
     form: TEAMGRID_DOCUMENT_FORM,
     kind: TEAMGRID_DOCUMENT_KIND,
     teamgrid: {
@@ -268,10 +297,36 @@ export function createTeamGridDocument(title = "Untitled spreadsheet", tags: str
       },
       namedExpressionsById: {},
       settings: {
-        locale: "en-US",
+        locale: normalizeTeamGridLocale(locale),
       },
     },
   };
+}
+
+export function defaultTeamGridLocale() {
+  const candidate = typeof navigator !== "undefined"
+    ? (navigator.languages?.find(Boolean) ?? navigator.language)
+    : undefined;
+  return normalizeTeamGridLocale(candidate);
+}
+
+export function normalizeTeamGridLocale(locale: unknown, fallback = DEFAULT_TEAMGRID_LOCALE) {
+  if (typeof locale !== "string") {
+    return fallback;
+  }
+  const trimmed = locale.trim().replace(/_/g, "-");
+  if (!trimmed) {
+    return fallback;
+  }
+  try {
+    const canonical = Intl.getCanonicalLocales(trimmed)[0];
+    if (!canonical) {
+      return fallback;
+    }
+    return TEAMGRID_BASE_LOCALE_DEFAULTS[canonical.toLowerCase()] ?? canonical;
+  } catch {
+    return fallback;
+  }
 }
 
 export function migrateTeamGridDocument(data: Record<string, unknown> | null | undefined): TeamGridDocumentEnvelope {
@@ -279,12 +334,13 @@ export function migrateTeamGridDocument(data: Record<string, unknown> | null | u
     return {
       subject: readSubject(data) || "Untitled spreadsheet",
       tags: readTags(data),
+      istemplate: readIsTemplate(data),
       form: TEAMGRID_DOCUMENT_FORM,
       kind: TEAMGRID_DOCUMENT_KIND,
       teamgrid: cloneTeamGridDocument(data.teamgrid),
     };
   }
-  return createTeamGridDocument(readSubject(data) || "Untitled spreadsheet", readTags(data));
+  return createTeamGridDocument(readSubject(data) || "Untitled spreadsheet", readTags(data), undefined, readIsTemplate(data));
 }
 
 export function isTeamGridEnvelope(data: unknown): data is TeamGridDocumentEnvelope {
@@ -334,14 +390,37 @@ export function createEmptyCell(rowId: RowId, columnId: ColumnId): Cell {
 export function cloneTeamGridDocument(document: TeamGridDocumentV1): TeamGridDocumentV1 {
   const clone = JSON.parse(JSON.stringify(document)) as TeamGridDocumentV1 & {
     workbook: Workbook & { title?: string };
+    settings?: Partial<TeamGridSettings>;
   };
   delete clone.workbook.title;
   clone.schemaVersion = TEAMGRID_SCHEMA_VERSION;
+  clone.settings = {
+    ...clone.settings,
+    locale: normalizeTeamGridLocale(clone.settings?.locale),
+  };
   for (const worksheet of Object.values(clone.workbook.worksheetsById)) {
     worksheet.chartOrder ??= [];
     worksheet.chartsById ??= {};
+    if (worksheet.viewBinding) {
+      worksheet.viewBinding = normalizeViewSheetBinding(worksheet.viewBinding);
+    }
   }
   return clone;
+}
+
+function normalizeViewSheetBinding(binding: ViewSheetBinding): ViewSheetBinding {
+  return {
+    kind: "mindoodbView",
+    viewId: String(binding.viewId ?? ""),
+    viewTitle: String(binding.viewTitle ?? binding.viewId ?? "View"),
+    showDocuments: binding.showDocuments !== false,
+    showCategories: Boolean(binding.showCategories),
+    rootCategoryPath: Array.isArray(binding.rootCategoryPath)
+      ? binding.rootCategoryPath.map((part) => String(part)).filter((part) => part.length > 0)
+      : [],
+    lastRefreshedAt: typeof binding.lastRefreshedAt === "string" ? binding.lastRefreshedAt : undefined,
+    lastViewCursor: binding.lastViewCursor == null ? null : String(binding.lastViewCursor),
+  };
 }
 
 export function readSubject(data: Record<string, unknown> | null | undefined) {
@@ -350,6 +429,10 @@ export function readSubject(data: Record<string, unknown> | null | undefined) {
 
 export function readTags(data: Record<string, unknown> | null | undefined) {
   return normalizeTags(data?.tags);
+}
+
+export function readIsTemplate(data: Record<string, unknown> | null | undefined) {
+  return data?.istemplate === true;
 }
 
 /**

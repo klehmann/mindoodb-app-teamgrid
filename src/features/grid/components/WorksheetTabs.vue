@@ -22,8 +22,10 @@
  *
  * Emits:
  * - `select(id)`: user clicked a tab.
- * - `add()`: user clicked the plus button.
+ * - `add()`: user picked Add Sheet from the plus menu.
+ * - `addView()`: user picked Add Virtual View Sheet from the plus menu.
  * - `rename(id)`: user requested a rename for a tab.
+ * - `configureView(id)`: user requested View Sheet settings.
  * - `delete(id)`: user requested deletion of a tab.
  */
 import { computed, ref } from "vue";
@@ -41,7 +43,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [worksheetId: WorksheetId];
   add: [];
+  "add-view": [];
   rename: [worksheetId: WorksheetId];
+  "configure-view": [worksheetId: WorksheetId];
   delete: [worksheetId: WorksheetId];
 }>();
 
@@ -52,6 +56,7 @@ const visibleWorksheetIds = computed(() =>
 );
 
 const contextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
+const addMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
 const contextWorksheetId = ref<WorksheetId | null>(null);
 
 const contextMenuItems = computed<MenuItem[]>(() => {
@@ -69,6 +74,16 @@ const contextMenuItems = computed<MenuItem[]>(() => {
       },
     },
     {
+      label: "View Sheet Settings...",
+      icon: "pi pi-table",
+      disabled: props.readonly || targetId === null || !props.grid.workbook.worksheetsById[targetId]?.viewBinding,
+      command: () => {
+        if (targetId !== null) {
+          emit("configure-view", targetId);
+        }
+      },
+    },
+    {
       label: "Delete",
       icon: "pi pi-trash",
       disabled: props.readonly || !canDelete,
@@ -81,9 +96,28 @@ const contextMenuItems = computed<MenuItem[]>(() => {
   ];
 });
 
+const addMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: "Add Sheet",
+    icon: "pi pi-plus",
+    disabled: props.readonly,
+    command: () => emit("add"),
+  },
+  {
+    label: "Add Virtual View Sheet",
+    icon: "pi pi-table",
+    disabled: props.readonly,
+    command: () => emit("add-view"),
+  },
+]);
+
 function openContextMenu(event: MouseEvent, worksheetId: WorksheetId) {
   contextWorksheetId.value = worksheetId;
   contextMenu.value?.show(event);
+}
+
+function openAddMenu(event: MouseEvent) {
+  addMenu.value?.show(event);
 }
 </script>
 
@@ -112,8 +146,17 @@ function openContextMenu(event: MouseEvent, worksheetId: WorksheetId) {
         x
       </span>
     </button>
-    <Button icon="pi pi-plus" text rounded size="small" aria-label="Add worksheet" :disabled="readonly" @click="emit('add')" />
+    <Button
+      icon="pi pi-plus"
+      text
+      rounded
+      size="small"
+      aria-label="Add worksheet"
+      :disabled="readonly"
+      @click="openAddMenu"
+    />
     <ContextMenu ref="contextMenu" :model="contextMenuItems" />
+    <ContextMenu ref="addMenu" :model="addMenuItems" />
   </nav>
 </template>
 

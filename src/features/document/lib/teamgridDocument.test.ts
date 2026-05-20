@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createTeamGridDocument,
   DEFAULT_WORKSHEET_COLUMNS,
@@ -6,16 +6,23 @@ import {
   getFirstVisibleWorksheet,
   isTeamGridEnvelope,
   migrateTeamGridDocument,
+  normalizeTeamGridLocale,
   normalizeTags,
   readTags,
+  readIsTemplate,
 } from "@/features/document/lib/teamgridDocument";
 
 describe("teamgrid document schema", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("creates one workbook with one visible worksheet tab", () => {
     const envelope = createTeamGridDocument("Planning");
 
     expect(envelope.subject).toBe("Planning");
     expect(envelope.tags).toEqual([]);
+    expect(envelope.istemplate).toBe(false);
     expect(envelope.form).toBe("teamgrid");
     expect(isTeamGridEnvelope(envelope)).toBe(true);
     expect(envelope.teamgrid.workbook.worksheetOrder).toHaveLength(1);
@@ -28,12 +35,41 @@ describe("teamgrid document schema", () => {
     expect(worksheet?.chartsById).toEqual({});
   });
 
+  it("initializes new documents from the browser locale when available", () => {
+    vi.stubGlobal("navigator", {
+      languages: ["de-DE", "en-US"],
+      language: "de-DE",
+    });
+
+    expect(createTeamGridDocument().teamgrid.settings.locale).toBe("de-DE");
+  });
+
+  it("normalizes browser base language locales to supported regional choices", () => {
+    vi.stubGlobal("navigator", {
+      languages: ["de"],
+      language: "de",
+    });
+
+    expect(createTeamGridDocument().teamgrid.settings.locale).toBe("de-DE");
+    expect(normalizeTeamGridLocale("de_DE")).toBe("de-DE");
+    expect(normalizeTeamGridLocale("fr")).toBe("fr-FR");
+  });
+
   it("migrates unknown document data into a Teamgrid envelope", () => {
     const migrated = migrateTeamGridDocument({ subject: "Legacy title" });
 
     expect(migrated.subject).toBe("Legacy title");
     expect(migrated.tags).toEqual([]);
+    expect(migrated.istemplate).toBe(false);
     expect(isTeamGridEnvelope(migrated)).toBe(true);
+  });
+
+  it("preserves the top-level template flag during migration", () => {
+    const envelope = createTeamGridDocument("Planning", [], "en-US", true);
+
+    expect(readIsTemplate(envelope as unknown as Record<string, unknown>)).toBe(true);
+    expect(migrateTeamGridDocument(envelope as unknown as Record<string, unknown>).istemplate).toBe(true);
+    expect(migrateTeamGridDocument({ subject: "Template", istemplate: true }).istemplate).toBe(true);
   });
 
   it("normalizes top-level tags and drops duplicate workbook titles during migration", () => {

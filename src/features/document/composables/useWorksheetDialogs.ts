@@ -14,6 +14,10 @@ import {
   type WorksheetId,
 } from "@/features/document/lib/teamgridDocument";
 import type { TeamGridAppApi } from "@/features/document/composables/useTeamGridDocument";
+import {
+  materializeViewSheet,
+  type ViewSheetSettings,
+} from "@/features/view-sheets/lib/viewSheetMaterialization";
 
 export interface UseWorksheetDialogsOptions {
   app: TeamGridAppApi;
@@ -26,6 +30,15 @@ export function useWorksheetDialogs(options: UseWorksheetDialogsOptions) {
   const renameDialogVisible = ref(false);
   const renameTargetId = ref<WorksheetId | null>(null);
   const renameDraft = ref("");
+  const viewSheetDialogVisible = ref(false);
+  const viewSheetTargetId = ref<WorksheetId | null>(null);
+  const viewSheetNameDraft = ref("");
+  const viewSheetViewIdDraft = ref("");
+  const viewSheetShowDocuments = ref(true);
+  const viewSheetShowCategories = ref(true);
+  const viewSheetRootCategoryPathDraft = ref("");
+  const viewSheetErrorMessage = ref<string | null>(null);
+  const viewSheetSaving = ref(false);
 
   /**
    * Append a new worksheet to the workbook seeded with the standard blank
@@ -119,13 +132,120 @@ export function useWorksheetDialogs(options: UseWorksheetDialogsOptions) {
     });
   }
 
+  function openCreateViewSheetDialog() {
+    if (app.gridReadOnly.value) {
+      return;
+    }
+    const firstView = app.configuredViews.value[0] ?? null;
+    viewSheetTargetId.value = null;
+    viewSheetViewIdDraft.value = firstView?.id ?? "";
+    viewSheetNameDraft.value = "";
+    viewSheetShowDocuments.value = true;
+    viewSheetShowCategories.value = true;
+    viewSheetRootCategoryPathDraft.value = "";
+    viewSheetErrorMessage.value = app.configuredViews.value.length === 0
+      ? "No configured MindooDB views are available to this app."
+      : null;
+    viewSheetDialogVisible.value = true;
+  }
+
+  function openViewSheetSettings(worksheetId: WorksheetId) {
+    if (app.gridReadOnly.value) {
+      return;
+    }
+    const worksheet = app.activeGrid.value?.workbook.worksheetsById[worksheetId];
+    const binding = worksheet?.viewBinding;
+    if (!worksheet || !binding) {
+      return;
+    }
+    viewSheetTargetId.value = worksheetId;
+    viewSheetNameDraft.value = worksheet.title;
+    viewSheetViewIdDraft.value = binding.viewId;
+    viewSheetShowDocuments.value = binding.showDocuments;
+    viewSheetShowCategories.value = binding.showCategories;
+    viewSheetRootCategoryPathDraft.value = binding.rootCategoryPath.join("\\");
+    viewSheetErrorMessage.value = null;
+    viewSheetDialogVisible.value = true;
+  }
+
+  async function applyViewSheetSettings() {
+    const settings = readViewSheetSettings();
+    const view = app.configuredViews.value.find((candidate) => candidate.id === settings.viewId);
+    if (!settings.title.trim()) {
+      viewSheetErrorMessage.value = "Enter a sheet name.";
+      return;
+    }
+    if (!view) {
+      viewSheetErrorMessage.value = "Select a configured view.";
+      return;
+    }
+    if (!settings.showDocuments && !settings.showCategories) {
+      viewSheetErrorMessage.value = "Show documents, categories, or both.";
+      return;
+    }
+
+    viewSheetSaving.value = true;
+    viewSheetErrorMessage.value = null;
+    try {
+      const targetId = viewSheetTargetId.value;
+      const existingWorksheet = targetId ? app.activeGrid.value?.workbook.worksheetsById[targetId] ?? null : null;
+      const worksheet = await materializeViewSheet({
+        settings,
+        view,
+        existingWorksheet,
+        openViewNavigator: app.openViewNavigator,
+      });
+      app.updateGrid((grid) => {
+        if (targetId) {
+          grid.workbook.worksheetsById[worksheet.id] = worksheet;
+          activeWorksheetId.value = worksheet.id;
+          return [{ type: "replaceWorksheet", worksheet }];
+        }
+        grid.workbook.worksheetOrder.push(worksheet.id);
+        grid.workbook.worksheetsById[worksheet.id] = worksheet;
+        activeWorksheetId.value = worksheet.id;
+        return [{ type: "addWorksheet", worksheet, index: grid.workbook.worksheetOrder.length - 1 }];
+      });
+      app.status.value = `Refreshed ${worksheet.title}.`;
+      viewSheetDialogVisible.value = false;
+      viewSheetTargetId.value = null;
+    } catch (error) {
+      viewSheetErrorMessage.value = error instanceof Error ? error.message : String(error);
+    } finally {
+      viewSheetSaving.value = false;
+    }
+  }
+
+  function readViewSheetSettings(): ViewSheetSettings {
+    return {
+      title: viewSheetNameDraft.value,
+      viewId: viewSheetViewIdDraft.value,
+      showDocuments: viewSheetShowDocuments.value,
+      showCategories: viewSheetShowCategories.value,
+      rootCategoryPathInput: viewSheetRootCategoryPathDraft.value,
+    };
+  }
+
   return {
     renameDialogVisible,
     renameTargetId,
     renameDraft,
+    viewSheetDialogVisible,
+    viewSheetTargetId,
+    viewSheetNameDraft,
+    viewSheetViewIdDraft,
+    viewSheetShowDocuments,
+    viewSheetShowCategories,
+    viewSheetRootCategoryPathDraft,
+    viewSheetErrorMessage,
+    viewSheetSaving,
+    configuredViews: app.configuredViews,
     addWorksheet,
     renameWorksheet,
     applyWorksheetRename,
     deleteWorksheet,
+    openCreateViewSheetDialog,
+    openViewSheetSettings,
+    applyViewSheetSettings,
   };
 }

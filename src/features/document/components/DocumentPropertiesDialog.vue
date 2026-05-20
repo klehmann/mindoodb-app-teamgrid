@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * Title + tags editor for the current spreadsheet document.
+ * Title, tags, and locale editor for the current spreadsheet document.
  *
- * Title and tag edits go through `useDocumentPropertiesDialog`, which
- * batches them into a single `setDocumentProperties` operation so they
- * participate in the granular-save machinery rather than going around it.
+ * Edits go through `useDocumentPropertiesDialog`, which batches them into a
+ * single `setDocumentProperties` operation so they participate in the
+ * granular-save machinery rather than going around it.
  */
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
@@ -19,6 +19,9 @@ const {
   propertiesDialogVisible,
   propertiesTitleDraft,
   propertiesTagsDraft,
+  propertiesIsTemplateDraft,
+  propertiesLocaleDraft,
+  propertiesLocaleOptions,
   applyDocumentProperties,
   resetPropertiesDraft,
 } = props.controller;
@@ -46,6 +49,16 @@ function cancel() {
         <textarea v-model="propertiesTagsDraft" class="native-input native-input--textarea" rows="6" placeholder="Work\Planning&#10;Finance" />
       </label>
       <p class="properties-dialog__hint">Enter one tag per line. Use a backslash to create hierarchy, for example <code>Work\Planning</code>.</p>
+      <label class="field">
+        Locale
+        <select v-model="propertiesLocaleDraft" class="native-input">
+          <option v-for="option in propertiesLocaleOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+      </label>
+      <label class="properties-dialog__checkbox">
+        <input v-model="propertiesIsTemplateDraft" type="checkbox">
+        Use this spreadsheet as a template
+      </label>
     </div>
     <template #footer>
       <Button label="Cancel" text @click="cancel" />
@@ -64,6 +77,13 @@ function cancel() {
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.properties-dialog__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
 }
 
 .properties-dialog code {

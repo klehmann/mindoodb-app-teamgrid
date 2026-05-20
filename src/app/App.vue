@@ -40,6 +40,7 @@ import FormulaBar from "@/features/grid/components/FormulaBar.vue";
 import GridViewport from "@/features/grid/components/GridViewport.vue";
 import OpenSpreadsheetDialog from "@/features/document/components/OpenSpreadsheetDialog.vue";
 import RenameWorksheetDialog from "@/features/document/components/RenameWorksheetDialog.vue";
+import ViewSheetSettingsDialog from "@/features/document/components/ViewSheetSettingsDialog.vue";
 import CellFormatDialog from "@/features/grid/components/CellFormatDialog.vue";
 import WorksheetTabs from "@/features/grid/components/WorksheetTabs.vue";
 
@@ -81,6 +82,7 @@ import { projectWorksheet } from "@/features/grid/lib/gridProjection";
 import type { TeamGridOperation } from "@/features/document/lib/teamgridOps";
 import { importTeamGridWorkbookBuffer } from "@/features/xlsx/lib/importWorkbook";
 import { writeTeamGridExcelBuffer } from "@/features/xlsx/lib/exportWorkbook";
+import { materializeViewSheet } from "@/features/view-sheets/lib/viewSheetMaterialization";
 
 const app = useTeamGridDocument();
 const { updateAvailable, updateReloading, reloadForUpdate } = useTeamGridAppUpdate();
@@ -94,6 +96,7 @@ const xlsxImportInput = ref<HTMLInputElement | null>(null);
 const deleteDialogVisible = ref(false);
 const revisionDialogVisible = ref(false);
 const saveInFlight = ref(false);
+const viewSheetRefreshInFlight = ref(false);
 
 const activeWorksheetId = ref<WorksheetId | null>(null);
 const cellContextRange = ref<CellSelectionRange | null>(null);
@@ -213,13 +216,19 @@ const openDialog = useOpenDialog({
   app,
   onError: (error) => showAppError(error),
 });
-const { openFileDialog } = openDialog;
+const { openFileDialog, openTemplateDialog } = openDialog;
 
 const propertiesDialog = useDocumentPropertiesDialog({ app });
 const { openPropertiesDialog } = propertiesDialog;
 
 const worksheetDialogs = useWorksheetDialogs({ app, activeWorksheetId });
-const { addWorksheet, renameWorksheet, deleteWorksheet } = worksheetDialogs;
+const {
+  addWorksheet,
+  renameWorksheet,
+  deleteWorksheet,
+  openCreateViewSheetDialog,
+  openViewSheetSettings,
+} = worksheetDialogs;
 
 const errorDialog = useErrorDialog({
   lastErrorMessage: app.lastErrorMessage,
@@ -292,6 +301,7 @@ const menuItems = computed<MenuItem[]>(() => [
     label: "File",
     items: [
       { label: "New", icon: "pi pi-file-plus", disabled: !app.canCreate.value, command: () => void app.createNewDocument() },
+      { label: "New from template...", icon: "pi pi-copy", disabled: !app.canCreate.value, command: () => void openTemplateDialog() },
       { label: "Open", icon: "pi pi-folder-open", command: () => void openFileDialog() },
       { separator: true },
       { label: "Save", icon: "pi pi-save", disabled: !app.canSave.value || saveInFlight.value, command: () => void saveCurrentDocument() },
@@ -456,6 +466,43 @@ async function importXlsxFile(event: Event) {
     app.status.value = `Imported ${file.name}.`;
   } catch (error) {
     showAppError(error);
+  }
+}
+
+async function refreshActiveViewSheet() {
+  const worksheet = activeWorksheet.value;
+  const binding = worksheet?.viewBinding;
+  if (!worksheet || !binding || app.gridReadOnly.value || viewSheetRefreshInFlight.value) {
+    return;
+  }
+  const view = app.configuredViews.value.find((candidate) => candidate.id === binding.viewId);
+  if (!view) {
+    showAppError(new Error(`Configured view "${binding.viewId}" is no longer available.`));
+    return;
+  }
+  viewSheetRefreshInFlight.value = true;
+  try {
+    const refreshedWorksheet = await materializeViewSheet({
+      settings: {
+        title: worksheet.title,
+        viewId: binding.viewId,
+        showDocuments: binding.showDocuments,
+        showCategories: binding.showCategories,
+        rootCategoryPathInput: binding.rootCategoryPath.join("\\"),
+      },
+      view,
+      existingWorksheet: worksheet,
+      openViewNavigator: app.openViewNavigator,
+    });
+    app.updateGrid((grid) => {
+      grid.workbook.worksheetsById[refreshedWorksheet.id] = refreshedWorksheet;
+      return [{ type: "replaceWorksheet", worksheet: refreshedWorksheet }];
+    });
+    app.status.value = `Refreshed ${refreshedWorksheet.title}.`;
+  } catch (error) {
+    showAppError(error);
+  } finally {
+    viewSheetRefreshInFlight.value = false;
   }
 }
 
@@ -1030,6 +1077,8 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
               :selected-chart-id="chartDialog.selectedChartId.value"
               :readonly="app.gridReadOnly.value"
               :locale="app.activeGrid.value.settings.locale"
+              :view-sheet-refresh-visible="Boolean(activeWorksheet.viewBinding)"
+              :view-sheet-refresh-loading="viewSheetRefreshInFlight"
               @select="selectCell"
               @select-range="selectRange"
               @add-range="addRange"
@@ -1051,6 +1100,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
               @chart-context="openChartContextMenu"
               @resize-chart="chartDialog.setChartAnchor($event.chartId, $event.anchor)"
               @delete-chart="deleteChart"
+              @refresh-view-sheet="refreshActiveViewSheet"
             />
           </div>
           <WorksheetTabs
@@ -1059,7 +1109,9 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
             :readonly="app.gridReadOnly.value"
             @select="activeWorksheetId = $event"
             @add="addWorksheet"
+            @add-view="openCreateViewSheetDialog"
             @rename="renameWorksheet"
+            @configure-view="openViewSheetSettings"
             @delete="deleteWorksheet"
           />
           <ContextMenu ref="cellContextMenu" :model="cellContextMenuItems" />
@@ -1114,6 +1166,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
     />
 
     <RenameWorksheetDialog :controller="worksheetDialogs" />
+    <ViewSheetSettingsDialog :controller="worksheetDialogs" />
 
     <DocumentRevisionDialog
       v-model:visible="revisionDialogVisible"

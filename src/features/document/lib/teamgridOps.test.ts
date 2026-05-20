@@ -212,17 +212,75 @@ describe("teamgrid operation serialization", () => {
     });
   });
 
-  it("serializes document properties as top-level metadata patches", () => {
+  it("serializes document properties and locale patches", () => {
     expect(serializeTeamGridOperations([{
       type: "setDocumentProperties",
       subject: "Budget",
       tags: ["Finance\\Q1", "Planning"],
+      isTemplate: true,
+      locale: "de-DE",
     }])).toEqual({
       json: {
         set: [
           { path: ["subject"], value: "Budget" },
           { path: ["tags"], value: ["Finance\\Q1", "Planning"] },
+          { path: ["istemplate"], value: true },
+          { path: ["teamgrid", "settings", "locale"], value: "de-DE" },
         ],
+      },
+    });
+  });
+
+  it("serializes generated worksheet replacements at the worksheet path", () => {
+    expect(serializeTeamGridOperations([{
+      type: "replaceWorksheet",
+      worksheet: {
+        id: "sheet_view",
+        title: "Contacts",
+        rowOrder: ["row_1"],
+        columnOrder: ["col_1"],
+        rowsById: { row_1: { id: "row_1" } },
+        columnsById: { col_1: { id: "col_1" } },
+        cellsById: {},
+        chartOrder: [],
+        chartsById: {},
+        viewBinding: {
+          kind: "mindoodbView",
+          viewId: "contacts_flat",
+          viewTitle: "Contacts",
+          showDocuments: true,
+          showCategories: true,
+          rootCategoryPath: ["Customers"],
+          lastRefreshedAt: "2026-05-20T12:00:00.000Z",
+          lastViewCursor: "cursor_1",
+        },
+      },
+    }])).toEqual({
+      json: {
+        set: [{
+          path: ["teamgrid", "workbook", "worksheetsById", "sheet_view"],
+          value: {
+            id: "sheet_view",
+            title: "Contacts",
+            rowOrder: ["row_1"],
+            columnOrder: ["col_1"],
+            rowsById: { row_1: { id: "row_1" } },
+            columnsById: { col_1: { id: "col_1" } },
+            cellsById: {},
+            chartOrder: [],
+            chartsById: {},
+            viewBinding: {
+              kind: "mindoodbView",
+              viewId: "contacts_flat",
+              viewTitle: "Contacts",
+              showDocuments: true,
+              showCategories: true,
+              rootCategoryPath: ["Customers"],
+              lastRefreshedAt: "2026-05-20T12:00:00.000Z",
+              lastViewCursor: "cursor_1",
+            },
+          },
+        }],
       },
     });
   });

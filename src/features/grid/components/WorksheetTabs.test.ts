@@ -1,6 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import PrimeVue from "primevue/config";
+import type { MenuItem } from "primevue/menuitem";
 
 import WorksheetTabs from "@/features/grid/components/WorksheetTabs.vue";
 import { createTeamGridDocument } from "@/features/document/lib/teamgridDocument";
@@ -39,10 +40,25 @@ describe("WorksheetTabs", () => {
     wrapper.unmount();
   });
 
-  it("emits add when the plus button is clicked", async () => {
+  it("offers Add Sheet from the plus menu", () => {
     const { wrapper } = mountTabs();
-    await wrapper.find('[aria-label="Add worksheet"]').trigger("click");
+    const contextMenus = wrapper.findAllComponents({ name: "ContextMenu" });
+    const addMenuItems = contextMenus[1].props("model") as MenuItem[];
+
+    addMenuItems.find((item) => item.label === "Add Sheet")?.command?.({} as never);
+
     expect(wrapper.emitted("add")).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it("offers Add Virtual View Sheet from the plus menu", () => {
+    const { wrapper } = mountTabs();
+    const contextMenus = wrapper.findAllComponents({ name: "ContextMenu" });
+    const addMenuItems = contextMenus[1].props("model") as MenuItem[];
+
+    addMenuItems.find((item) => item.label === "Add Virtual View Sheet")?.command?.({} as never);
+
+    expect(wrapper.emitted("add-view")).toHaveLength(1);
     wrapper.unmount();
   });
 
@@ -59,6 +75,27 @@ describe("WorksheetTabs", () => {
 
     await wrapper.findAll(".worksheet-tab")[0].trigger("dblclick");
     expect(wrapper.emitted("rename")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("offers settings for view-backed worksheets", async () => {
+    const { wrapper, grid } = mountTabs();
+    const worksheetId = grid.workbook.worksheetOrder[0];
+    grid.workbook.worksheetsById[worksheetId].viewBinding = {
+      kind: "mindoodbView",
+      viewId: "contacts_flat",
+      viewTitle: "Contacts",
+      showDocuments: true,
+      showCategories: true,
+      rootCategoryPath: [],
+    };
+    wrapper.vm.$forceUpdate();
+    await wrapper.find(".worksheet-tab").trigger("contextmenu");
+    const contextMenus = wrapper.findAllComponents({ name: "ContextMenu" });
+    const tabMenuItems = contextMenus[0].props("model") as MenuItem[];
+    tabMenuItems.find((item) => item.label === "View Sheet Settings...")?.command?.({} as never);
+
+    expect(wrapper.emitted<[string]>("configure-view")?.[0]?.[0]).toBe(worksheetId);
     wrapper.unmount();
   });
 });

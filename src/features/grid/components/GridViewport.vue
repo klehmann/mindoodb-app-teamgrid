@@ -92,9 +92,13 @@ const props = withDefaults(defineProps<{
   selectedChartId?: ChartId | null;
   readonly: boolean;
   locale: string;
+  viewSheetRefreshVisible?: boolean;
+  viewSheetRefreshLoading?: boolean;
 }>(), {
   additionalRanges: () => [],
   selectedChartId: null,
+  viewSheetRefreshVisible: false,
+  viewSheetRefreshLoading: false,
 });
 
 const emit = defineEmits<{
@@ -118,6 +122,7 @@ const emit = defineEmits<{
   "chart-context": [payload: { event: MouseEvent; chartId: ChartId }];
   "resize-chart": [payload: { chartId: ChartId; anchor: TwoCellAnchor }];
   "delete-chart": [chartId: ChartId];
+  "refresh-view-sheet": [];
   /**
    * Delete/Backspace pressed while more than one cell is selected.
    * The parent is expected to clear every selected cell in a single
@@ -461,7 +466,20 @@ export type { CellId };
         </colgroup>
         <thead>
           <tr>
-            <th class="grid-corner" scope="col" />
+            <th class="grid-corner" scope="col">
+              <button
+                v-if="viewSheetRefreshVisible"
+                class="grid-corner__refresh"
+                type="button"
+                title="Refresh view sheet"
+                aria-label="Refresh view sheet"
+                :disabled="readonly || viewSheetRefreshLoading"
+                @mousedown.prevent.stop
+                @click.stop="emit('refresh-view-sheet')"
+              >
+                <i class="pi" :class="viewSheetRefreshLoading ? 'pi-spin pi-spinner' : 'pi-refresh'" aria-hidden="true" />
+              </button>
+            </th>
             <th
               v-for="column in projection.columns"
               :key="column.id"
@@ -623,13 +641,15 @@ export type { CellId };
   border-collapse: separate;
   border-spacing: 0;
   width: max-content;
-  min-width: 100%;
+  min-width: max-content;
   table-layout: fixed;
   font-size: 0.92rem;
 }
 
 .grid-col-row-header {
   width: 3rem;
+  min-width: 3rem;
+  max-width: 3rem;
 }
 
 .grid-corner,
@@ -642,6 +662,28 @@ export type { CellId };
   user-select: none;
 }
 
+.grid-corner__refresh {
+  display: inline-grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.grid-corner__refresh:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.grid-corner__refresh:not(:disabled):hover {
+  background: rgb(255 255 255 / 0.12);
+  color: var(--text);
+}
+
 .grid-column-header {
   position: relative;
   height: 2rem;
@@ -651,6 +693,9 @@ export type { CellId };
   position: sticky;
   left: 0;
   z-index: 3;
+  width: 3rem;
+  min-width: 3rem;
+  max-width: 3rem;
 }
 
 .grid-column-header,

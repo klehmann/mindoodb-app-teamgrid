@@ -31,6 +31,8 @@ import { normalizeTags } from "@/features/document/lib/teamgridDocument";
 /** Synthetic key for the root "All spreadsheets" node shown above the tag tree. */
 export const ALL_SPREADSHEETS_NODE_KEY = "all";
 
+export type OpenSpreadsheetType = "all" | "noTemplates" | "onlyTemplates";
+
 /** One node in the category tree rendered on the left side of File/Open. */
 export interface OpenCategoryNode {
   /** Navigator entry key, or {@link ALL_SPREADSHEETS_NODE_KEY} for the root. */
@@ -65,10 +67,10 @@ export interface OpenDocumentRow {
  * display column. The fixed `id` lets the host cache the view's index across
  * dialog opens.
  */
-export function createOpenViewDefinition(): MindooDBAppViewDefinition {
+export function createOpenViewDefinition(type: OpenSpreadsheetType = "noTemplates"): MindooDBAppViewDefinition {
   const v = createViewLanguage();
-  return {
-    id: "teamgrid-open-tags-v1",
+  const definition: MindooDBAppViewDefinition = {
+    id: `teamgrid-open-tags-${type}-v1`,
     title: "Teamgrid spreadsheets by tag",
     defaultExpand: "expanded",
     columns: [
@@ -88,6 +90,18 @@ export function createOpenViewDefinition(): MindooDBAppViewDefinition {
       },
     ],
   };
+  if (type === "noTemplates") {
+    definition.filter = {
+      mode: "expression",
+      expression: v.neq(v.field("istemplate"), true),
+    };
+  } else if (type === "onlyTemplates") {
+    definition.filter = {
+      mode: "expression",
+      expression: v.eq(v.field("istemplate"), true),
+    };
+  }
+  return definition;
 }
 
 /**
@@ -130,7 +144,7 @@ export function buildOpenCategoryTree(categoryEntries: MindooDBAppViewEntry[], d
     const node: OpenCategoryNode = {
       key: entry.key,
       label: readCategoryLabel(entry),
-      count: entry.descendantDocumentCount,
+      count: entry.descendantDocumentCount ?? 0,
       children: [],
     };
     nodesByKey.set(node.key, node);

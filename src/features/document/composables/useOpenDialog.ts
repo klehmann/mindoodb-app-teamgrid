@@ -18,6 +18,7 @@ import {
   mapDocumentEntries,
   type OpenCategoryNode,
   type OpenDocumentRow,
+  type OpenSpreadsheetType,
 } from "@/features/document/lib/viewOpen";
 import type { TeamGridAppApi } from "@/features/document/composables/useTeamGridDocument";
 
@@ -29,7 +30,9 @@ export interface UseOpenDialogOptions {
 export function useOpenDialog(options: UseOpenDialogOptions) {
   const { app, onError } = options;
   const openDialogVisible = ref(false);
+  const openDialogMode = ref<"open" | "template">("open");
   const selectedOpenDocId = ref("");
+  const selectedOpenSpreadsheetType = ref<OpenSpreadsheetType>("noTemplates");
   const selectedOpenCategoryKey = ref(ALL_SPREADSHEETS_NODE_KEY);
   const openCategoryNodes = ref<OpenCategoryNode[]>([]);
   const openDialogDocuments = ref<OpenDocumentRow[]>([]);
@@ -38,6 +41,19 @@ export function useOpenDialog(options: UseOpenDialogOptions) {
 
   async function openFileDialog() {
     try {
+      openDialogMode.value = "open";
+      selectedOpenSpreadsheetType.value = "noTemplates";
+      await rebuildOpenNavigator();
+      openDialogVisible.value = true;
+    } catch (error) {
+      onError(error);
+    }
+  }
+
+  async function openTemplateDialog() {
+    try {
+      openDialogMode.value = "template";
+      selectedOpenSpreadsheetType.value = "onlyTemplates";
       await rebuildOpenNavigator();
       openDialogVisible.value = true;
     } catch (error) {
@@ -64,6 +80,17 @@ export function useOpenDialog(options: UseOpenDialogOptions) {
     }
   }
 
+  async function handleOpenSpreadsheetTypeChange() {
+    try {
+      if (openDialogMode.value === "template") {
+        selectedOpenSpreadsheetType.value = "onlyTemplates";
+      }
+      await rebuildOpenNavigator();
+    } catch (error) {
+      onError(error);
+    }
+  }
+
   async function selectOpenCategory(key: string) {
     selectedOpenCategoryKey.value = key;
     await refreshOpenDocumentsForSelectedCategory();
@@ -78,7 +105,11 @@ export function useOpenDialog(options: UseOpenDialogOptions) {
     if (!selectedOpenDocId.value) {
       return;
     }
-    await app.openDocument(selectedOpenDocId.value);
+    if (openDialogMode.value === "template") {
+      await app.createDocumentFromTemplate(selectedOpenDocId.value);
+    } else {
+      await app.openDocument(selectedOpenDocId.value);
+    }
     openDialogVisible.value = false;
     await disposeOpenNavigator();
   }
@@ -91,7 +122,7 @@ export function useOpenDialog(options: UseOpenDialogOptions) {
     await disposeOpenNavigator();
     const navigator = await app.createViewNavigator({
       databaseIds: [app.selectedDatabaseId.value],
-      definition: createOpenViewDefinition(),
+      definition: createOpenViewDefinition(selectedOpenSpreadsheetType.value),
       categorizationStyle: "category_then_document",
       options: {
         includeCategories: true,
@@ -130,12 +161,16 @@ export function useOpenDialog(options: UseOpenDialogOptions) {
 
   return {
     openDialogVisible,
+    openDialogMode,
     selectedOpenDocId,
+    selectedOpenSpreadsheetType,
     selectedOpenCategoryKey,
     openCategoryNodes,
     openDialogDocuments,
     openFileDialog,
+    openTemplateDialog,
     handleOpenDatabaseChange,
+    handleOpenSpreadsheetTypeChange,
     selectOpenCategory,
     openSelectedDocument,
     disposeOpenNavigator,

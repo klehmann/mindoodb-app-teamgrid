@@ -40,7 +40,9 @@ import {
   type MindooDBAppDocumentSummary,
   type MindooDBAppHistoricalDocument,
   type MindooDBAppCreateViewNavigatorInput,
+  type MindooDBAppResolvedViewDefinition,
   type MindooDBAppViewNavigator,
+  type MindooDBAppViewNavigatorOpenOptions,
   type MindooDBAppRuntime,
   type MindooDBAppSession,
   type MindooDBAppUiPreferences,
@@ -85,6 +87,7 @@ interface OpenSpreadsheetSession {
 export function useTeamGridDocument() {
   const session = ref<MindooDBAppSession | null>(null);
   const databases = ref<MindooDBAppDatabaseInfo[]>([]);
+  const configuredViews = ref<MindooDBAppResolvedViewDefinition[]>([]);
   const selectedDatabaseId = ref("");
   const currentDatabase = ref<MindooDBAppDatabase | null>(null);
   const currentDatabaseId = ref("");
@@ -173,6 +176,7 @@ export function useTeamGridDocument() {
         hostUiPreferences.value = { ...uiPreferences };
       });
       databases.value = context.databases;
+      configuredViews.value = context.views;
       selectedDatabaseId.value = context.preferredDatabaseId
         ?? readableDatabases.value[0]?.id
         ?? context.databases[0]?.id
@@ -214,6 +218,13 @@ export function useTeamGridDocument() {
       throw new Error("Connect to Haven before opening a view.");
     }
     return await session.value.createViewNavigator(input);
+  }
+
+  async function openViewNavigator(viewId: string, options?: MindooDBAppViewNavigatorOpenOptions): Promise<MindooDBAppViewNavigator> {
+    if (!session.value) {
+      throw new Error("Connect to Haven before opening a view.");
+    }
+    return await session.value.openViewNavigator(viewId, options);
   }
 
   /**
@@ -267,6 +278,27 @@ export function useTeamGridDocument() {
 
   async function createDocumentFromEnvelope(envelope: TeamGridDocumentEnvelope) {
     await createNewDocument(envelope);
+  }
+
+  async function createDocumentFromTemplate(templateDocumentId: string) {
+    try {
+      const sourceDatabaseId = selectedDatabaseId.value;
+      const sourceDatabase = await openDatabaseById(sourceDatabaseId);
+      const templateDocument = await sourceDatabase.documents.get(templateDocumentId);
+      if (!templateDocument) {
+        throw new Error("Select a template to use.");
+      }
+      const templateEnvelope = migrateTeamGridDocument(templateDocument.data);
+      const envelope: TeamGridDocumentEnvelope = {
+        ...templateEnvelope,
+        subject: `Copy of ${templateEnvelope.subject || "Untitled spreadsheet"}`,
+        istemplate: false,
+        teamgrid: cloneTeamGridDocument(templateEnvelope.teamgrid),
+      };
+      await createNewDocument(envelope);
+    } catch (error) {
+      showError(error);
+    }
   }
 
   /** Open an existing document by id from the currently selected database. */
@@ -613,6 +645,7 @@ export function useTeamGridDocument() {
 
   return {
     databases,
+    configuredViews,
     selectedDatabaseId,
     documents,
     currentDocument,
@@ -647,8 +680,10 @@ export function useTeamGridDocument() {
     timeTravelDateLabel,
     refreshDocuments,
     createViewNavigator,
+    openViewNavigator,
     createNewDocument,
     createDocumentFromEnvelope,
+    createDocumentFromTemplate,
     openDocument,
     switchToOpenSession,
     closeOpenSession,

@@ -92,6 +92,32 @@ describe("useTeamGridDocument open sessions", () => {
     wrapper.unmount();
   });
 
+  it("creates a normal spreadsheet copy from a template", async () => {
+    const wrapper = mountHarness();
+    await flushPromises();
+    const app = wrapper.vm.app;
+    const template = createTeamGridDocument("Budget template", ["Finance"], "en-US", true);
+    fakeDatabase.documents.get.mockResolvedValueOnce({
+      id: "template-1",
+      data: template,
+      heads: ["template-head"],
+    });
+
+    await app.createDocumentFromTemplate("template-1");
+
+    expect(fakeDatabase.documents.get).toHaveBeenCalledWith("template-1");
+    expect(fakeDatabase.documents.create).toHaveBeenCalledWith({
+      set: expect.objectContaining({
+        subject: "Copy of Budget template",
+        tags: ["Finance"],
+        istemplate: false,
+        form: "teamgrid",
+      }),
+    });
+    expect(app.activeSubject.value).toBe("Copy of Budget template");
+    wrapper.unmount();
+  });
+
   it("surfaces save failures as user-visible errors", async () => {
     const wrapper = mountHarness();
     await flushPromises();
@@ -100,7 +126,7 @@ describe("useTeamGridDocument open sessions", () => {
     await app.createDocumentFromEnvelope(createTeamGridDocument("Save failure"));
     app.updateGrid((_grid, envelope) => {
       envelope.subject = "Unsaved title";
-      return [{ type: "setDocumentProperties", subject: "Unsaved title", tags: [] }];
+      return [{ type: "setDocumentProperties", subject: "Unsaved title", tags: [], isTemplate: envelope.istemplate, locale: envelope.teamgrid.settings.locale }];
     });
     fakeDatabase.documents.update.mockRejectedValueOnce(new Error("JSON patch failed"));
 

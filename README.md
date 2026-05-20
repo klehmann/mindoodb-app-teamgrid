@@ -22,10 +22,11 @@ TeamGrid is also available as an example preset on the **Applications** page of 
 TeamGrid follows the same host bridge pattern as TeamEdit:
 
 - `read` lists and opens spreadsheet documents.
-- `create` enables File / New and File / Import XLSX.
+- `create` enables File / New, File / New from template..., and File / Import XLSX.
 - `update` enables save and grid mutations.
 - `delete` enables document deletion.
 - `history` enables the revision picker and read-only historical snapshots.
+- `views` enables the File / Open dialog's view-backed category tree (driven by the navigator API) and Virtual View Sheets (see below) that materialize MindooDB virtual view data into worksheet rows.
 - `attachments` is not used by the first spreadsheet sample.
 
 Host time travel and document revisions are read-only. The app still allows sheet navigation, selection, copy-friendly viewing, formula inspection, and Excel export in those modes.
@@ -50,10 +51,12 @@ This is the same shape TeamEdit uses for collaborative markdown via the SDK's te
 Each MindooDB document stores one TeamGrid workbook:
 
 - `subject` is the document title shown in file pickers.
+- `tags` is a normalized list of hierarchical tag strings (`Work\Planning`) used by the File / Open category tree.
+- `istemplate` marks the spreadsheet as a template so it can be filtered in File / Open and duplicated via File / New from template... (see [Spreadsheet Templates](#spreadsheet-templates)).
 - `kind` is `mindoodb.teamgrid`.
 - `teamgrid` contains the versioned workbook schema.
 
-Inside `teamgrid.workbook` a workbook is an ordered list of worksheet IDs plus a map of worksheets keyed by ID. Each worksheet contains its own ordered `rowOrder`, `columnOrder`, and maps for row metadata, column metadata, and cells (`cellsById`, keyed by `rowId:columnId`).
+Inside `teamgrid.workbook` a workbook is an ordered list of worksheet IDs plus a map of worksheets keyed by ID. Each worksheet contains its own ordered `rowOrder`, `columnOrder`, and maps for row metadata, column metadata, and cells (`cellsById`, keyed by `rowId:columnId`). A worksheet may also carry an optional `viewBinding` that turns it into a Virtual View Sheet — see [Virtual View Sheets](#virtual-view-sheets).
 
 ## Formulas
 
@@ -104,6 +107,29 @@ Charts are first-class objects on each worksheet, stored beside `cellsById` in t
 
 See `src/features/charts/` for overlay rendering, data resolution, geometry, and `src/features/xlsx/lib/chartImporter.ts` / `chartExporter.ts` for Excel interop.
 
+## Virtual View Sheets
+
+A Virtual View Sheet is a regular TeamGrid worksheet that is populated from a MindooDB **virtual view** configured for the TeamGrid application in Haven. The host advertises configured views through the launch context; the app turns the user's choice into an opened view navigator on the Haven side, paginates through every entry, and materializes the result into the worksheet's stable-ID row, column, and cell maps. Once materialized, the data is a normal part of the workbook: Excel formulas can reference it, charts can be drawn over it, and the cells participate in the same selection, formatting, copy/paste, undo, and granular-save plumbing as hand-entered data.
+
+This is the bridge that lets a TeamGrid workbook process MindooDB document data with the full spreadsheet feature set — including Excel-compatible formulas, embedded charts, and XLSX export — without giving up the indexed virtual view performance on the database side.
+
+- **Adding a sheet.** The "+" tab menu offers _Add Virtual View Sheet_ alongside _Add Sheet_. The dialog (`ViewSheetSettingsDialog.vue`) picks one of the configured virtual views, a sheet name, whether to show documents, categories, or both, and an optional top-level category path (`somecategory\sublevel1`) that scopes the navigator. The same dialog opens from the tab context menu to edit an existing view sheet.
+- **Materialization.** `src/features/view-sheets/lib/viewSheetMaterialization.ts` walks the view navigator with `category_then_document` ordering, projects each navigator entry into a worksheet row, and reads column values straight from `MindooDBAppViewEntry.columnValues`. View-language count formulas (`v.childCount()`, `v.descendantDocumentCount()`, `v.siblingCount()`, …) are resolved against the per-entry counts the navigator already publishes, so categories show pre-aggregated totals without re-counting client-side.
+- **Permanent, static cells.** The materialization writes plain `Cell` records into the worksheet just like any other content — there is no special "live view" cell kind. The values are persisted into the MindooDB document, so the data is available offline, participates in revisions and time travel, and stays static between refreshes. This is what lets standard Excel formulas like `=SUM(A2:A20)` and inserted charts reference virtual view rows by ordinary range syntax.
+- **Refresh.** Each view sheet exposes a Refresh button (and a "stale" indicator) in the worksheet header. Refresh re-runs the navigator, rewrites the row, column, and cell maps in place, and records the refresh timestamp on the worksheet's `viewBinding`. Manually edited cells in a view sheet are intentionally overwritten on refresh — the source of truth is the configured virtual view.
+- **XLSX export.** Because view sheet rows are materialized into the normal cell map, `File / Export XLSX` writes them out as static cell values with no special handling. Recipients open the workbook in Excel and see exactly the same values, formats, and charts the author saw at the moment of the last refresh, with no MindooDB connection required.
+
+See `src/features/view-sheets/` for materialization, and `viewBinding` on `Worksheet` for the persisted reference back to the source view.
+
+## Spreadsheet Templates
+
+Any TeamGrid spreadsheet can be flagged as a template by toggling _Use this spreadsheet as a template_ in the Spreadsheet Properties dialog. The flag is stored as a top-level `istemplate` field on the document envelope (next to `subject` and `tags`) and is persisted through the same `setDocumentProperties` granular operation as the title and tags, so concurrent edits to the flag merge cleanly with other property edits.
+
+- **File / Open filtering.** The Open dialog has a _Spreadsheet type_ selector with three modes — _All_, _No templates_, and _Only templates_. Each mode is backed by a fixed-id dynamic virtual view definition with a different filter expression (`v.neq(v.field("istemplate"), true)` and `v.eq(v.field("istemplate"), true)`), so the category tree, document count badges, and tag fan-out all stay correct without the client filtering documents after the fact. By default the dialog opens in _No templates_ mode so templates do not clutter the normal Open list.
+- **File / New from template....** The File menu adds a _New from template..._ command that reuses the Open dialog in a template-picking mode: the type selector is locked to _Only templates_, the dialog header changes to _New from template_, and the confirm button becomes _Create_. Picking a template fetches the source document, clones its Teamgrid envelope, clears `istemplate` on the copy, and titles the new spreadsheet `Copy of <template title>` before loading it in the editor as an ordinary new spreadsheet that the user is free to save back to any writable database.
+
+The template logic lives in `src/features/document/lib/teamgridDocument.ts` (model defaults and `readIsTemplate`), `src/features/document/lib/teamgridOps.ts` (the `setDocumentProperties` payload), `src/features/document/lib/viewOpen.ts` (the three filter-mode view definitions), `src/features/document/composables/useOpenDialog.ts` (open vs. template mode), and `src/features/document/composables/useTeamGridDocument.ts` (`createDocumentFromTemplate`).
+
 ## Selection & Editing
 
 Selection follows the same conventions as Excel and Google Sheets, with `useSelection` owning the reactive state, `useGridSelectionGestures` translating mouse and keyboard events into intent, and `useInlineCellEditor` handling the inline input field. The model tracks an active cell, a primary rectangular range, and a list of additional disjoint ranges so cells, rows, and columns can be mixed in one multi-selection.
@@ -146,7 +172,10 @@ src/
       lib/{teamgridDocument,teamgridOps,viewOpen}.ts
       components/{DocumentRevisionDialog,TagTreeList,ErrorDialog,
                   OpenSpreadsheetDialog,DocumentPropertiesDialog,
-                  DeleteSpreadsheetDialog,RenameWorksheetDialog}.vue
+                  DeleteSpreadsheetDialog,RenameWorksheetDialog,
+                  ViewSheetSettingsDialog}.vue
+    view-sheets/                Virtual View Sheet materialization
+      lib/viewSheetMaterialization.ts
     grid/                       spreadsheet surface and formula bar
       composables/{useSelection,useFormulaBarEditing,useFormulaAssistRouter,
                    useGridClipboard,useCellFormatDialog,useInlineCellEditor,
@@ -169,14 +198,15 @@ Pointers into the most important modules:
 - `src/features/document/composables/useTeamGridDocument.ts` owns Haven bridge setup, database/document lifecycle, capability gates, time travel, revision snapshots, and `baseHeads`-aware granular saves. Its `TeamGridAppApi` type is the contract every other composable depends on.
 - `src/features/document/lib/teamgridDocument.ts` defines the persisted schema, migrations, ID helpers, and default workbook factory.
 - `src/features/document/lib/teamgridOps.ts` defines semantic edit operations and serializes them to `MindooDBAppJsonPatch`.
-- `src/features/document/lib/viewOpen.ts` builds the dynamic view navigator used by the File / Open dialog.
+- `src/features/document/lib/viewOpen.ts` builds the three filter-mode dynamic view definitions (all / no templates / only templates) used by the File / Open and File / New from template... dialogs.
+- `src/features/view-sheets/lib/viewSheetMaterialization.ts` walks a view navigator and projects its entries into the worksheet's stable-ID row, column, and cell maps so Virtual View Sheet rows persist alongside hand-edited cells.
 - `src/features/grid/lib/gridProjection.ts` turns stable IDs into visible rows, columns, and addresses.
 - `src/features/grid/lib/cellFormatting.ts` handles value coercion, date/number formatting, and style merging.
 - `src/features/formulas/lib/` contains parsing, evaluation, dependency tracking, and function metadata.
 - `src/features/clipboard/lib/` contains the serializer/deserializer for the TeamGrid + Excel + TSV clipboard payloads.
 - `src/features/xlsx/lib/` contains the `.xlsx` import and export.
 - `src/features/grid/components/GridViewport.vue` is the spreadsheet surface; it delegates selection, inline editing, column/row resizing, and native clipboard plumbing to the composables in `src/features/grid/composables/`.
-- The dialog SFCs under `src/features/document/components/` and `src/features/grid/components/CellFormatDialog.vue` each take a controller object from their matching composable (`useErrorDialog`, `useOpenDialog`, `useDocumentPropertiesDialog`, `useWorksheetDialogs`, `useCellFormatDialog`) as a prop. The composable owns state and actions; the SFC renders the UI.
+- The dialog SFCs under `src/features/document/components/` and `src/features/grid/components/CellFormatDialog.vue` each take a controller object from their matching composable (`useErrorDialog`, `useOpenDialog`, `useDocumentPropertiesDialog`, `useWorksheetDialogs`, `useCellFormatDialog`) as a prop. The composable owns state and actions; the SFC renders the UI. `ViewSheetSettingsDialog.vue` follows the same pattern and is owned by `useWorksheetDialogs`.
 
 ## Current Scope
 

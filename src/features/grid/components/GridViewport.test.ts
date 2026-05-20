@@ -266,6 +266,15 @@ describe("GridViewport mouse range selection", () => {
 });
 
 describe("GridViewport row and column header selection", () => {
+  it("emits refresh-view-sheet from the grid corner refresh button", async () => {
+    const { wrapper } = mountGrid();
+
+    await wrapper.setProps({ viewSheetRefreshVisible: true });
+    await wrapper.find('[aria-label="Refresh view sheet"]').trigger("click");
+
+    expect(wrapper.emitted("refresh-view-sheet")).toHaveLength(1);
+  });
+
   it("selects the whole row when clicking its header", async () => {
     const { wrapper, firstRow, firstColumn, lastColumn } = mountGrid();
 

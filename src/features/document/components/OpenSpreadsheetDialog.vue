@@ -21,11 +21,14 @@ const props = defineProps<{
 
 const {
   openDialogVisible,
+  openDialogMode,
   selectedOpenDocId,
+  selectedOpenSpreadsheetType,
   selectedOpenCategoryKey,
   openCategoryNodes,
   openDialogDocuments,
   handleOpenDatabaseChange,
+  handleOpenSpreadsheetTypeChange,
   selectOpenCategory,
   openSelectedDocument,
   disposeOpenNavigator,
@@ -36,7 +39,7 @@ const {
   <Dialog
     v-model:visible="openDialogVisible"
     modal
-    header="Open spreadsheet"
+    :header="openDialogMode === 'template' ? 'New from template' : 'Open spreadsheet'"
     :style="{ width: '58rem', maxWidth: '96vw' }"
     @hide="disposeOpenNavigator"
   >
@@ -45,6 +48,19 @@ const {
         Database
         <select v-model="selectedDatabaseId.value" class="native-input" @change="handleOpenDatabaseChange">
           <option v-for="database in readableDatabases.value" :key="database.id" :value="database.id">{{ database.title || database.id }}</option>
+        </select>
+      </label>
+      <label class="field">
+        Spreadsheet type
+        <select
+          v-model="selectedOpenSpreadsheetType"
+          class="native-input"
+          :disabled="openDialogMode === 'template'"
+          @change="handleOpenSpreadsheetTypeChange"
+        >
+          <option value="all">All</option>
+          <option value="noTemplates">No templates</option>
+          <option value="onlyTemplates">Only templates</option>
         </select>
       </label>
       <div class="open-dialog__browser">
@@ -69,13 +85,20 @@ const {
             <small>{{ document.detail }}</small>
             <small>{{ document.id }}</small>
           </button>
-          <p v-if="openDialogDocuments.length === 0" class="document-list__empty">No spreadsheets in this category.</p>
+          <p v-if="openDialogDocuments.length === 0" class="document-list__empty">
+            {{ openDialogMode === "template" ? "No template spreadsheets in this category." : "No spreadsheets in this category." }}
+          </p>
         </div>
       </div>
     </div>
     <template #footer>
       <Button label="Cancel" text @click="openDialogVisible = false" />
-      <Button label="Open" icon="pi pi-folder-open" :disabled="!selectedOpenDocId" @click="openSelectedDocument" />
+      <Button
+        :label="openDialogMode === 'template' ? 'Create' : 'Open'"
+        icon="pi pi-folder-open"
+        :disabled="!selectedOpenDocId"
+        @click="openSelectedDocument"
+      />
     </template>
   </Dialog>
 </template>

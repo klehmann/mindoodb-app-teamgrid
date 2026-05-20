@@ -69,6 +69,48 @@ describe("Teamgrid XLSX export", () => {
     expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(["A B", "A B 2"]);
   });
 
+  it("exports view-backed worksheets as ordinary sheet data", () => {
+    const envelope = createTeamGridDocument();
+    const document = envelope.teamgrid;
+    const worksheet = firstVisibleWorksheet(document);
+    const [row1, row2] = worksheet.rowOrder;
+    const [columnA, columnB] = worksheet.columnOrder;
+    worksheet.title = "Contacts View";
+    worksheet.viewBinding = {
+      kind: "mindoodbView",
+      viewId: "contacts_flat",
+      viewTitle: "Contacts",
+      showDocuments: true,
+      showCategories: true,
+      rootCategoryPath: ["Customers"],
+    };
+    worksheet.cellsById[createCellId(row1, columnA)] = {
+      id: createCellId(row1, columnA),
+      rowId: row1,
+      columnId: columnA,
+      value: { kind: "string", text: "Name" },
+    };
+    worksheet.cellsById[createCellId(row2, columnA)] = {
+      id: createCellId(row2, columnA),
+      rowId: row2,
+      columnId: columnA,
+      value: { kind: "string", text: "Alice" },
+    };
+    worksheet.cellsById[createCellId(row2, columnB)] = {
+      id: createCellId(row2, columnB),
+      rowId: row2,
+      columnId: columnB,
+      value: { kind: "string", text: "Customer" },
+    };
+
+    const workbook = createTeamGridExcelWorkbook(document);
+
+    expect(workbook.getWorksheet("Contacts View")!.getCell("A1").value).toBe("Name");
+    expect(workbook.getWorksheet("Contacts View")!.getCell("A2").value).toBe("Alice");
+    expect(workbook.getWorksheet("Contacts View")!.getCell("B2").value).toBe("Customer");
+    expect(JSON.stringify(workbook.model)).not.toContain("contacts_flat");
+  });
+
   it("exports cross-sheet formulas from stable references using exported sheet names", () => {
     const envelope = createTeamGridDocument();
     const document = envelope.teamgrid;

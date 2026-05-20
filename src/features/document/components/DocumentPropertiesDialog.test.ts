@@ -10,12 +10,21 @@ function makeController() {
   const propertiesDialogVisible = ref(true);
   const propertiesTitleDraft = ref("Q3 plan");
   const propertiesTagsDraft = ref("Work\\Planning\nFinance");
+  const propertiesIsTemplateDraft = ref(true);
+  const propertiesLocaleDraft = ref("de-DE");
+  const propertiesLocaleOptions = ref([
+    { value: "en-US", label: "English (United States)" },
+    { value: "de-DE", label: "German (Germany)" },
+  ]);
   const applyDocumentProperties = vi.fn();
   const resetPropertiesDraft = vi.fn();
   return {
     propertiesDialogVisible,
     propertiesTitleDraft,
     propertiesTagsDraft,
+    propertiesIsTemplateDraft,
+    propertiesLocaleDraft,
+    propertiesLocaleOptions,
     applyDocumentProperties,
     resetPropertiesDraft,
   } as unknown as ReturnType<typeof useDocumentPropertiesDialog>;
@@ -37,6 +46,8 @@ describe("DocumentPropertiesDialog", () => {
     await flushPromises();
 
     expect(document.body.querySelector<HTMLInputElement>("input.native-input")?.value).toBe("Q3 plan");
+    expect(document.body.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(true);
+    expect(document.body.querySelector<HTMLSelectElement>("select.native-input")?.value).toBe("de-DE");
 
     findButtonByLabel("Apply")?.click();
     await flushPromises();

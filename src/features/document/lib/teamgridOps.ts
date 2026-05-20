@@ -44,8 +44,8 @@ import type {
  * - `tombstoneRow` / `tombstoneColumn` / `tombstoneWorksheet` mark an entity
  *   deleted without physically removing it, so formulas can still report
  *   `#REF!` instead of losing identity.
- * - `addWorksheet`, `renameWorksheet` handle workbook-level changes.
- * - `setDocumentProperties` writes the top-level `subject` and `tags` fields.
+ * - `addWorksheet`, `replaceWorksheet`, `renameWorksheet` handle workbook-level changes.
+ * - `setDocumentProperties` writes the title, tags, template flag, and workbook locale.
  */
 export type TeamGridOperation =
   | { type: "setCell"; worksheetId: WorksheetId; cell: Cell }
@@ -57,6 +57,7 @@ export type TeamGridOperation =
   | { type: "insertColumn"; worksheetId: WorksheetId; columnId: ColumnId; column: ColumnMeta; index: number }
   | { type: "tombstoneColumn"; worksheetId: WorksheetId; columnId: ColumnId; deletedAt: string }
   | { type: "addWorksheet"; worksheet: Worksheet; index: number }
+  | { type: "replaceWorksheet"; worksheet: Worksheet }
   | { type: "renameWorksheet"; worksheetId: WorksheetId; title: string }
   | { type: "tombstoneWorksheet"; worksheetId: WorksheetId; deletedAt: string }
   | { type: "addChart"; worksheetId: WorksheetId; chart: Chart; index: number }
@@ -68,7 +69,7 @@ export type TeamGridOperation =
   | { type: "setChartCategoryAxis"; worksheetId: WorksheetId; chartId: ChartId; categoryAxis: SeriesRange | undefined }
   | { type: "setChartLegend"; worksheetId: WorksheetId; chartId: ChartId; legend: ChartLegend | undefined }
   | { type: "setChartStyle"; worksheetId: WorksheetId; chartId: ChartId; style: ChartStyle | undefined }
-  | { type: "setDocumentProperties"; subject: string; tags: string[] };
+  | { type: "setDocumentProperties"; subject: string; tags: string[]; isTemplate: boolean; locale: string };
 
 /**
  * Convert Teamgrid semantic operations into App SDK JSON patches.
@@ -115,6 +116,9 @@ export function serializeTeamGridOperations(
         pushSet(json, ["teamgrid", "workbook", "worksheetsById", operation.worksheet.id], operation.worksheet);
         pushListInsert(json, ["teamgrid", "workbook", "worksheetOrder"], operation.index, [operation.worksheet.id]);
         break;
+      case "replaceWorksheet":
+        pushSet(json, worksheetPath(operation.worksheet.id), operation.worksheet);
+        break;
       case "renameWorksheet":
         pushSet(json, [...worksheetPath(operation.worksheetId), "title"], operation.title);
         break;
@@ -152,6 +156,8 @@ export function serializeTeamGridOperations(
       case "setDocumentProperties":
         pushSet(json, ["subject"], operation.subject);
         pushSet(json, ["tags"], operation.tags);
+        pushSet(json, ["istemplate"], operation.isTemplate);
+        pushSet(json, ["teamgrid", "settings", "locale"], operation.locale);
         break;
     }
   }
