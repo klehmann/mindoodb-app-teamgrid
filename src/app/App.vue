@@ -375,7 +375,7 @@ const menuItems = computed<MenuItem[]>(() => [
         label: "Close current spreadsheet",
         icon: "pi pi-times",
         disabled: !app.currentDocument.value,
-        command: () => app.activeSpreadsheetSessionId.value && requestCloseOpenSession(app.activeSpreadsheetSessionId.value),
+        command: () => app.activeSpreadsheetSessionId.value && void requestCloseOpenSession(app.activeSpreadsheetSessionId.value),
       },
     ],
   },
@@ -757,7 +757,10 @@ async function saveCurrentDocument() {
   }
 }
 
-function requestCloseOpenSession(sessionId: string) {
+async function requestCloseOpenSession(sessionId: string) {
+  if (sessionId === app.activeSpreadsheetSessionId.value && gridViewportComponent.value?.flushPendingEdit()) {
+    await nextTick();
+  }
   const session = app.openSessions.value.find((candidate) => candidate.id === sessionId);
   if (!session) {
     return;
