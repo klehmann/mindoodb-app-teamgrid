@@ -92,6 +92,29 @@ describe("useTeamGridDocument open sessions", () => {
     wrapper.unmount();
   });
 
+  it("requires explicit discard confirmation before closing dirty sessions", async () => {
+    const wrapper = mountHarness();
+    await flushPromises();
+    const app = wrapper.vm.app;
+
+    await app.createDocumentFromEnvelope(createTeamGridDocument("Dirty spreadsheet"));
+    app.updateGrid((_grid, envelope) => {
+      envelope.subject = "Unsaved title";
+      return [{ type: "setDocumentProperties", subject: "Unsaved title", tags: [], isTemplate: envelope.istemplate, locale: envelope.teamgrid.settings.locale }];
+    });
+
+    const sessionId = app.activeSpreadsheetSessionId.value;
+
+    expect(app.closeOpenSession(sessionId)).toBe(false);
+    expect(app.openSessions.value).toHaveLength(1);
+    expect(app.status.value).toBe("Save the spreadsheet before closing its window.");
+
+    expect(app.closeOpenSession(sessionId, { discardChanges: true })).toBe(true);
+    expect(app.openSessions.value).toHaveLength(0);
+    expect(app.currentDocument.value).toBeNull();
+    wrapper.unmount();
+  });
+
   it("creates a normal spreadsheet copy from a template", async () => {
     const wrapper = mountHarness();
     await flushPromises();

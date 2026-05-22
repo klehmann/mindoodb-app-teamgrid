@@ -569,15 +569,15 @@ export function useTeamGridDocument() {
     status.value = `Switched to ${session.envelope.subject || session.documentId}.`;
   }
 
-  function closeOpenSession(sessionId: string) {
+  function closeOpenSession(sessionId: string, options: { discardChanges?: boolean } = {}) {
     snapshotActiveSession();
     const session = openSpreadsheetSessions.value.find((candidate) => candidate.id === sessionId);
     if (!session) {
-      return;
+      return false;
     }
-    if (session.isDirty) {
+    if (session.isDirty && !options.discardChanges) {
       status.value = "Save the spreadsheet before closing its window.";
-      return;
+      return false;
     }
     openSpreadsheetSessions.value = openSpreadsheetSessions.value.filter((candidate) => candidate.id !== sessionId);
     if (activeSpreadsheetSessionId.value === sessionId) {
@@ -588,6 +588,7 @@ export function useTeamGridDocument() {
         clearActiveDocumentState();
       }
     }
+    return true;
   }
 
   function activateSession(session: OpenSpreadsheetSession) {

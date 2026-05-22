@@ -33,6 +33,7 @@ import type { MenuItem } from "primevue/menuitem";
 import DocumentRevisionDialog from "@/features/document/components/DocumentRevisionDialog.vue";
 import DocumentPropertiesDialog from "@/features/document/components/DocumentPropertiesDialog.vue";
 import DeleteSpreadsheetDialog from "@/features/document/components/DeleteSpreadsheetDialog.vue";
+import DiscardChangesDialog from "@/features/document/components/DiscardChangesDialog.vue";
 import ErrorDialog from "@/features/document/components/ErrorDialog.vue";
 import ChartPropertiesDialog from "@/features/charts/components/ChartPropertiesDialog.vue";
 import FormulaAssistPanel from "@/features/grid/components/FormulaAssistPanel.vue";
@@ -95,9 +96,11 @@ const gridViewportComponent = ref<InstanceType<typeof GridViewport> | null>(null
 const xlsxImportInput = ref<HTMLInputElement | null>(null);
 
 const deleteDialogVisible = ref(false);
+const discardChangesDialogVisible = ref(false);
 const revisionDialogVisible = ref(false);
 const saveInFlight = ref(false);
 const viewSheetRefreshInFlight = ref(false);
+const pendingCloseSessionId = ref("");
 
 const activeWorksheetId = ref<WorksheetId | null>(null);
 const cellContextRange = ref<CellSelectionRange | null>(null);
@@ -266,6 +269,9 @@ const activeFormulaAssistCaretPos = computed(() =>
     ? formulaAssistCaretPos.value
     : activeFormulaAssistDraft.value.length);
 
+const pendingCloseSessionTitle = computed(() =>
+  app.openSessions.value.find((session) => session.id === pendingCloseSessionId.value)?.title ?? "This spreadsheet");
+
 /**
  * Right-hand toolbar badge that summarizes the current document mode:
  * read-only revision, active time-travel cursor, or live-edit + dirty
@@ -369,7 +375,7 @@ const menuItems = computed<MenuItem[]>(() => [
         label: "Close current spreadsheet",
         icon: "pi pi-times",
         disabled: !app.currentDocument.value,
-        command: () => app.activeSpreadsheetSessionId.value && app.closeOpenSession(app.activeSpreadsheetSessionId.value),
+        command: () => app.activeSpreadsheetSessionId.value && requestCloseOpenSession(app.activeSpreadsheetSessionId.value),
       },
     ],
   },
@@ -748,6 +754,27 @@ async function saveCurrentDocument() {
     await app.saveDocument();
   } finally {
     saveInFlight.value = false;
+  }
+}
+
+function requestCloseOpenSession(sessionId: string) {
+  const session = app.openSessions.value.find((candidate) => candidate.id === sessionId);
+  if (!session) {
+    return;
+  }
+  if (session.isDirty) {
+    pendingCloseSessionId.value = sessionId;
+    discardChangesDialogVisible.value = true;
+    return;
+  }
+  app.closeOpenSession(sessionId);
+}
+
+function discardChangesAndCloseSession() {
+  const sessionId = pendingCloseSessionId.value;
+  pendingCloseSessionId.value = "";
+  if (sessionId) {
+    app.closeOpenSession(sessionId, { discardChanges: true });
   }
 }
 
@@ -1351,6 +1378,12 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
     <DeleteSpreadsheetDialog
       v-model:visible="deleteDialogVisible"
       @confirm="app.deleteCurrentDocument"
+    />
+
+    <DiscardChangesDialog
+      v-model:visible="discardChangesDialogVisible"
+      :title="pendingCloseSessionTitle"
+      @discard="discardChangesAndCloseSession"
     />
 
     <RenameWorksheetDialog :controller="worksheetDialogs" />
