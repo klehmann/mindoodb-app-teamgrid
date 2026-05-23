@@ -36,7 +36,7 @@
     "exceljs": "^4.4.0",
     "fast-formula-parser": "^1.0.19",
     "fflate": "^0.8.3",
-    "mindoodb-app-sdk": "0.0.18",
+    "mindoodb-app-sdk": "0.0.19",
     "mindoodb-view-language": "0.0.13",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
