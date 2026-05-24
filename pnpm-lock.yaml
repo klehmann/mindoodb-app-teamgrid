@@ -54,8 +54,8 @@ importers:
         specifier: ^0.8.3
         version: 0.8.3
       mindoodb-app-sdk:
-        specifier: 0.0.19
-        version: 0.0.19
+        specifier: 0.0.20
+        version: 0.0.20
       mindoodb-view-language:
         specifier: 0.0.13
         version: 0.0.13
@@ -2500,8 +2500,8 @@ packages:
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
 
-  mindoodb-app-sdk@0.0.19:
-    resolution: {integrity: sha512-QXYwHImpdqejQhSjpS2ImzylfEbNisdzwjzZpdnaYWP0GBEDYRCktr/68VInVOai90oaRJxlZGIerSxYxz+ncQ==}
+  mindoodb-app-sdk@0.0.20:
+    resolution: {integrity: sha512-ySY/9PY+0Nl9OoFb193g/Ow90EgQwTkUeJzFKkgoe66NWi64LbbtoOr22+eEBSdx/k1pQRqXBX/b0E1aAl4ALQ==}
     engines: {node: '>=22.13.0'}
 
   mindoodb-view-language@0.0.13:
@@ -5755,7 +5755,7 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mindoodb-app-sdk@0.0.19:
+  mindoodb-app-sdk@0.0.20:
     dependencies:
       mindoodb-view-language: 0.0.13
 
