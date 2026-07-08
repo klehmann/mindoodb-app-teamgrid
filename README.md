@@ -212,3 +212,8 @@ Pointers into the most important modules:
 ## Current Scope
 
 This sample is deliberately small. It does not yet implement virtualization for very large sheets, named ranges in the UI, cross-workbook formulas, conditional formatting, or every Excel formula and chart edge case. We are actively exploring more advanced editors — both open source and commercial — to edit Office formats in a data-sovereign way with full concurrency support, but most packages we evaluated are not yet powerful enough for our requirements (in particular: a clean separation between presentation and a stable-ID data model, and being able to drive edits through granular CRDT-friendly operations rather than whole-document replacements). The pieces above can all be layered onto TeamGrid's stable-ID schema and JSON-patch save path without changing the core collaboration model.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](./LICENSE). Copyright 2026
+Mindoo GmbH.
