@@ -41,13 +41,33 @@ async function isTrustedClientSource(source: ExtendableMessageEvent["source"]) {
 }
 
 self.onmessage = (event) => {
-  if (!event.isTrusted || event.origin !== self.location.origin) {
+  // WebKit (iOS Safari) and older Gecko deliver ExtendableMessageEvent with an
+  // empty `origin` string for client postMessage (the spec even initializes it
+  // to ""). Rejecting "" here silently drops SKIP_WAITING on iPhone, leaving the
+  // updated worker stuck in `waiting` and re-showing the update banner after
+  // every reload. The authoritative sender check remains `isTrustedClientSource`
+  // below, which resolves the client and compares its URL origin.
+  if (!event.isTrusted || (event.origin !== "" && event.origin !== self.location.origin)) {
     return;
   }
   if (!isSkipWaitingMessage(event.data)) {
     return;
   }
   event.waitUntil((async () => {
+    // Second WebKit (iOS) quirk in the same class: a message posted to the
+    // *waiting* worker via `registration.waiting.postMessage(...)` arrives with a
+    // null `source`, so the sending client cannot be resolved and
+    // `isTrustedClientSource` returns false — again silently dropping
+    // SKIP_WAITING and leaving the updated worker stuck in `waiting`, so the
+    // update banner reappears after every reload on iPhone. When the source is
+    // unresolvable we honor the message anyway: the origin gate above already
+    // restricts it to same-origin senders, and activating a waiting worker is
+    // not a sensitive operation.
+    const hasResolvableSource = Boolean(readClientId(event.source));
+    if (!hasResolvableSource) {
+      await self.skipWaiting();
+      return;
+    }
     if (await isTrustedClientSource(event.source)) {
       await self.skipWaiting();
     }
