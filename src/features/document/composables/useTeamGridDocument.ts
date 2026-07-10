@@ -96,7 +96,7 @@ export function useTeamGridDocument() {
   const currentEnvelope = ref<TeamGridDocumentEnvelope | null>(null);
   const viewingHistoricalSnapshot = ref<MindooDBAppHistoricalDocument | null>(null);
   const currentRuntime = ref<MindooDBAppRuntime>("iframe");
-  const hostUiPreferences = ref<MindooDBAppUiPreferences>({ iosMultitaskingOptimized: false });
+  const hostUiPreferences = ref<MindooDBAppUiPreferences>({ iosMultitaskingOptimized: false, reduceMotion: false });
   const launchTimeTravelDate = ref<number | null>(null);
   const status = ref("Connecting to Haven...");
   const lastErrorMessage = ref<string | null>(null);
@@ -339,6 +339,29 @@ export function useTeamGridDocument() {
     } catch (error) {
       showError(error);
     }
+  }
+
+  /**
+   * Live-collaboration poll: reload the open spreadsheet when another
+   * device/user changed it on Haven. Only runs while the editor is idle (no
+   * unsaved local edits, not read-only), so nothing can be lost, and only
+   * replaces the grid when the fetched document actually differs from the
+   * loaded one. Returns whether new remote state was adopted.
+   */
+  async function pollRemoteChanges(): Promise<boolean> {
+    if (!currentDatabase.value || !currentDocument.value) {
+      return false;
+    }
+    if (isDirty.value || pendingOps.value.length > 0 || gridReadOnly.value) {
+      return false;
+    }
+    const fresh = await currentDatabase.value.documents.get(currentDocument.value.id);
+    if (!fresh || documentsLookEqual(fresh, currentDocument.value)) {
+      return false;
+    }
+    loadDocument(currentDatabase.value, currentDatabaseId.value, fresh);
+    status.value = "Merged remote changes.";
+    return true;
   }
 
   /**
@@ -689,6 +712,7 @@ export function useTeamGridDocument() {
     switchToOpenSession,
     closeOpenSession,
     refreshCurrentDocument,
+    pollRemoteChanges,
     saveDocument,
     deleteCurrentDocument,
     openRevisionDialog,
@@ -714,6 +738,18 @@ export function readDocumentSummaryLabel(summary: MindooDBAppDocumentSummary) {
  * shape.
  */
 export type TeamGridAppApi = ReturnType<typeof useTeamGridDocument>;
+
+/**
+ * Cheap remote-change detector for the live poll. Prefers comparing document
+ * heads (exact Automerge version match) and falls back to comparing payloads
+ * when a bridge does not report heads.
+ */
+function documentsLookEqual(a: MindooDBAppDocument, b: MindooDBAppDocument) {
+  if (a.heads?.length && b.heads?.length) {
+    return [...a.heads].sort().join("|") === [...b.heads].sort().join("|");
+  }
+  return JSON.stringify(a.data) === JSON.stringify(b.data);
+}
 
 /** Normalize an unknown thrown value into a human-readable status message. */
 function readError(error: unknown) {

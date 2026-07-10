@@ -23,11 +23,12 @@
  * composables: cell commits, row / column / cell mutations triggered from
  * the menu, save with pending-edit flush, and the PrimeVue menu models.
  */
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import Button from "primevue/button";
 import ContextMenu from "primevue/contextmenu";
 import Menubar from "primevue/menubar";
 import Message from "primevue/message";
+import SplitButton from "primevue/splitbutton";
 import type { MenuItem } from "primevue/menuitem";
 
 import DocumentRevisionDialog from "@/features/document/components/DocumentRevisionDialog.vue";
@@ -525,6 +526,105 @@ async function importXlsxFile(event: Event) {
     app.status.value = `Imported ${file.name}.`;
   } catch (error) {
     showAppError(error);
+  }
+}
+
+/* --- Live collaboration -------------------------------------------------- */
+
+/**
+ * How often the open spreadsheet re-checks Haven for changes made by other
+ * devices/users while auto-refresh is enabled. The poll only adopts remote
+ * state while the grid is idle (no unsaved edits, no active cell/formula
+ * editing), so it can never clobber local work.
+ */
+const LIVE_POLL_INTERVAL_MS = 4000;
+const AUTO_REFRESH_STORAGE_KEY = "mindoodb-teamgrid-auto-refresh";
+let livePollTimer: ReturnType<typeof setInterval> | null = null;
+let livePolling = false;
+
+/**
+ * Opt-in live collaboration, toggled via the refresh split button's dropdown.
+ * Off by default; persisted per device so the choice survives reloads.
+ */
+const autoRefreshEnabled = ref(readAutoRefreshPreference());
+
+const refreshMenuItems = computed<MenuItem[]>(() => [
+  {
+    label: "Auto-refresh",
+    icon: autoRefreshEnabled.value ? "pi pi-check" : "pi pi-circle",
+    command: () => {
+      autoRefreshEnabled.value = !autoRefreshEnabled.value;
+    },
+  },
+]);
+
+function readAutoRefreshPreference(): boolean {
+  if (typeof localStorage === "undefined") {
+    return false;
+  }
+  return localStorage.getItem(AUTO_REFRESH_STORAGE_KEY) === "1";
+}
+
+function startLivePolling() {
+  stopLivePolling();
+  livePollTimer = setInterval(() => {
+    void pollCurrentDocumentForRemoteChanges();
+  }, LIVE_POLL_INTERVAL_MS);
+}
+
+function stopLivePolling() {
+  if (livePollTimer) {
+    clearInterval(livePollTimer);
+    livePollTimer = null;
+  }
+}
+
+watch(
+  autoRefreshEnabled,
+  (enabled) => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(AUTO_REFRESH_STORAGE_KEY, enabled ? "1" : "0");
+    }
+    if (enabled) {
+      startLivePolling();
+    } else {
+      stopLivePolling();
+    }
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  stopLivePolling();
+});
+
+/**
+ * Live-collaboration poll tick. Skips whenever auto-refresh is disabled, the
+ * tab is hidden, a save or view-sheet refresh is in flight, or the user is
+ * mid-edit in the formula bar or an inline cell editor; the composable's
+ * `pollRemoteChanges` additionally skips while the document is dirty or
+ * read-only. Best-effort: failures are swallowed and retried next tick.
+ */
+async function pollCurrentDocumentForRemoteChanges(): Promise<void> {
+  if (!autoRefreshEnabled.value || livePolling) {
+    return;
+  }
+  if (typeof document !== "undefined" && document.hidden) {
+    return;
+  }
+  if (saveInFlight.value || viewSheetRefreshInFlight.value) {
+    return;
+  }
+  if (formulaEditing.value || inlineCellEditing.value) {
+    return;
+  }
+  livePolling = true;
+  try {
+    await app.pollRemoteChanges();
+  } catch {
+    // Ignore; live polling is best-effort and retries next interval.
+  } finally {
+    livePolling = false;
   }
 }
 
@@ -1225,13 +1325,18 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
           :disabled="!app.canSave.value || saveInFlight"
           @click="void saveCurrentDocument()"
         />
-        <Button
+        <SplitButton
           :icon="app.isViewingHistorical.value ? 'pi pi-history' : 'pi pi-refresh'"
           text
-          rounded
           severity="secondary"
-          :aria-label="app.isViewingHistorical.value ? 'Return to current version' : 'Refresh spreadsheet'"
+          class="toolbar__refresh-split"
+          :model="refreshMenuItems"
           :disabled="!app.canRefresh.value || saveInFlight"
+          :button-props="{
+            'aria-label': app.isViewingHistorical.value ? 'Return to current version' : 'Refresh spreadsheet',
+            title: app.isViewingHistorical.value ? 'Return to current version' : 'Refresh spreadsheet',
+          }"
+          :menu-button-props="{ 'aria-label': 'Refresh options', title: 'Refresh options' }"
           @click="app.isViewingHistorical.value ? app.returnToCurrent() : app.refreshCurrentDocument()"
         />
       </div>

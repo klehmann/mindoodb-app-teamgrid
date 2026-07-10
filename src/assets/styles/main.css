@@ -282,6 +282,23 @@ select {
   display: none;
 }
 
+/* Icon-only refresh split button: square refresh action + narrow dropdown arrow. */
+.toolbar__refresh-split {
+  flex: 0 0 auto;
+}
+
+.toolbar__refresh-split .p-splitbutton-button {
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+}
+
+.toolbar__refresh-split .p-splitbutton-dropdown {
+  width: 1.4rem;
+  height: 2.1rem;
+  padding: 0;
+}
+
 .toolbar__document-title {
   position: relative;
   flex: 0 1 auto;
