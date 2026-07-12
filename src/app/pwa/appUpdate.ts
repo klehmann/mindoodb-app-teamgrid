@@ -4,6 +4,7 @@ const TEAMGRID_SERVICE_WORKER_URL = `${import.meta.env.BASE_URL}sw.js`;
 const TEAMGRID_SERVICE_WORKER_SCOPE = import.meta.env.BASE_URL || "/";
 
 const updateAvailable = ref(false);
+const updateDismissedForSession = ref(false);
 const updateReloading = ref(false);
 const updateRegistration = ref<ServiceWorkerRegistration | null>(null);
 
@@ -12,8 +13,8 @@ let controllerChangeWired = false;
 
 function notifyUpdateAvailable(registration: ServiceWorkerRegistration) {
   updateRegistration.value = registration;
-  updateAvailable.value = true;
   updateReloading.value = false;
+  updateAvailable.value = !updateDismissedForSession.value;
 }
 
 function observeInstallingWorker(registration: ServiceWorkerRegistration, worker: ServiceWorker | null) {
@@ -98,10 +99,17 @@ export function reloadForTeamGridUpdate() {
   window.location.reload();
 }
 
+export function dismissTeamGridUpdate() {
+  updateAvailable.value = false;
+  updateDismissedForSession.value = true;
+  updateReloading.value = false;
+}
+
 export function useTeamGridAppUpdate() {
   return {
     updateAvailable: readonly(updateAvailable),
     updateReloading: readonly(updateReloading),
     reloadForUpdate: reloadForTeamGridUpdate,
+    dismissUpdate: dismissTeamGridUpdate,
   };
 }

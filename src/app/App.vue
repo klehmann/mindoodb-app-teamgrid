@@ -87,7 +87,7 @@ import { writeTeamGridExcelBuffer } from "@/features/xlsx/lib/exportWorkbook";
 import { materializeViewSheet } from "@/features/view-sheets/lib/viewSheetMaterialization";
 
 const app = useTeamGridDocument();
-const { updateAvailable, updateReloading, reloadForUpdate } = useTeamGridAppUpdate();
+const { updateAvailable, updateReloading, reloadForUpdate, dismissUpdate } = useTeamGridAppUpdate();
 
 const cellContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
 const axisContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
@@ -1292,8 +1292,9 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
     <Message
       v-if="updateAvailable"
       severity="warn"
-      :closable="false"
+      :closable="true"
       class="app-update-banner"
+      @close="dismissUpdate"
     >
       <div class="app-update-banner__content">
         <div class="app-update-banner__copy">
