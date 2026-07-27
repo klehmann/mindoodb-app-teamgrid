@@ -2,6 +2,97 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      /*
+        Repairs a poisoned browser cache. Stays inline and dependency-free on
+        purpose: it has to survive the one failure that keeps every other line
+        of application code from running, so nothing inside the bundle can do
+        this job -- the bundle is what went missing.
+
+        A hashed bundle the host has not published yet is answered with
+        index.html: status 200, content-type text/html, four hours of public
+        caching. The browser files markup under a .js address, rejects it as a
+        module script, and keeps rejecting it on every following visit, because
+        the entry counts as fresh. Reloading changes nothing; only a request
+        that bypasses the cache replaces the entry.
+      */
+      (function () {
+        var ATTEMPT_KEY = "mindoodb-shell-recovery";
+        var COOLDOWN_MS = 60000;
+
+        // Blocked storage must not read as "never tried before" -- that would
+        // reload forever. window.name survives a reload in the same tab and
+        // needs no storage permission, so it carries the marker instead.
+        function lastAttempt() {
+          try {
+            var stored = sessionStorage.getItem(ATTEMPT_KEY);
+            if (stored !== null) return Number(stored) || 0;
+          } catch (error) {
+            // Fall through to window.name.
+          }
+          var carried = /mindoodb-shell-recovery=(\d+)/.exec(window.name || "");
+          return carried ? Number(carried[1]) : 0;
+        }
+
+        function rememberAttempt() {
+          var now = String(Date.now());
+          try {
+            sessionStorage.setItem(ATTEMPT_KEY, now);
+            return;
+          } catch (error) {
+            // Fall through to window.name.
+          }
+          window.name = (window.name || "").replace(/mindoodb-shell-recovery=\d+/, "") + ATTEMPT_KEY + "=" + now;
+        }
+
+        function settled(job) {
+          return Promise.resolve(job).catch(function () {});
+        }
+
+        function repair(url) {
+          var jobs = [settled(fetch(url, { cache: "reload" }))];
+          if (window.caches) {
+            jobs.push(settled(caches.keys().then(function (names) {
+              return Promise.all(names.map(function (name) {
+                return caches.delete(name);
+              }));
+            })));
+          }
+          if (navigator.serviceWorker) {
+            jobs.push(settled(navigator.serviceWorker.getRegistrations().then(function (registrations) {
+              return Promise.all(registrations.map(function (registration) {
+                return registration.unregister();
+              }));
+            })));
+          }
+          return Promise.all(jobs);
+        }
+
+        window.addEventListener("error", function (event) {
+          var element = event.target;
+          if (!element || element === window) return;
+          if (element.tagName !== "SCRIPT" && element.tagName !== "LINK") return;
+
+          // Only our own build output. A failing third-party or cross-origin
+          // resource is a different problem and must not wipe the offline shell.
+          var url = element.src || element.href || "";
+          if (url.indexOf(location.origin + "/assets/") !== 0) return;
+
+          console.error("[boot] Program file could not be loaded.", url);
+          if (Date.now() - lastAttempt() < COOLDOWN_MS) {
+            var root = document.getElementById("app");
+            if (root && !root.firstChild) {
+              root.textContent = "MindooDB Teamgrid could not load its program files. Please close the app and open it again.";
+            }
+            return;
+          }
+          rememberAttempt();
+          repair(url).then(function () {
+            location.reload();
+          });
+        }, true);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MindooDB Teamgrid</title>
   </head>
