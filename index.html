@@ -4,25 +4,35 @@
     <meta charset="UTF-8" />
     <script>
       /*
-        Repairs a poisoned browser cache. Stays inline and dependency-free on
-        purpose: it has to survive the one failure that keeps every other line
-        of application code from running, so nothing inside the bundle can do
-        this job -- the bundle is what went missing.
+        Boot-time recovery for a poisoned browser cache.
 
-        A hashed bundle the host has not published yet is answered with
-        index.html: status 200, content-type text/html, four hours of public
-        caching. The browser files markup under a .js address, rejects it as a
-        module script, and keeps rejecting it on every following visit, because
-        the entry counts as fresh. Reloading changes nothing; only a request
-        that bypasses the cache replaces the entry.
+        Why this lives here (inline, no imports): it must run even when every
+        hashed /assets/* file fails to load. Nothing inside the JS/CSS bundle
+        can do this job -- the bundle is what went missing.
+
+        Failure mode: a hashed bundle the host has not published yet can be
+        answered with index.html (status 200, content-type text/html, hours of
+        public caching). The browser then stores HTML under a .js address,
+        rejects it as a module script, and keeps rejecting it on every visit
+        while the cache entry stays fresh. A normal reload does not help; only
+        a cache-bypassing request replaces the entry.
+
+        public/404.html (real HTTP 404 for missing files) stops that response
+        for new visits. This script recovers tabs that already hold a poisoned
+        entry (or hit a similar race right after an update).
+
+        Flow: on a same-origin /assets/ <script> or <link> error, run repair()
+        once per cooldown window, then location.reload(). If it fails again
+        while #app is still empty, show a plain-text message instead of looping.
       */
       (function () {
         var ATTEMPT_KEY = "mindoodb-shell-recovery";
         var COOLDOWN_MS = 60000;
 
-        // Blocked storage must not read as "never tried before" -- that would
-        // reload forever. window.name survives a reload in the same tab and
-        // needs no storage permission, so it carries the marker instead.
+        // Timestamp of the last repair attempt. sessionStorage is preferred;
+        // if storage is blocked, window.name carries the marker instead
+        // (survives reload in the same tab, needs no storage permission).
+        // Treating "unreadable storage" as "never tried" would reload forever.
         function lastAttempt() {
           try {
             var stored = sessionStorage.getItem(ATTEMPT_KEY);
@@ -45,10 +55,22 @@
           window.name = (window.name || "").replace(/mindoodb-shell-recovery=\d+/, "") + ATTEMPT_KEY + "=" + now;
         }
 
+        // Ignore per-job failures so one missing API cannot block the reload.
         function settled(job) {
           return Promise.resolve(job).catch(function () {});
         }
 
+        // Wipe every browser layer that can keep serving the broken asset.
+        // Jobs are kicked off immediately and run in parallel; Promise.all
+        // only waits for them to finish. Up to three jobs:
+        //   1) Always -- re-fetch this URL with cache:"reload" so the HTTP
+        //      cache overwrites a poisoned entry (HTML stored under a .js
+        //      address) with whatever the network returns now.
+        //   2) If Cache Storage exists -- delete every named cache (Workbox /
+        //      PWA offline shell and runtime assets).
+        //   3) If service workers exist -- unregister them so they stop
+        //      answering from precache after the reload.
+        // The caller reloads the page once this settles.
         function repair(url) {
           var jobs = [settled(fetch(url, { cache: "reload" }))];
           if (window.caches) {
@@ -68,6 +90,7 @@
           return Promise.all(jobs);
         }
 
+        // Capture phase: see <script>/<link> load failures before they bubble.
         window.addEventListener("error", function (event) {
           var element = event.target;
           if (!element || element === window) return;
@@ -79,6 +102,9 @@
           if (url.indexOf(location.origin + "/assets/") !== 0) return;
 
           console.error("[boot] Program file could not be loaded.", url);
+          // Cooldown: one automatic repair+reload per minute. A second failure
+          // in that window means repair did not help -- show plain text in
+          // #app instead of looping forever.
           if (Date.now() - lastAttempt() < COOLDOWN_MS) {
             var root = document.getElementById("app");
             if (root && !root.firstChild) {
@@ -88,6 +114,7 @@
           }
           rememberAttempt();
           repair(url).then(function () {
+            // Hard reload so the next boot hits the network / fresh SW state.
             location.reload();
           });
         }, true);
