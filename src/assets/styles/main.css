@@ -233,7 +233,8 @@ select {
   z-index: 1;
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
+  /* Stay content-sized so the refresh control cannot grow over the title. */
+  flex: 0 0 auto;
   min-width: 0;
   gap: 0.25rem;
 }
@@ -282,8 +283,8 @@ select {
 .toolbar__document-tab {
   display: flex;
   align-items: center;
-  flex: 0 1 min(32rem, 36vw);
-  max-width: min(32rem, 36vw);
+  flex: 1 1 auto;
+  max-width: min(32rem, 40%);
   min-width: 0;
   padding: 0.08rem 0.18rem 0.08rem 0.35rem;
   border: 1px solid transparent;
@@ -343,8 +344,12 @@ select {
     width: 1.9rem;
     padding: 0;
   }
+  /* Brand label steals the title row on a phone. */
+  .toolbar__title {
+    display: none;
+  }
   .toolbar__document-tab {
-    max-width: 12rem;
+    max-width: none;
   }
 }
 
@@ -368,8 +373,9 @@ select {
 
 .toolbar__document-title {
   position: relative;
-  flex: 0 1 auto;
-  max-width: min(32rem, 36vw);
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   padding: 0.22rem 0.75rem;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -394,8 +400,8 @@ select {
 }
 
 @media (max-width: 960px) {
-  .toolbar--ios-multitasking .toolbar__title {
-    margin-left: 80px;
+  .toolbar--ios-multitasking .toolbar__leading {
+    padding-left: 80px;
   }
 
   .toolbar__menubar.p-menubar-mobile .p-menubar-root-list {
@@ -414,7 +420,7 @@ select {
 
 
   .toolbar__document-title {
-    max-width: 14rem;
+    max-width: none;
   }
 }
 
@@ -435,6 +441,12 @@ button.toolbar__status-badge {
 button.toolbar__status-badge:hover,
 button.toolbar__status-badge:focus-visible {
   background: rgb(255 255 255 / 0.12);
+}
+
+@media (max-width: 640px) {
+  .toolbar__status-badge {
+    display: none;
+  }
 }
 
 .workspace {
