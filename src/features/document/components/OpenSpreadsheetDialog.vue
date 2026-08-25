@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 /**
  * File / Open dialog backed by a dynamic view navigator.
  *
@@ -13,6 +15,7 @@ import type { MindooDBAppDatabaseInfo } from "mindoodb-app-sdk";
 import TagTreeList from "@/features/document/components/TagTreeList.vue";
 import type { useOpenDialog } from "@/features/document/composables/useOpenDialog";
 
+const { t } = useI18n();
 const props = defineProps<{
   controller: ReturnType<typeof useOpenDialog>;
   selectedDatabaseId: Ref<string>;
@@ -39,13 +42,13 @@ const {
   <Dialog
     v-model:visible="openDialogVisible"
     modal
-    :header="openDialogMode === 'template' ? 'New from template' : 'Open spreadsheet'"
+    :header="openDialogMode === 'template' ? t('app.open.templateTitle') : t('app.open.title')"
     :style="{ width: '58rem', maxWidth: '96vw' }"
     @hide="disposeOpenNavigator"
   >
     <div class="open-dialog">
       <label class="field">
-        Database
+        {{ t('app.open.database') }}
         <select v-model="selectedDatabaseId.value" class="native-input" @change="handleOpenDatabaseChange">
           <option v-for="database in readableDatabases.value" :key="database.id" :value="database.id">{{ database.title || database.id }}</option>
         </select>
@@ -58,13 +61,13 @@ const {
           :disabled="openDialogMode === 'template'"
           @change="handleOpenSpreadsheetTypeChange"
         >
-          <option value="all">All</option>
-          <option value="noTemplates">No templates</option>
-          <option value="onlyTemplates">Only templates</option>
+          <option value="all">{{ t("app.open.all") }}</option>
+          <option value="noTemplates">{{ t("app.open.noTemplates") }}</option>
+          <option value="onlyTemplates">{{ t("app.open.onlyTemplates") }}</option>
         </select>
       </label>
       <div class="open-dialog__browser">
-        <aside class="open-dialog__tree" aria-label="Spreadsheet tags">
+        <aside class="open-dialog__tree" :aria-label="t('app.open.tagsAria')">
           <TagTreeList
             :nodes="openCategoryNodes"
             :selected-key="selectedOpenCategoryKey"
@@ -86,15 +89,15 @@ const {
             <small>{{ document.id }}</small>
           </button>
           <p v-if="openDialogDocuments.length === 0" class="document-list__empty">
-            {{ openDialogMode === "template" ? "No template spreadsheets in this category." : "No spreadsheets in this category." }}
+            {{ openDialogMode === "template" ? t("app.open.emptyTemplates") : t("app.open.empty") }}
           </p>
         </div>
       </div>
     </div>
     <template #footer>
-      <Button label="Cancel" text @click="openDialogVisible = false" />
+      <Button :label="t('common.cancel')" text @click="openDialogVisible = false" />
       <Button
-        :label="openDialogMode === 'template' ? 'Create' : 'Open'"
+        :label="openDialogMode === 'template' ? t('common.create') : t('common.open')"
         icon="pi pi-folder-open"
         :disabled="!selectedOpenDocId"
         @click="openSelectedDocument"

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 /**
  * GridViewport - the spreadsheet surface that renders rows, columns, and
  * cells of a {@link Worksheet} and turns user gestures into semantic
@@ -59,8 +61,11 @@ import {
   useColumnRowResize,
 } from "@/features/grid/composables/useColumnRowResize";
 import { useGridClipboardBridge } from "@/features/grid/composables/useGridClipboardBridge";
+
 import type { CellSelectionRange } from "@/features/grid/composables/useSelection";
 import { createSingleWorksheetFormulaContext, type FormulaContext } from "@/features/formulas/lib";
+
+const { t } = useI18n();
 
 /**
  * Coordinate range used to draw the clipboard source marquee ("marching
@@ -487,8 +492,8 @@ export type { CellId };
                 v-if="viewSheetRefreshVisible"
                 class="grid-corner__refresh"
                 type="button"
-                title="Refresh view sheet"
-                aria-label="Refresh view sheet"
+                :title="t('grid.viewport.refreshViewSheet')"
+                :aria-label="t('grid.viewport.refreshViewSheet')"
                 :disabled="readonly || viewSheetRefreshLoading"
                 @mousedown.prevent.stop
                 @click.stop="emit('refresh-view-sheet')"
@@ -522,7 +527,7 @@ export type { CellId };
 
     <div ref="gridBodyScroll" class="grid-viewport__body" @scroll="syncHeaderScroll">
       <div class="grid-viewport__body-content">
-        <table class="grid-table grid-table--body" aria-label="Spreadsheet grid">
+        <table class="grid-table grid-table--body" :aria-label="t('grid.viewport.spreadsheetGrid')">
           <colgroup>
             <col class="grid-col-row-header">
             <col

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 /**
  * Excel-style formula bar with content assist for the registered functions.
  *
@@ -25,6 +27,7 @@ import Button from "primevue/button";
 import { insertFunctionAtCaret } from "@/features/formulas/lib/assist";
 import type { FunctionDefinition } from "@/features/formulas/lib";
 
+const { t } = useI18n();
 const props = defineProps<{
   modelValue: string;
   activeAddress: string;
@@ -149,7 +152,7 @@ defineExpose({ applyFormulaAssistSuggestion });
 </script>
 
 <template>
-  <section class="formula-bar" aria-label="Formula editor">
+  <section class="formula-bar" :aria-label="t('grid.formula.aria')">
     <span class="formula-bar__address">{{ activeAddress || "A1" }}</span>
     <textarea
       ref="inputEl"
@@ -159,15 +162,15 @@ defineExpose({ applyFormulaAssistSuggestion });
       wrap="soft"
       spellcheck="false"
       :readonly="readonly"
-      placeholder="Enter a value or formula, for example =SUM(A1:B4)"
+      :placeholder="t('grid.formula.placeholder')"
       @focus="emit('begin-edit')"
       @input="updateDraft(($event.target as HTMLTextAreaElement).value)"
       @keydown="handleKeydown"
     />
     <div class="formula-bar__actions">
-      <Button label="fx" text rounded severity="secondary" aria-label="Show formula help" :disabled="readonly" @click="requestHelp" />
-      <Button icon="pi pi-times" text rounded severity="secondary" aria-label="Cancel editing" :disabled="readonly" @click="cancel" />
-      <Button icon="pi pi-check" text rounded aria-label="Apply formula" :disabled="readonly" @click="commit" />
+      <Button label="fx" text rounded severity="secondary" :aria-label="t('grid.formula.help')" :disabled="readonly" @click="requestHelp" />
+      <Button icon="pi pi-times" text rounded severity="secondary" :aria-label="t('grid.formula.cancel')" :disabled="readonly" @click="cancel" />
+      <Button icon="pi pi-check" text rounded :aria-label="t('grid.formula.apply')" :disabled="readonly" @click="commit" />
     </div>
     <p v-if="errorMessage" class="formula-bar__error">{{ errorMessage }}</p>
   </section>

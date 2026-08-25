@@ -36,8 +36,8 @@
     "exceljs": "^4.4.0",
     "fast-formula-parser": "^1.0.19",
     "fflate": "^0.8.3",
-    "mindoodb-app-sdk": "0.0.28",
-    "mindoodb-view-language": "0.0.14",
+    "mindoodb-app-sdk": "0.0.37",
+    "mindoodb-view-language": "0.0.16",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
     "vue": "^3.5.31",
@@ -45,7 +45,8 @@
     "workbox-expiration": "^7.4.1",
     "workbox-precaching": "^7.4.1",
     "workbox-routing": "^7.4.1",
-    "workbox-strategies": "^7.4.1"
+    "workbox-strategies": "^7.4.1",
+    "vue-i18n": "^11.4.8"
   },
   "devDependencies": {
     "@types/d3-scale": "^4.0.9",

@@ -56,11 +56,11 @@ importers:
         specifier: ^0.8.3
         version: 0.8.3
       mindoodb-app-sdk:
-        specifier: 0.0.28
-        version: 0.0.28(@automerge/automerge@3.2.6)
+        specifier: 0.0.37
+        version: 0.0.37(@automerge/automerge@3.4.1)(mindoodb@0.0.53)
       mindoodb-view-language:
-        specifier: 0.0.14
-        version: 0.0.14
+        specifier: 0.0.16
+        version: 0.0.16
       primeicons:
         specifier: ^7.0.0
         version: 7.0.0
@@ -70,6 +70,9 @@ importers:
       vue:
         specifier: ^3.5.31
         version: 3.5.34(typescript@6.0.3)
+      vue-i18n:
+        specifier: ^11.4.8
+        version: 11.4.8(vue@3.5.34(typescript@6.0.3))
       workbox-cacheable-response:
         specifier: ^7.4.1
         version: 7.4.1
@@ -149,8 +152,8 @@ packages:
   '@asamuzakjp/nwsapi@2.3.9':
     resolution: {integrity: sha512-n8GuYSrI9bF7FFZ/SjhwevlHc8xaVlb/7HmHelnc/PZXBD2ZR49NnN9sMMuDdEGPeeRQ5d0hqlSlEpgCX3Wl0Q==}
 
-  '@automerge/automerge@3.2.6':
-    resolution: {integrity: sha512-9/GXXfYYWNVGpnbRrGQzTNU4fWZ3XaEMeEg0OrpK4pvlQSpkmUBoirEb/4TMK6BwMysZGV5Yeneq3wwc7RNGfg==}
+  '@automerge/automerge@3.4.1':
+    resolution: {integrity: sha512-zsZpbs/iDPvp+ZojIYd+gxmbcPVz2Xbkcx778G8zrt3E0zS+6saHJOm666lOuZyNRlTV4wHw9qzGTKueedeCsQ==}
 
   '@babel/code-frame@7.29.0':
     resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
@@ -1097,6 +1100,22 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@intlify/core-base@11.4.8':
+    resolution: {integrity: sha512-A+Q7SKm5oEcy1E/cghqd7n/St4XjTqLhiiyDuieNcMrJcrHlkY5n0jp7Q9dD3txvVHzvsmBVV5M9wD5/s1zfzw==}
+    engines: {node: '>= 22'}
+
+  '@intlify/devtools-types@11.4.8':
+    resolution: {integrity: sha512-MGpID+rlfzGUbNcnC20bm5NMSBHPrvx0atLTfv9dftn3kjXw1hGKDcIcwrO99tSrZEc2i+hczRL7ks8qXsHPkQ==}
+    engines: {node: '>= 22'}
+
+  '@intlify/message-compiler@11.4.8':
+    resolution: {integrity: sha512-vbzk17dYwduYiv52EK61+FDCyhfVg1uPUtPmiD/d45W99uJIcXywrweOBcHv7n9/iEqmXiMGT52bgJbZDQqK3w==}
+    engines: {node: '>= 22'}
+
+  '@intlify/shared@11.4.8':
+    resolution: {integrity: sha512-XbRgrv+XEuvDr7UCY55oibVrh+o4u+A0VB6nSL0F5Z8LcZxE/8j573LYG6bCrOigIcHdGpSNI7Rh5UpC5/B/eg==}
+    engines: {node: '>= 22'}
+
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
     engines: {node: '>=12'}
@@ -1573,6 +1592,9 @@ packages:
 
   '@vue/compiler-ssr@3.5.34':
     resolution: {integrity: sha512-cDtTHKibkThKGHH1SP+WdccquNRYQDFH6rRjQCqT9G2ltFAfoR5pUftpab/z+aM5mW9HLLVQW7hfKKQe/1GBeQ==}
+
+  '@vue/devtools-api@6.6.4':
+    resolution: {integrity: sha512-sGhTPMuXqZ1rVOk32RylztWkfXTRhuS7vgAKv0zjqk8gbsHkJ7xfFf+jbySxt7tWObEJwyKaHMikV/WGDiQm8g==}
 
   '@vue/language-core@3.2.8':
     resolution: {integrity: sha512-9OiSPQFiAAWNVnXb0d2dcTmcKnFQamhuNES6ayyISrb/mwPWVgoGdAqSfCWqKhQpa3D5gDTcYD+w7ObiheZ81g==}
@@ -2544,21 +2566,24 @@ packages:
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
 
-  mindoodb-app-sdk@0.0.28:
-    resolution: {integrity: sha512-IwGE0VEQm1pEgtFQVJFWgmM2hvQsEjMts7d/CQVEWr9Xc8/9rCW1d/a5UEwraBlXkb5+UqrBlJ3FswS6iHhDHQ==}
+  mindoodb-app-sdk@0.0.37:
+    resolution: {integrity: sha512-rnHVgHPbMn43kntU/1SIue4UwUdKnLn2eQjZQcrQvGXlU9mp9Zu38UhC8GoXdmSda9vK+T0Pt9FIghd39sY+ZQ==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
-      '@automerge/automerge': ^3.2.1
+      '@automerge/automerge': ^3.3.2
+      mindoodb: '>=0.0.53'
     peerDependenciesMeta:
       '@automerge/automerge':
         optional: true
+      mindoodb:
+        optional: true
 
-  mindoodb-view-language@0.0.14:
-    resolution: {integrity: sha512-3FhCwDOo8snQ2Zw9M4weMbcmxRHtPH6QmgIvywqwMkx6IvxN+S7ksGqAyaEiA6KL4kKoin8dByC+76LLMn1hOw==}
+  mindoodb-view-language@0.0.16:
+    resolution: {integrity: sha512-xFgD8YgfcT8AWTLU4WyscUgxrEr1sTWBHf+qqWd+39PMT7bxPoxJrkHcJB5PHO7G8xWLUFG9QYk7HJ9KG+6IVA==}
     engines: {node: '>=22.13.0'}
 
-  mindoodb@0.0.32:
-    resolution: {integrity: sha512-+fzUV40LVx+HSZy6YDgV82Mta1+I83is3AQwzDTeE1nMicLzy+ThHase0jtexWMRAi1dDFSSllzYxnkCOx0i7A==}
+  mindoodb@0.0.53:
+    resolution: {integrity: sha512-VzZEM/nJwiiKQLJn+/5Hg+ioitBlpfMFlFqzDazmx5eLentDhFNBa5WABzML1V3pwp05Zxl+GTAqcDm9W7oyHQ==}
     engines: {node: '>=22.13.0'}
     hasBin: true
     peerDependencies:
@@ -3117,9 +3142,8 @@ packages:
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
-  uuid@10.0.0:
-    resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
-    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+  uuid@11.1.1:
+    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
     hasBin: true
 
   uuid@8.3.2:
@@ -3233,6 +3257,12 @@ packages:
 
   vue-component-type-helpers@3.2.8:
     resolution: {integrity: sha512-9689efAXhN/EV86plgkL/XFiJSXhGtWPG6JDboZ+QnjlUWUUQrQ0ILKQtw4iQsuwIwu5k6Aw+JnehDe7161e7A==}
+
+  vue-i18n@11.4.8:
+    resolution: {integrity: sha512-0ULeHP6Z9CGvAm67S77ZEp41cfGXIREGL8qfhos2BMgcQQewtQcDKuojt6jjasAD/S8GwfTp2ySPmDSpwvrCMQ==}
+    engines: {node: '>= 22'}
+    peerDependencies:
+      vue: ^3.0.0
 
   vue-tsc@3.2.8:
     resolution: {integrity: sha512-27vTLJ6Q2370obOd0PFYoYoKnmXJ521uUIedrs3Zhhhg/8YG10VOCMmwt+JQslatpAMTDbnWiitLnoD5VlIvog==}
@@ -3431,7 +3461,7 @@ snapshots:
 
   '@asamuzakjp/nwsapi@2.3.9': {}
 
-  '@automerge/automerge@3.2.6': {}
+  '@automerge/automerge@3.4.1': {}
 
   '@babel/code-frame@7.29.0':
     dependencies:
@@ -4378,6 +4408,24 @@ snapshots:
   '@img/sharp-win32-x64@0.34.5':
     optional: true
 
+  '@intlify/core-base@11.4.8':
+    dependencies:
+      '@intlify/devtools-types': 11.4.8
+      '@intlify/message-compiler': 11.4.8
+      '@intlify/shared': 11.4.8
+
+  '@intlify/devtools-types@11.4.8':
+    dependencies:
+      '@intlify/core-base': 11.4.8
+      '@intlify/shared': 11.4.8
+
+  '@intlify/message-compiler@11.4.8':
+    dependencies:
+      '@intlify/shared': 11.4.8
+      source-map-js: 1.2.1
+
+  '@intlify/shared@11.4.8': {}
+
   '@isaacs/cliui@8.0.2':
     dependencies:
       string-width: 5.1.2
@@ -4781,6 +4829,8 @@ snapshots:
     dependencies:
       '@vue/compiler-dom': 3.5.34
       '@vue/shared': 3.5.34
+
+  '@vue/devtools-api@6.6.4': {}
 
   '@vue/language-core@3.2.8':
     dependencies:
@@ -5836,11 +5886,12 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mindoodb-app-sdk@0.0.28(@automerge/automerge@3.2.6):
+  mindoodb-app-sdk@0.0.37(@automerge/automerge@3.4.1)(mindoodb@0.0.53):
     dependencies:
-      mindoodb-view-language: 0.0.14
+      mindoodb-view-language: 0.0.16
     optionalDependencies:
-      '@automerge/automerge': 3.2.6
+      '@automerge/automerge': 3.4.1
+      mindoodb: 0.0.53
     transitivePeerDependencies:
       - expo-standard-web-crypto
       - node-forge
@@ -5848,9 +5899,9 @@ snapshots:
       - react-native-quick-crypto
       - tweetnacl
 
-  mindoodb-view-language@0.0.14:
+  mindoodb-view-language@0.0.16:
     dependencies:
-      mindoodb: 0.0.32
+      mindoodb: 0.0.53
     transitivePeerDependencies:
       - expo-standard-web-crypto
       - node-forge
@@ -5858,11 +5909,11 @@ snapshots:
       - react-native-quick-crypto
       - tweetnacl
 
-  mindoodb@0.0.32:
+  mindoodb@0.0.53:
     dependencies:
-      '@automerge/automerge': 3.2.6
+      '@automerge/automerge': 3.4.1
       minisearch: 7.2.0
-      uuid: 10.0.0
+      uuid: 11.1.1
 
   miniflare@4.20260508.0:
     dependencies:
@@ -6522,7 +6573,7 @@ snapshots:
 
   util-deprecate@1.0.2: {}
 
-  uuid@10.0.0: {}
+  uuid@11.1.1: {}
 
   uuid@8.3.2: {}
 
@@ -6585,6 +6636,14 @@ snapshots:
   vscode-uri@3.1.0: {}
 
   vue-component-type-helpers@3.2.8: {}
+
+  vue-i18n@11.4.8(vue@3.5.34(typescript@6.0.3)):
+    dependencies:
+      '@intlify/core-base': 11.4.8
+      '@intlify/devtools-types': 11.4.8
+      '@intlify/shared': 11.4.8
+      '@vue/devtools-api': 6.6.4
+      vue: 3.5.34(typescript@6.0.3)
 
   vue-tsc@3.2.8(typescript@6.0.3):
     dependencies:

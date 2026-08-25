@@ -5,15 +5,35 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "jsx": "preserve",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["node"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ],
     "skipLibCheck": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "mindoodb-app-sdk": ["../mindoodb-app-sdk/src/index.ts"],
-      "mindoodb-app-sdk/testing": ["../mindoodb-app-sdk/src/testing/index.ts"],
-      "mindoodb-view-language": ["../mindoodb-view-language/src/index.ts"]
-    }
+      "@/*": [
+        "./src/*"
+      ],
+      "mindoodb-app-sdk": [
+        "../mindoodb-app-sdk/src/index.ts"
+      ],
+      "mindoodb-app-sdk/testing": [
+        "../mindoodb-app-sdk/src/testing/index.ts"
+      ],
+      "mindoodb-view-language": [
+        "../mindoodb-view-language/src/index.ts"
+      ]
+    },
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "vite.config.ts",
+    "src/**/*.json"
+  ]
 }

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 /**
  * Tab strip rendered below the grid for switching between worksheets.
  *
@@ -34,6 +36,7 @@ import ContextMenu from "primevue/contextmenu";
 import type { MenuItem } from "primevue/menuitem";
 import type { TeamGridDocumentV1, WorksheetId } from "@/features/document/lib/teamgridDocument";
 
+const { t } = useI18n();
 const props = defineProps<{
   grid: TeamGridDocumentV1;
   activeWorksheetId: WorksheetId | null;
@@ -64,7 +67,7 @@ const contextMenuItems = computed<MenuItem[]>(() => {
   const canDelete = targetId !== null && visibleWorksheetIds.value.length > 1;
   return [
     {
-      label: "Rename",
+      label: t("grid.sheets.rename"),
       icon: "pi pi-pencil",
       disabled: props.readonly || targetId === null,
       command: () => {
@@ -74,7 +77,7 @@ const contextMenuItems = computed<MenuItem[]>(() => {
       },
     },
     {
-      label: "View Sheet Settings...",
+      label: t("grid.sheets.viewSettings"),
       icon: "pi pi-table",
       disabled: props.readonly || targetId === null || !props.grid.workbook.worksheetsById[targetId]?.viewBinding,
       command: () => {
@@ -84,7 +87,7 @@ const contextMenuItems = computed<MenuItem[]>(() => {
       },
     },
     {
-      label: "Delete",
+      label: t("common.delete"),
       icon: "pi pi-trash",
       disabled: props.readonly || !canDelete,
       command: () => {
@@ -98,13 +101,13 @@ const contextMenuItems = computed<MenuItem[]>(() => {
 
 const addMenuItems = computed<MenuItem[]>(() => [
   {
-    label: "Add Sheet",
+    label: t("grid.sheets.addSheet"),
     icon: "pi pi-plus",
     disabled: props.readonly,
     command: () => emit("add"),
   },
   {
-    label: "Add Virtual View Sheet",
+    label: t("grid.sheets.addViewSheet"),
     icon: "pi pi-table",
     disabled: props.readonly,
     command: () => emit("add-view"),
@@ -122,7 +125,7 @@ function openAddMenu(event: MouseEvent) {
 </script>
 
 <template>
-  <nav class="worksheet-tabs" aria-label="Worksheets">
+  <nav class="worksheet-tabs" :aria-label="t('grid.sheets.aria')">
     <button
       v-for="worksheetId in visibleWorksheetIds"
       :key="worksheetId"
@@ -139,7 +142,7 @@ function openAddMenu(event: MouseEvent) {
         class="worksheet-tab__delete"
         role="button"
         tabindex="0"
-        aria-label="Delete worksheet"
+        :aria-label="t('grid.sheets.delete')"
         @click.stop="emit('delete', worksheetId)"
         @keyup.enter.stop="emit('delete', worksheetId)"
       >
@@ -151,7 +154,7 @@ function openAddMenu(event: MouseEvent) {
       text
       rounded
       size="small"
-      aria-label="Add worksheet"
+      :aria-label="t('grid.sheets.add')"
       :disabled="readonly"
       @click="openAddMenu"
     />

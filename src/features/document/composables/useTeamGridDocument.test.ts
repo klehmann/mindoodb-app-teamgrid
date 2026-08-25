@@ -25,12 +25,14 @@ const fakeSession = {
   getLaunchContext: vi.fn(),
   onThemeChange: vi.fn(() => vi.fn()),
   onUiPreferencesChange: vi.fn(() => vi.fn()),
+  onLocaleChange: vi.fn(() => vi.fn()),
   openDatabase: vi.fn(),
   createViewNavigator: vi.fn(),
   disconnect: vi.fn(),
 };
 
 vi.mock("mindoodb-app-sdk", () => ({
+  abbreviateCanonicalName: (value: string) => value,
   createMindooDBAppBridge: vi.fn(() => ({
     connect: vi.fn(async () => fakeSession),
   })),
@@ -49,6 +51,8 @@ describe("useTeamGridDocument open sessions", () => {
       runtime: "iframe",
       theme: {},
       uiPreferences: { iosMultitaskingOptimized: false },
+      locale: "en",
+      user: { id: "u1", username: "cn=Test/o=Acme" },
     });
     fakeSession.openDatabase.mockResolvedValue(fakeDatabase);
     let nextDocumentId = 1;

@@ -8,7 +8,10 @@
  */
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
+import { useI18n } from "vue-i18n";
+import DocumentRecipientsField from "@/features/document/components/DocumentRecipientsField.vue";
 import type { useDocumentPropertiesDialog } from "@/features/document/composables/useDocumentPropertiesDialog";
+
 
 const props = defineProps<{
   controller: ReturnType<typeof useDocumentPropertiesDialog>;
@@ -24,7 +27,16 @@ const {
   propertiesLocaleOptions,
   applyDocumentProperties,
   resetPropertiesDraft,
+  propertiesIsSealed,
+  propertiesRecipientsDraft,
+  propertiesDirectoryUsers,
+  propertiesRecipientsError,
+  propertiesApplying,
+  propertiesCurrentUserName,
+  propertiesCurrentUserCanonical,
 } = props.controller;
+
+const { t } = useI18n();
 
 function cancel() {
   propertiesDialogVisible.value = false;
@@ -36,33 +48,42 @@ function cancel() {
   <Dialog
     v-model:visible="propertiesDialogVisible"
     modal
-    header="Spreadsheet properties"
+    :header="t('app.properties.title')"
     :style="{ width: '34rem', maxWidth: '96vw' }"
   >
     <div class="properties-dialog">
       <label class="field">
-        Title
+        {{ t('app.properties.titleLabel') }}
         <input v-model="propertiesTitleDraft" class="native-input" type="text" autocomplete="off">
       </label>
       <label class="field">
-        Tags
+        {{ t('app.properties.tagsLabel') }}
         <textarea v-model="propertiesTagsDraft" class="native-input native-input--textarea" rows="6" placeholder="Work\Planning&#10;Finance" />
       </label>
-      <p class="properties-dialog__hint">Enter one tag per line. Use a backslash to create hierarchy, for example <code>Work\Planning</code>.</p>
+      <p class="properties-dialog__hint">{{ t("app.properties.tagsHint") }}</p>
       <label class="field">
-        Locale
+        {{ t('app.properties.localeLabel') }}
         <select v-model="propertiesLocaleDraft" class="native-input">
           <option v-for="option in propertiesLocaleOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
       </label>
       <label class="properties-dialog__checkbox">
         <input v-model="propertiesIsTemplateDraft" type="checkbox">
-        Use this spreadsheet as a template
+        {{ t('app.properties.useAsTemplate') }}
       </label>
+      <DocumentRecipientsField
+        v-if="propertiesIsSealed"
+        v-model="propertiesRecipientsDraft"
+        :current-user-name="propertiesCurrentUserName"
+        :current-user-canonical="propertiesCurrentUserCanonical"
+        :directory-users="propertiesDirectoryUsers"
+        :disabled="readOnly || propertiesApplying"
+      />
+      <p v-if="propertiesRecipientsError" class="properties-dialog__hint">{{ propertiesRecipientsError }}</p>
     </div>
     <template #footer>
-      <Button label="Cancel" text @click="cancel" />
-      <Button label="Apply" icon="pi pi-check" :disabled="readOnly" @click="applyDocumentProperties" />
+      <Button :label="t('common.cancel')" text @click="cancel" />
+      <Button :label="t('common.apply')" icon="pi pi-check" :disabled="readOnly || propertiesApplying" @click="applyDocumentProperties" />
     </template>
   </Dialog>
 </template>

@@ -19,3 +19,9 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
     }),
   });
 }
+
+import { config } from "@vue/test-utils";
+import { i18n, setUiLanguage } from "@/i18n";
+
+setUiLanguage("en");
+config.global.plugins.push(i18n);

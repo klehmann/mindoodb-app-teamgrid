@@ -20,6 +20,7 @@ import "@fontsource/tinos/latin-700.css";
 import "primeicons/primeicons.css";
 
 import App from "./App.vue";
+import { i18n } from "@/i18n";
 import "@/assets/styles/main.css";
 import { registerTeamGridServiceWorker } from "@/app/pwa/appUpdate";
 import { TEAMGRID_BOOT_COMPLETED_EVENT } from "@/app/pwa/bootRecovery";
@@ -28,6 +29,7 @@ import { applyAppTheme, buildPrimeVueTheme } from "@/shared/lib/theme";
 async function bootstrap() {
   const app = createApp(App);
 
+  app.use(i18n);
   app.use(PrimeVue, {
     ripple: true,
     theme: buildPrimeVueTheme(),

@@ -46,9 +46,11 @@ import {
   type MindooDBAppRuntime,
   type MindooDBAppSession,
   type MindooDBAppUiPreferences,
+  abbreviateCanonicalName,
 } from "mindoodb-app-sdk";
 
 import { applyAppTheme } from "@/shared/lib/theme";
+import { setUiLanguage, t } from "@/i18n";
 import { canMutateGrid, isGridSessionReadOnly } from "@/shared/lib/capabilities";
 import {
   hasTeamGridOperations,
@@ -86,6 +88,8 @@ interface OpenSpreadsheetSession {
  */
 export function useTeamGridDocument() {
   const session = ref<MindooDBAppSession | null>(null);
+  const currentUserName = ref("");
+  const currentUserCanonical = ref("");
   const databases = ref<MindooDBAppDatabaseInfo[]>([]);
   const configuredViews = ref<MindooDBAppResolvedViewDefinition[]>([]);
   const selectedDatabaseId = ref("");
@@ -111,6 +115,7 @@ export function useTeamGridDocument() {
 
   let cleanupTheme: (() => void) | null = null;
   let cleanupUiPreferences: (() => void) | null = null;
+  let cleanupLocale: (() => void) | null = null;
 
   const readableDatabases = computed(() => databases.value.filter((database) => database.capabilities.includes("read")));
   const creatableDatabases = computed(() => databases.value.filter((database) => database.capabilities.includes("create")));
@@ -167,6 +172,10 @@ export function useTeamGridDocument() {
       const nextSession = await bridge.connect();
       session.value = nextSession;
       const context = await nextSession.getLaunchContext();
+      currentUserCanonical.value = context.user?.username ?? "";
+      currentUserName.value = abbreviateCanonicalName(currentUserCanonical.value) || currentUserCanonical.value;
+      setUiLanguage(context.locale);
+      cleanupLocale = nextSession.onLocaleChange((locale) => setUiLanguage(locale));
       launchTimeTravelDate.value = context.timeTravelDate ?? null;
       applyAppTheme(context.theme);
       cleanupTheme = nextSession.onThemeChange((theme) => applyAppTheme(theme));
@@ -181,7 +190,7 @@ export function useTeamGridDocument() {
         ?? readableDatabases.value[0]?.id
         ?? context.databases[0]?.id
         ?? "";
-      status.value = "Connected. Choose File / New or File / Open.";
+      status.value = t("app.status.connected");
     } catch (error) {
       showError(error);
     }
@@ -190,6 +199,7 @@ export function useTeamGridDocument() {
   onBeforeUnmount(async () => {
     cleanupTheme?.();
     cleanupUiPreferences?.();
+    cleanupLocale?.();
     await session.value?.disconnect();
   });
 
@@ -202,7 +212,7 @@ export function useTeamGridDocument() {
    */
   async function openDatabaseById(databaseId: string) {
     if (!session.value || !databaseId) {
-      throw new Error("Select a database first.");
+      throw new Error(t("app.status.selectDatabase"));
     }
     return await session.value.openDatabase(databaseId);
   }
@@ -215,14 +225,14 @@ export function useTeamGridDocument() {
    */
   async function createViewNavigator(input: MindooDBAppCreateViewNavigatorInput): Promise<MindooDBAppViewNavigator> {
     if (!session.value) {
-      throw new Error("Connect to Haven before opening a view.");
+      throw new Error(t("app.status.connectBeforeView"));
     }
     return await session.value.createViewNavigator(input);
   }
 
   async function openViewNavigator(viewId: string, options?: MindooDBAppViewNavigatorOpenOptions): Promise<MindooDBAppViewNavigator> {
     if (!session.value) {
-      throw new Error("Connect to Haven before opening a view.");
+      throw new Error(t("app.status.connectBeforeView"));
     }
     return await session.value.openViewNavigator(viewId, options);
   }
@@ -255,22 +265,40 @@ export function useTeamGridDocument() {
    * action remains useful even when the user only has read access to the
    * primary database.
    */
-  async function createNewDocument(envelopeOverride?: TeamGridDocumentEnvelope) {
+  type SpreadsheetEncryption =
+    | { mode: "shared"; decryptionKeyId?: string }
+    | { mode: "people"; recipients: string[] };
+
+  async function createNewDocument(
+    envelopeOverride?: TeamGridDocumentEnvelope,
+    options?: { databaseId?: string; encryption?: SpreadsheetEncryption },
+  ) {
     try {
-      const targetDatabaseInfo = selectedDatabaseInfo.value?.capabilities.includes("create")
-        ? selectedDatabaseInfo.value
-        : creatableDatabases.value[0];
+      const requestedDatabase = options?.databaseId
+        ? creatableDatabases.value.find((database) => database.id === options.databaseId)
+        : undefined;
+      const targetDatabaseInfo = requestedDatabase
+        ?? (selectedDatabaseInfo.value?.capabilities.includes("create")
+          ? selectedDatabaseInfo.value
+          : creatableDatabases.value[0]);
       if (!targetDatabaseInfo) {
-        throw new Error("No writable database is available.");
+        throw new Error(t("app.create.noWritable"));
       }
       selectedDatabaseId.value = targetDatabaseInfo.id;
       const database = await openDatabaseById(targetDatabaseInfo.id);
-      const envelope = envelopeOverride ?? createTeamGridDocument("Untitled spreadsheet");
-      const document = await database.documents.create({
+      const envelope = envelopeOverride ?? createTeamGridDocument(t("common.untitled"));
+      const encryption = options?.encryption;
+      const createInput: Record<string, unknown> = {
         set: envelope as unknown as Record<string, unknown>,
-      });
+      };
+      if (encryption?.mode === "people") {
+        createInput.recipients = encryption.recipients;
+      } else if (encryption?.mode === "shared" && encryption.decryptionKeyId) {
+        createInput.decryptionKeyId = encryption.decryptionKeyId;
+      }
+      const document = await database.documents.create(createInput as { set: Record<string, unknown> });
       loadDocument(database, targetDatabaseInfo.id, document);
-      status.value = `Created ${document.id}.`;
+      status.value = t("app.status.createdId", { id: document.id });
     } catch (error) {
       showError(error);
     }
@@ -286,12 +314,12 @@ export function useTeamGridDocument() {
       const sourceDatabase = await openDatabaseById(sourceDatabaseId);
       const templateDocument = await sourceDatabase.documents.get(templateDocumentId);
       if (!templateDocument) {
-        throw new Error("Select a template to use.");
+        throw new Error(t("app.status.selectTemplate"));
       }
       const templateEnvelope = migrateTeamGridDocument(templateDocument.data);
       const envelope: TeamGridDocumentEnvelope = {
         ...templateEnvelope,
-        subject: `Copy of ${templateEnvelope.subject || "Untitled spreadsheet"}`,
+        subject: t("app.create.copyOf", { title: templateEnvelope.subject || t("common.untitled") }),
         istemplate: false,
         teamgrid: cloneTeamGridDocument(templateEnvelope.teamgrid),
       };
@@ -308,10 +336,10 @@ export function useTeamGridDocument() {
       const database = await openDatabaseById(databaseId);
       const document = await database.documents.get(documentId);
       if (!document) {
-        throw new Error("Select a document to open.");
+        throw new Error(t("app.status.selectDocument"));
       }
       loadDocument(database, databaseId, document);
-      status.value = `Opened ${document.id}.`;
+      status.value = t("app.status.openedId", { id: document.id });
     } catch (error) {
       showError(error);
     }
@@ -326,16 +354,16 @@ export function useTeamGridDocument() {
    */
   async function refreshCurrentDocument() {
     if (!currentDatabase.value || !currentDocument.value) {
-      status.value = "Open a document before refreshing.";
+      status.value = t("app.status.refreshNeedsDocument");
       return;
     }
     try {
       const document = await currentDatabase.value.documents.get(currentDocument.value.id);
       if (!document) {
-        throw new Error("The document is no longer available.");
+        throw new Error(t("app.status.documentGone"));
       }
       loadDocument(currentDatabase.value, currentDatabaseId.value, document);
-      status.value = "Reloaded the current spreadsheet.";
+      status.value = t("app.status.reloaded");
     } catch (error) {
       showError(error);
     }
@@ -360,7 +388,7 @@ export function useTeamGridDocument() {
       return false;
     }
     loadDocument(currentDatabase.value, currentDatabaseId.value, fresh);
-    status.value = "Merged remote changes.";
+    status.value = t("app.status.mergedRemote");
     return true;
   }
 
@@ -379,22 +407,22 @@ export function useTeamGridDocument() {
    */
   async function saveDocument() {
     if (!currentDatabase.value || !currentDocument.value || !currentEnvelope.value) {
-      status.value = "Open or create a spreadsheet before saving.";
+      status.value = t("app.status.saveNeedsDocument");
       return;
     }
     if (gridReadOnly.value) {
       status.value = isTimeTravelActive.value
-        ? "Time travel mode is read-only."
-        : "Historical revisions are read-only. Return to the current version before saving.";
+        ? t("app.status.timeTravelReadOnly")
+        : t("app.status.historicalSaveReadOnly");
       return;
     }
     if (!currentCanUpdate.value) {
-      status.value = "This application does not have write access to the current database.";
+      status.value = t("app.status.saveNeedsWrite");
       return;
     }
     try {
       if (!hasTeamGridOperations(pendingOps.value)) {
-        status.value = "No granular spreadsheet changes are pending.";
+        status.value = t("app.status.noPendingChanges");
         isDirty.value = false;
         return;
       }
@@ -408,7 +436,7 @@ export function useTeamGridDocument() {
       isDirty.value = false;
       snapshotActiveSession();
       const reconciled = JSON.stringify(returnedEnvelope) !== JSON.stringify(optimisticEnvelope);
-      status.value = reconciled ? "Saved and merged concurrent changes." : "Saved.";
+      status.value = reconciled ? t("app.status.savedReconciled") : t("app.status.saved");
     } catch (error) {
       showError(error);
     }
@@ -417,11 +445,11 @@ export function useTeamGridDocument() {
   /** Hard-delete the currently open document from its database. */
   async function deleteCurrentDocument() {
     if (!currentDatabase.value || !currentDocument.value) {
-      status.value = "Open a spreadsheet before deleting.";
+      status.value = t("app.status.deleteNeedsDocument");
       return;
     }
     if (!canDelete.value) {
-      status.value = "This application cannot delete the current spreadsheet.";
+      status.value = t("app.status.deleteNeedsAccess");
       return;
     }
     try {
@@ -435,7 +463,7 @@ export function useTeamGridDocument() {
       } else {
         clearActiveDocumentState();
       }
-      status.value = `Deleted ${deletedId}.`;
+      status.value = t("app.status.deletedId", { id: deletedId });
     } catch (error) {
       showError(error);
     }
@@ -481,8 +509,8 @@ export function useTeamGridDocument() {
       const snapshot = await currentDatabase.value.documents.getAtRevision(currentDocument.value.id, revisionId);
       if (snapshot.state !== "exists" || !snapshot.data) {
         status.value = snapshot.state === "deleted"
-          ? "That revision is a deletion marker and cannot be opened."
-          : "That revision is no longer available.";
+          ? t("app.status.revisionDeleted")
+          : t("app.status.revisionUnavailable");
         return;
       }
       viewingHistoricalSnapshot.value = snapshot;
@@ -490,7 +518,7 @@ export function useTeamGridDocument() {
       pendingOps.value = [];
       pendingOpsBaseHeads.value = [];
       isDirty.value = false;
-      status.value = "Opened historical revision read-only.";
+      status.value = t("app.status.openedHistorical");
     } catch (error) {
       showError(error);
     }
@@ -509,7 +537,7 @@ export function useTeamGridDocument() {
     pendingOps.value = [];
     pendingOpsBaseHeads.value = [];
     isDirty.value = false;
-    status.value = "Returned to the current spreadsheet.";
+    status.value = t("app.status.returnedToCurrentSpreadsheet");
   }
 
   /**
@@ -585,11 +613,11 @@ export function useTeamGridDocument() {
     snapshotActiveSession();
     const session = openSpreadsheetSessions.value.find((candidate) => candidate.id === sessionId);
     if (!session) {
-      status.value = "That spreadsheet window is no longer open.";
+      status.value = t("app.status.windowMissing");
       return;
     }
     activateSession(session);
-    status.value = `Switched to ${session.envelope.subject || session.documentId}.`;
+    status.value = t("app.status.switchedTo", { title: session.envelope.subject || session.documentId });
   }
 
   function closeOpenSession(sessionId: string, options: { discardChanges?: boolean } = {}) {
@@ -599,7 +627,7 @@ export function useTeamGridDocument() {
       return false;
     }
     if (session.isDirty && !options.discardChanges) {
-      status.value = "Save the spreadsheet before closing its window.";
+      status.value = t("app.closeBeforeSave");
       return false;
     }
     openSpreadsheetSessions.value = openSpreadsheetSessions.value.filter((candidate) => candidate.id !== sessionId);
@@ -687,6 +715,11 @@ export function useTeamGridDocument() {
     openSessions,
     activeSpreadsheetSessionId,
     readableDatabases,
+    session,
+    creatableDatabases,
+    currentDatabase,
+    currentUserName,
+    currentUserCanonical,
     selectedDatabaseInfo,
     currentDatabaseInfo,
     currentCanBrowseHistory,

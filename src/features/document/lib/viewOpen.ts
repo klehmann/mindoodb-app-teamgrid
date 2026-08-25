@@ -27,6 +27,7 @@ import {
 } from "mindoodb-app-sdk";
 
 import { normalizeTags } from "@/features/document/lib/teamgridDocument";
+import { t } from "@/i18n";
 
 /** Synthetic key for the root "All spreadsheets" node shown above the tag tree. */
 export const ALL_SPREADSHEETS_NODE_KEY = "all";
@@ -43,6 +44,8 @@ export interface OpenCategoryNode {
   count: number;
   /** Nested categories sorted by the view's ascending sort. */
   children: OpenCategoryNode[];
+  /** Hierarchical tag path when this node maps to a real tag. */
+  tag?: string;
 }
 
 /** One document row rendered on the right side of File/Open. */
@@ -71,19 +74,19 @@ export function createOpenViewDefinition(type: OpenSpreadsheetType = "noTemplate
   const v = createViewLanguage();
   const definition: MindooDBAppViewDefinition = {
     id: `teamgrid-open-tags-${type}-v1`,
-    title: "Teamgrid spreadsheets by tag",
+    title: t("app.open.viewTitle"),
     defaultExpand: "expanded",
     columns: [
       {
         name: "tags",
-        title: "Tags",
+        title: t("app.open.columnTags"),
         role: "category",
         expression: v.field("tags"),
         sorting: "ascending",
       },
       {
         name: "subject",
-        title: "Title",
+        title: t("app.open.columnTitle"),
         role: "display",
         expression: v.field("subject"),
         sorting: "ascending",
@@ -135,7 +138,7 @@ export async function collectNavigatorEntries(navigator: MindooDBAppViewNavigato
 export function buildOpenCategoryTree(categoryEntries: MindooDBAppViewEntry[], documentCount: number) {
   const root: OpenCategoryNode = {
     key: ALL_SPREADSHEETS_NODE_KEY,
-    label: "All spreadsheets",
+    label: t("app.open.allSpreadsheets"),
     count: documentCount,
     children: [],
   };
@@ -146,6 +149,7 @@ export function buildOpenCategoryTree(categoryEntries: MindooDBAppViewEntry[], d
       label: readCategoryLabel(entry),
       count: entry.descendantDocumentCount ?? 0,
       children: [],
+      tag: categoryTagFromPath(entry.categoryPath),
     };
     nodesByKey.set(node.key, node);
   }
@@ -200,16 +204,38 @@ function mapDocumentEntry(entry: MindooDBAppViewEntry) {
     id: entry.docId,
     title: readTitle(entry),
     tags,
-    detail: tags.join(", ") || "Untagged",
+    detail: tags.join(", ") || t("app.open.untagged"),
   };
 }
 
 function readTitle(entry: MindooDBAppViewEntry) {
   const value = entry.columnValues.subject;
-  return typeof value === "string" && value.trim() ? value : entry.docId ?? "Untitled spreadsheet";
+  return typeof value === "string" && value.trim() ? value : entry.docId ?? t("common.untitled");
 }
 
 function readCategoryLabel(entry: MindooDBAppViewEntry) {
   const value = entry.categoryPath.at(-1);
-  return value == null || value === "" ? "Untagged" : String(value);
+  return value == null || value === "" ? t("app.open.untagged") : String(value);
 }
+
+function categoryTagFromPath(categoryPath: unknown[]) {
+  const parts: string[] = [];
+  for (const part of categoryPath ?? []) {
+    if (typeof part !== "string" && typeof part !== "number") continue;
+    const value = String(part).trim();
+    if (value) parts.push(value);
+  }
+  return parts.length > 0 ? parts.join("\\") : undefined;
+}
+
+/** Keep only category nodes that represent a real existing tag. */
+export function usableExistingTagNodes(nodes: OpenCategoryNode[]): OpenCategoryNode[] {
+  return nodes.flatMap((node) => {
+    const children = usableExistingTagNodes(node.children);
+    if (node.tag) {
+      return [{ ...node, children }];
+    }
+    return children;
+  });
+}
+

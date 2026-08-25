@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 /**
  * Confirmation dialog shown before closing a dirty spreadsheet session.
  * Confirming intentionally discards local pending operations for that window.
@@ -6,6 +8,7 @@
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 
+const { t } = useI18n();
 defineProps<{
   title: string;
 }>();
@@ -26,13 +29,13 @@ function discard() {
   <Dialog
     v-model:visible="visible"
     modal
-    header="Discard changes?"
+    :header="t('app.confirm.discardTitle')"
     :style="{ width: '28rem', maxWidth: '96vw' }"
   >
-    <p>{{ title }} has unsaved changes. Close it and discard those changes?</p>
+    <p>{{ t('app.confirm.discardBody', { title }) }}</p>
     <template #footer>
-      <Button label="Keep editing" text @click="visible = false" />
-      <Button label="Discard changes" icon="pi pi-times" severity="danger" @click="discard" />
+      <Button :label="t('common.keepEditing')" text @click="visible = false" />
+      <Button :label="t('app.confirm.discardConfirm')" icon="pi pi-times" severity="danger" @click="discard" />
     </template>
   </Dialog>
 </template>

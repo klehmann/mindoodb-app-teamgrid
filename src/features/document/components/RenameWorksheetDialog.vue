@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 /**
  * Modal-driven rename input for a worksheet tab.
  *
@@ -10,6 +12,7 @@ import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import type { useWorksheetDialogs } from "@/features/document/composables/useWorksheetDialogs";
 
+const { t } = useI18n();
 const props = defineProps<{
   controller: ReturnType<typeof useWorksheetDialogs>;
 }>();
@@ -25,11 +28,11 @@ const {
   <Dialog
     v-model:visible="renameDialogVisible"
     modal
-    header="Rename worksheet"
+    :header="t('app.renameSheet.title')"
     :style="{ width: '24rem', maxWidth: '96vw' }"
   >
     <label class="field">
-      Name
+      {{ t('app.renameSheet.name') }}
       <input
         v-model="renameDraft"
         class="native-input"
@@ -40,8 +43,8 @@ const {
       >
     </label>
     <template #footer>
-      <Button label="Cancel" text @click="renameDialogVisible = false" />
-      <Button label="Rename" icon="pi pi-check" :disabled="!renameDraft.trim()" @click="applyWorksheetRename" />
+      <Button :label="t('common.cancel')" text @click="renameDialogVisible = false" />
+      <Button :label="t('common.rename')" icon="pi pi-check" :disabled="!renameDraft.trim()" @click="applyWorksheetRename" />
     </template>
   </Dialog>
 </template>

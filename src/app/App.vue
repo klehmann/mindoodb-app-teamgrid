@@ -24,6 +24,7 @@
  * the menu, save with pending-edit flush, and the PrimeVue menu models.
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import Button from "primevue/button";
 import ContextMenu from "primevue/contextmenu";
 import Menubar from "primevue/menubar";
@@ -44,6 +45,7 @@ import OpenSpreadsheetDialog from "@/features/document/components/OpenSpreadshee
 import RenameWorksheetDialog from "@/features/document/components/RenameWorksheetDialog.vue";
 import ViewSheetSettingsDialog from "@/features/document/components/ViewSheetSettingsDialog.vue";
 import CellFormatDialog from "@/features/grid/components/CellFormatDialog.vue";
+import NewSpreadsheetDialog, { type NewSpreadsheetDraft } from "@/features/document/components/NewSpreadsheetDialog.vue";
 import WorksheetTabs from "@/features/grid/components/WorksheetTabs.vue";
 
 import { useTeamGridDocument } from "@/features/document/composables/useTeamGridDocument";
@@ -84,9 +86,11 @@ import { projectWorksheet } from "@/features/grid/lib/gridProjection";
 import type { TeamGridOperation } from "@/features/document/lib/teamgridOps";
 import { importTeamGridWorkbookBuffer } from "@/features/xlsx/lib/importWorkbook";
 import { writeTeamGridExcelBuffer } from "@/features/xlsx/lib/exportWorkbook";
+import { createTeamGridDocument } from "@/features/document/lib/teamgridDocument";
 import { materializeViewSheet } from "@/features/view-sheets/lib/viewSheetMaterialization";
 
 const app = useTeamGridDocument();
+const { t } = useI18n();
 const { updateAvailable, updateReloading, reloadForUpdate, dismissUpdate } = useTeamGridAppUpdate();
 
 const cellContextMenu = ref<InstanceType<typeof ContextMenu> | null>(null);
@@ -97,6 +101,9 @@ const gridViewportComponent = ref<InstanceType<typeof GridViewport> | null>(null
 const xlsxImportInput = ref<HTMLInputElement | null>(null);
 
 const deleteDialogVisible = ref(false);
+const newSpreadsheetDialogVisible = ref(false);
+const newSpreadsheetCreating = ref(false);
+
 const discardChangesDialogVisible = ref(false);
 const revisionDialogVisible = ref(false);
 const saveInFlight = ref(false);
@@ -242,7 +249,7 @@ const errorDialog = useErrorDialog({
 });
 
 /** Document subject with a sensible default for the toolbar title button. */
-const documentTitle = computed(() => app.activeSubject.value || "Untitled spreadsheet");
+const documentTitle = computed(() => app.activeSubject.value || t("common.untitled"));
 
 /**
  * True when at least one formula editor (bar or in-cell) is open with a
@@ -259,7 +266,7 @@ const showFormulaAssistHint = computed(() =>
  * a full popover by default.
  */
 const statusLineText = computed(() => showFormulaAssistHint.value
-  ? `${app.status.value} \u00B7 Press Ctrl+Space for function help`
+  ? `${app.status.value} \u00B7 ${t("app.formulaAssistHint")}`
   : app.status.value);
 
 const activeFormulaAssistDraft = computed(() =>
@@ -271,7 +278,7 @@ const activeFormulaAssistCaretPos = computed(() =>
     : activeFormulaAssistDraft.value.length);
 
 const pendingCloseSessionTitle = computed(() =>
-  app.openSessions.value.find((session) => session.id === pendingCloseSessionId.value)?.title ?? "This spreadsheet");
+  app.openSessions.value.find((session) => session.id === pendingCloseSessionId.value)?.title ?? t("app.status.thisSpreadsheet"));
 
 /**
  * Right-hand toolbar badge that summarizes the current document mode:
@@ -280,12 +287,12 @@ const pendingCloseSessionTitle = computed(() =>
  */
 const statusBadgeLabel = computed(() => {
   if (app.isViewingHistorical.value) {
-    return "Historical \u00B7 read-only";
+    return t("app.status.historicalReadOnly");
   }
   if (app.isTimeTravelActive.value) {
-    return `Time travel \u00B7 ${app.timeTravelDateLabel.value}`;
+    return t("app.status.timeTravel", { date: app.timeTravelDateLabel.value });
   }
-  return `Current \u00B7 ${app.isDirty.value ? "Unsaved" : "Saved"}`;
+  return app.isDirty.value ? t("app.status.currentUnsaved") : t("app.status.currentSaved");
 });
 
 // Keep the explicit `activeWorksheetId` ref in sync with whatever
@@ -307,63 +314,63 @@ watch(
  */
 const menuItems = computed<MenuItem[]>(() => [
   {
-    label: "File",
+    label: t("app.menu.file"),
     items: [
-      { label: "New", icon: "pi pi-file-plus", disabled: !app.canCreate.value, command: () => void app.createNewDocument() },
-      { label: "New from template...", icon: "pi pi-copy", disabled: !app.canCreate.value, command: () => void openTemplateDialog() },
-      { label: "Open", icon: "pi pi-folder-open", command: () => void openFileDialog() },
+      { label: t("app.menu.new"), icon: "pi pi-file-plus", disabled: !app.canCreate.value, command: () => { newSpreadsheetDialogVisible.value = true; } },
+      { label: t("app.menu.newFromTemplate"), icon: "pi pi-copy", disabled: !app.canCreate.value, command: () => void openTemplateDialog() },
+      { label: t("app.menu.open"), icon: "pi pi-folder-open", command: () => void openFileDialog() },
       { separator: true },
-      { label: "Save", icon: "pi pi-save", disabled: !app.canSave.value || saveInFlight.value, command: () => void saveCurrentDocument() },
-      { label: "Import XLSX...", icon: "pi pi-upload", disabled: !app.canCreate.value, command: () => xlsxImportInput.value?.click() },
-      { label: "Export XLSX", icon: "pi pi-download", disabled: !app.activeGrid.value, command: () => void exportCurrentWorkbook() },
-      { label: "Delete", icon: "pi pi-trash", disabled: !app.canDelete.value, command: () => { deleteDialogVisible.value = true; } },
+      { label: t("app.menu.save"), icon: "pi pi-save", disabled: !app.canSave.value || saveInFlight.value, command: () => void saveCurrentDocument() },
+      { label: t("app.menu.importXlsx"), icon: "pi pi-upload", disabled: !app.canCreate.value, command: () => xlsxImportInput.value?.click() },
+      { label: t("app.menu.exportXlsx"), icon: "pi pi-download", disabled: !app.activeGrid.value, command: () => void exportCurrentWorkbook() },
+      { label: t("app.menu.delete"), icon: "pi pi-trash", disabled: !app.canDelete.value, command: () => { deleteDialogVisible.value = true; } },
     ],
   },
   {
-    label: "Edit",
+    label: t("app.menu.edit"),
     items: [
-      { label: "Copy", icon: "pi pi-copy", shortcut: "\u2318C", disabled: !hasSelection.value, command: () => void copySelectionFromMenu("copy") },
-      { label: "Cut", icon: "pi pi-file-export", shortcut: "\u2318X", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => void copySelectionFromMenu("cut") },
-      { label: "Paste", icon: "pi pi-clipboard", shortcut: "\u2318V", disabled: app.gridReadOnly.value || (!internalClipboard.value && !navigator.clipboard), command: () => void pasteFromMenu() },
+      { label: t("app.menu.copy"), icon: "pi pi-copy", shortcut: "\u2318C", disabled: !hasSelection.value, command: () => void copySelectionFromMenu("copy") },
+      { label: t("app.menu.cut"), icon: "pi pi-file-export", shortcut: "\u2318X", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => void copySelectionFromMenu("cut") },
+      { label: t("app.menu.paste"), icon: "pi pi-clipboard", shortcut: "\u2318V", disabled: app.gridReadOnly.value || (!internalClipboard.value && !navigator.clipboard), command: () => void pasteFromMenu() },
       { separator: true },
-      { label: "Insert row above", icon: "pi pi-arrow-up", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertRow("before") },
-      { label: "Insert row below", icon: "pi pi-arrow-down", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertRow("after") },
-      { label: "Insert column left", icon: "pi pi-arrow-left", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertColumn("before") },
-      { label: "Insert column right", icon: "pi pi-arrow-right", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertColumn("after") },
+      { label: t("app.menu.insertRowAbove"), icon: "pi pi-arrow-up", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertRow("before") },
+      { label: t("app.menu.insertRowBelow"), icon: "pi pi-arrow-down", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertRow("after") },
+      { label: t("app.menu.insertColumnLeft"), icon: "pi pi-arrow-left", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertColumn("before") },
+      { label: t("app.menu.insertColumnRight"), icon: "pi pi-arrow-right", disabled: app.gridReadOnly.value || !selectedCell.value, command: () => insertColumn("after") },
       { separator: true },
-      { label: "Delete row", icon: "pi pi-minus", disabled: app.gridReadOnly.value || !selectedCell.value, command: deleteSelectedRow },
-      { label: "Delete column", icon: "pi pi-minus", disabled: app.gridReadOnly.value || !selectedCell.value, command: deleteSelectedColumn },
+      { label: t("app.menu.deleteRow"), icon: "pi pi-minus", disabled: app.gridReadOnly.value || !selectedCell.value, command: deleteSelectedRow },
+      { label: t("app.menu.deleteColumn"), icon: "pi pi-minus", disabled: app.gridReadOnly.value || !selectedCell.value, command: deleteSelectedColumn },
       { separator: true },
-      { label: "Hide rows", icon: "pi pi-eye-slash", disabled: app.gridReadOnly.value || selectedRowIdsFromSelection().length === 0, command: () => setSelectedRowsHidden(true) },
-      { label: "Unhide rows", icon: "pi pi-eye", disabled: app.gridReadOnly.value || !selectionHasHiddenRows(), command: () => setSelectedRowsHidden(false) },
-      { label: "Hide columns", icon: "pi pi-eye-slash", disabled: app.gridReadOnly.value || selectedColumnIdsFromSelection().length === 0, command: () => setSelectedColumnsHidden(true) },
-      { label: "Unhide columns", icon: "pi pi-eye", disabled: app.gridReadOnly.value || !selectionHasHiddenColumns(), command: () => setSelectedColumnsHidden(false) },
+      { label: t("app.menu.hideRows"), icon: "pi pi-eye-slash", disabled: app.gridReadOnly.value || selectedRowIdsFromSelection().length === 0, command: () => setSelectedRowsHidden(true) },
+      { label: t("app.menu.unhideRows"), icon: "pi pi-eye", disabled: app.gridReadOnly.value || !selectionHasHiddenRows(), command: () => setSelectedRowsHidden(false) },
+      { label: t("app.menu.hideColumns"), icon: "pi pi-eye-slash", disabled: app.gridReadOnly.value || selectedColumnIdsFromSelection().length === 0, command: () => setSelectedColumnsHidden(true) },
+      { label: t("app.menu.unhideColumns"), icon: "pi pi-eye", disabled: app.gridReadOnly.value || !selectionHasHiddenColumns(), command: () => setSelectedColumnsHidden(false) },
     ],
   },
   {
-    label: "Insert",
+    label: t("app.menu.insert"),
     items: [
-      { label: "Column chart", icon: "pi pi-chart-bar", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("column") },
-      { label: "Bar chart", icon: "pi pi-chart-bar", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("bar") },
-      { label: "Line chart", icon: "pi pi-chart-line", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("line") },
-      { label: "Pie chart", icon: "pi pi-chart-pie", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("pie") },
+      { label: t("app.menu.columnChart"), icon: "pi pi-chart-bar", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("column") },
+      { label: t("app.menu.barChart"), icon: "pi pi-chart-bar", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("bar") },
+      { label: t("app.menu.lineChart"), icon: "pi pi-chart-line", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("line") },
+      { label: t("app.menu.pieChart"), icon: "pi pi-chart-pie", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => insertChart("pie") },
     ],
   },
   {
-    label: "Format",
+    label: t("app.menu.format"),
     items: [
-      { label: "Format cells...", icon: "pi pi-sliders-h", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => openCellFormatDialog(selectedRange.value) },
+      { label: t("app.menu.formatCells"), icon: "pi pi-sliders-h", disabled: app.gridReadOnly.value || !hasSelection.value, command: () => openCellFormatDialog(selectedRange.value) },
     ],
   },
   {
-    label: "History",
+    label: t("app.menu.history"),
     items: [
-      { label: "Browse revisions", icon: "pi pi-history", disabled: !app.currentCanBrowseHistory.value || !app.currentDocument.value, command: () => void openRevisionDialog() },
-      { label: "Return to current", icon: "pi pi-refresh", disabled: !app.isViewingHistorical.value, command: app.returnToCurrent },
+      { label: t("app.menu.browseRevisions"), icon: "pi pi-history", disabled: !app.currentCanBrowseHistory.value || !app.currentDocument.value, command: () => void openRevisionDialog() },
+      { label: t("app.menu.returnToCurrent"), icon: "pi pi-refresh", disabled: !app.isViewingHistorical.value, command: app.returnToCurrent },
     ],
   },
   {
-    label: "Window",
+    label: t("app.menu.window"),
     items: [
       ...app.openSessions.value.map((session) => ({
         label: `${session.isActive ? "\u2713 " : ""}${session.title}${session.isDirty ? " *" : ""}`,
@@ -373,7 +380,7 @@ const menuItems = computed<MenuItem[]>(() => [
       })),
       ...(app.openSessions.value.length > 0 ? [{ separator: true } satisfies MenuItem] : []),
       {
-        label: "Close current spreadsheet",
+        label: t("app.menu.closeCurrent"),
         icon: "pi pi-times",
         disabled: !app.currentDocument.value,
         command: () => app.activeSpreadsheetSessionId.value && void requestCloseOpenSession(app.activeSpreadsheetSessionId.value),
@@ -384,8 +391,8 @@ const menuItems = computed<MenuItem[]>(() => [
 
 const axisContextMenuItems = computed<MenuItem[]>(() => {
   const isRowMenu = axisContextKind.value === "row";
-  const hideLabel = isRowMenu ? "Hide rows" : "Hide columns";
-  const unhideLabel = isRowMenu ? "Unhide rows" : "Unhide columns";
+  const hideLabel = isRowMenu ? t("app.menu.hideRows") : t("app.menu.hideColumns");
+  const unhideLabel = isRowMenu ? t("app.menu.unhideRows") : t("app.menu.unhideColumns");
   const hasHidden = isRowMenu ? selectionHasHiddenRows() : selectionHasHiddenColumns();
   return [
     {
@@ -405,76 +412,76 @@ const axisContextMenuItems = computed<MenuItem[]>(() => {
 
 const cellContextMenuItems = computed<MenuItem[]>(() => [
   {
-    label: "Copy",
+    label: t("app.menu.copy"),
     icon: "pi pi-copy",
     disabled: !cellContextRange.value,
     command: () => void copySelectionFromMenu("copy", cellContextRange.value),
   },
   {
-    label: "Cut",
+    label: t("app.menu.cut"),
     icon: "pi pi-file-export",
     disabled: app.gridReadOnly.value || !cellContextRange.value,
     command: () => void copySelectionFromMenu("cut", cellContextRange.value),
   },
   {
-    label: "Paste",
+    label: t("app.menu.paste"),
     icon: "pi pi-clipboard",
     disabled: app.gridReadOnly.value || (!internalClipboard.value && !navigator.clipboard),
     command: () => void pasteFromMenu(),
   },
   { separator: true },
   {
-    label: "Format cells...",
+    label: t("app.menu.formatCells"),
     icon: "pi pi-sliders-h",
     disabled: app.gridReadOnly.value || !cellContextRange.value,
     command: () => openCellFormatDialog(cellContextRange.value),
   },
   { separator: true },
   {
-    label: "Insert row above",
+    label: t("app.menu.insertRowAbove"),
     icon: "pi pi-arrow-up",
     disabled: app.gridReadOnly.value || !selectedCell.value,
     command: () => insertRow("before"),
   },
   {
-    label: "Insert row below",
+    label: t("app.menu.insertRowBelow"),
     icon: "pi pi-arrow-down",
     disabled: app.gridReadOnly.value || !selectedCell.value,
     command: () => insertRow("after"),
   },
   {
-    label: "Insert column left",
+    label: t("app.menu.insertColumnLeft"),
     icon: "pi pi-arrow-left",
     disabled: app.gridReadOnly.value || !selectedCell.value,
     command: () => insertColumn("before"),
   },
   {
-    label: "Insert column right",
+    label: t("app.menu.insertColumnRight"),
     icon: "pi pi-arrow-right",
     disabled: app.gridReadOnly.value || !selectedCell.value,
     command: () => insertColumn("after"),
   },
   { separator: true },
   {
-    label: "Hide rows",
+    label: t("app.menu.hideRows"),
     icon: "pi pi-eye-slash",
     disabled: app.gridReadOnly.value || selectedRowIdsFromSelection().length === 0,
     command: () => setSelectedRowsHidden(true),
   },
   {
-    label: "Unhide rows",
+    label: t("app.menu.unhideRows"),
     icon: "pi pi-eye",
     disabled: app.gridReadOnly.value || !selectionHasHiddenRows(),
     command: () => setSelectedRowsHidden(false),
   },
   {
-    label: "Hide columns",
+    label: t("app.menu.hideColumns"),
     icon: "pi pi-eye-slash",
     disabled: app.gridReadOnly.value || selectedColumnIdsFromSelection().length === 0,
     command: () => setSelectedColumnsHidden(true),
   },
   {
-    label: "Unhide columns",
+    label: t("app.menu.unhideColumns"),
     icon: "pi pi-eye",
     disabled: app.gridReadOnly.value || !selectionHasHiddenColumns(),
     command: () => setSelectedColumnsHidden(false),
@@ -483,13 +490,13 @@ const cellContextMenuItems = computed<MenuItem[]>(() => [
 
 const chartContextMenuItems = computed<MenuItem[]>(() => [
   {
-    label: "Chart properties...",
+    label: t("app.menu.chartProperties"),
     icon: "pi pi-sliders-h",
     disabled: app.gridReadOnly.value || !chartDialog.selectedChart.value,
     command: () => chartDialog.selectedChartId.value && chartDialog.openChartProperties(chartDialog.selectedChartId.value),
   },
   {
-    label: "Delete chart",
+    label: t("app.menu.deleteChart"),
     icon: "pi pi-trash",
     disabled: app.gridReadOnly.value || !chartDialog.selectedChart.value,
     command: chartDialog.removeSelectedChart,
@@ -506,7 +513,7 @@ async function exportCurrentWorkbook() {
     const buffer = await writeTeamGridExcelBuffer(grid);
     const filename = `${sanitizeDownloadFilename(documentTitle.value)}.xlsx`;
     downloadBlob(buffer, filename);
-    app.status.value = `Exported ${filename}`;
+    app.status.value = t("app.status.exportedFile", { file: filename });
   } catch (error) {
     showAppError(error);
   }
@@ -520,10 +527,10 @@ async function importXlsxFile(event: Event) {
     return;
   }
   try {
-    const title = file.name.replace(/\.xlsx$/i, "") || "Imported spreadsheet";
+    const title = file.name.replace(/\.xlsx$/i, "") || t("app.importedSpreadsheet");
     const envelope = await importTeamGridWorkbookBuffer(await file.arrayBuffer(), title);
     await app.createDocumentFromEnvelope(envelope);
-    app.status.value = `Imported ${file.name}.`;
+    app.status.value = t("app.status.importedFile", { file: file.name });
   } catch (error) {
     showAppError(error);
   }
@@ -550,7 +557,7 @@ const autoRefreshEnabled = ref(readAutoRefreshPreference());
 
 const refreshMenuItems = computed<MenuItem[]>(() => [
   {
-    label: "Auto-refresh",
+    label: t("app.menu.autoRefresh"),
     icon: autoRefreshEnabled.value ? "pi pi-check" : "pi pi-circle",
     command: () => {
       autoRefreshEnabled.value = !autoRefreshEnabled.value;
@@ -840,6 +847,23 @@ function openChartContextMenu(payload: { event: MouseEvent; chartId: ChartId }) 
 function deleteChart(chartId: ChartId) {
   chartDialog.selectChart(chartId);
   chartDialog.removeSelectedChart();
+}
+
+
+async function createSpreadsheetFromDraft(draft: NewSpreadsheetDraft | {
+  databaseId: string;
+  title: string;
+  tags: string[];
+  encryption: { mode: "shared"; decryptionKeyId?: string } | { mode: "people"; recipients: string[] };
+}) {
+  newSpreadsheetCreating.value = true;
+  try {
+    const envelope = createTeamGridDocument(draft.title.trim() || t("common.untitled"), draft.tags);
+    await app.createNewDocument(envelope, { databaseId: draft.databaseId, encryption: draft.encryption });
+    newSpreadsheetDialogVisible.value = false;
+  } finally {
+    newSpreadsheetCreating.value = false;
+  }
 }
 
 async function saveCurrentDocument() {
@@ -1298,10 +1322,10 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
     >
       <div class="app-update-banner__content">
         <div class="app-update-banner__copy">
-          <strong>New version available</strong>
-          <p>Reload TeamGrid to switch to the latest version and refresh offline assets.</p>
+          <strong>{{ t("app.update.title") }}</strong>
+          <p>{{ t("app.update.body") }}</p>
         </div>
-        <Button label="Reload now" size="small" :loading="updateReloading" @click="reloadForUpdate" />
+        <Button :label="t('app.update.reload')" size="small" :loading="updateReloading" @click="reloadForUpdate" />
       </div>
     </Message>
 
@@ -1314,18 +1338,8 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
     >
     <header class="toolbar glass-card" :class="{ 'toolbar--ios-multitasking': app.hostUiPreferences.value.iosMultitaskingOptimized }">
       <div class="toolbar__leading">
-        <span class="toolbar__title">TeamGrid</span>
+        <span class="toolbar__title">{{ t("app.title") }}</span>
         <Menubar :model="menuItems" class="toolbar__menubar" />
-        <Button
-          icon="pi pi-save"
-          class="toolbar__mobile-save"
-          text
-          rounded
-          severity="secondary"
-          aria-label="Save spreadsheet"
-          :disabled="!app.canSave.value || saveInFlight"
-          @click="void saveCurrentDocument()"
-        />
         <SplitButton
           :icon="app.isViewingHistorical.value ? 'pi pi-history' : 'pi pi-refresh'"
           text
@@ -1334,31 +1348,54 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
           :model="refreshMenuItems"
           :disabled="!app.canRefresh.value || saveInFlight"
           :button-props="{
-            'aria-label': app.isViewingHistorical.value ? 'Return to current version' : 'Refresh spreadsheet',
-            title: app.isViewingHistorical.value ? 'Return to current version' : 'Refresh spreadsheet',
+            'aria-label': app.isViewingHistorical.value ? t('app.returnToCurrentVersion') : t('app.refreshSpreadsheet'),
+            title: app.isViewingHistorical.value ? t('app.returnToCurrentVersion') : t('app.refreshSpreadsheet'),
           }"
-          :menu-button-props="{ 'aria-label': 'Refresh options', title: 'Refresh options' }"
+          :menu-button-props="{ 'aria-label': t('app.refreshOptions'), title: t('app.refreshOptions') }"
           @click="app.isViewingHistorical.value ? app.returnToCurrent() : app.refreshCurrentDocument()"
         />
       </div>
-      <button
-        v-if="app.currentEnvelope.value"
-        class="toolbar__document-title"
-        type="button"
-        :disabled="app.gridReadOnly.value"
-        @click="openPropertiesDialog"
-      >
-        {{ documentTitle }}
-      </button>
-      <button
-        v-if="app.currentCanBrowseHistory.value && app.currentDocument.value"
-        class="toolbar__status-badge"
-        type="button"
-        @click="openRevisionDialog"
-      >
-        {{ statusBadgeLabel }}
-      </button>
-      <span v-else-if="app.currentDocument.value" class="toolbar__status-badge">{{ statusBadgeLabel }}</span>
+      <div v-if="app.currentEnvelope.value" class="toolbar__document-tab">
+        <button
+          class="toolbar__document-title"
+          type="button"
+          :title="documentTitle"
+          :disabled="app.gridReadOnly.value"
+          @click="openPropertiesDialog"
+        >
+          {{ documentTitle }}
+        </button>
+        <button
+          class="toolbar__document-close"
+          type="button"
+          :aria-label="t('app.menu.closeCurrent')"
+          :title="t('app.menu.closeCurrent')"
+          @click="app.activeSpreadsheetSessionId.value && void requestCloseOpenSession(app.activeSpreadsheetSessionId.value)"
+        >
+          <i class="pi pi-times" aria-hidden="true" />
+        </button>
+      </div>
+      <div class="toolbar__meta">
+        <Button
+          v-if="app.canSave.value"
+          class="toolbar__save-changes"
+          :label="t('app.status.saveChanges')"
+          icon="pi pi-save"
+          size="small"
+          :loading="saveInFlight"
+          :disabled="saveInFlight"
+          @click="void saveCurrentDocument()"
+        />
+        <button
+          v-else-if="app.currentCanBrowseHistory.value && app.currentDocument.value"
+          class="toolbar__status-badge"
+          type="button"
+          @click="openRevisionDialog"
+        >
+          {{ statusBadgeLabel }}
+        </button>
+        <span v-else-if="app.currentDocument.value" class="toolbar__status-badge">{{ statusBadgeLabel }}</span>
+      </div>
     </header>
 
     <section class="workspace">
@@ -1366,12 +1403,12 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
         <div class="workspace__sheet">
           <div v-if="app.isTimeTravelActive.value" class="history-banner">
             <i class="pi pi-clock" aria-hidden="true" />
-            <span>Time travel mode is active as of {{ app.timeTravelDateLabel.value }} - read-only.</span>
+            <span>{{ t("app.history.timeTravelBanner", { date: app.timeTravelDateLabel.value }) }}</span>
           </div>
           <div v-if="app.isViewingHistorical.value" class="history-banner">
             <i class="pi pi-history" aria-hidden="true" />
-            <span>You're viewing a historical revision - read-only.</span>
-            <button type="button" @click="app.returnToCurrent">Return to current</button>
+            <span>{{ t("app.history.historicalBanner") }}</span>
+            <button type="button" @click="app.returnToCurrent">{{ t("app.history.returnToCurrent") }}</button>
           </div>
 
           <FormulaBar
@@ -1446,8 +1483,8 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
         <h1>Collaborative spreadsheets</h1>
         <p>Create a new spreadsheet or open an existing one. Edit cells, write formulas, organize your work across multiple sheet tabs, and see your teammates' changes in real time.</p>
         <div class="empty-state__actions">
-          <Button label="New spreadsheet" icon="pi pi-file-plus" :disabled="!app.canCreate.value" @click="() => app.createNewDocument()" />
-          <Button label="Open spreadsheet" icon="pi pi-folder-open" severity="secondary" @click="openFileDialog" />
+          <Button :label="t('app.welcome.newDocument')" icon="pi pi-file-plus" :disabled="!app.canCreate.value" @click="newSpreadsheetDialogVisible = true" />
+          <Button :label="t('app.welcome.openDocument')" icon="pi pi-folder-open" severity="secondary" @click="openFileDialog" />
         </div>
       </section>
     </section>
@@ -1471,6 +1508,18 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
       :readonly="app.gridReadOnly.value"
       @select="handleFormulaAssistSelect"
       @dismiss="formulaAssistOpen = false"
+    />
+
+    <NewSpreadsheetDialog
+      :visible="newSpreadsheetDialogVisible"
+      :databases="app.creatableDatabases.value"
+      :session="app.session.value"
+      :current-user-name="app.currentUserName.value"
+      :current-user-canonical="app.currentUserCanonical.value"
+      :initial-database-id="app.selectedDatabaseId.value"
+      :creating="newSpreadsheetCreating"
+      @update:visible="newSpreadsheetDialogVisible = $event"
+      @create="createSpreadsheetFromDraft"
     />
 
     <OpenSpreadsheetDialog

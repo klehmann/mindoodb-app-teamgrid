@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 /**
  * Generic error dialog that surfaces unexpected failures from the document
  * composable to the user. The visible state and message are owned by
@@ -9,6 +11,7 @@ import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import type { useErrorDialog } from "@/features/document/composables/useErrorDialog";
 
+const { t } = useI18n();
 const props = defineProps<{
   controller: ReturnType<typeof useErrorDialog>;
   message: string | null;
@@ -22,13 +25,13 @@ const { errorDialogVisible, dismissErrorDialog } = props.controller;
   <Dialog
     v-model:visible="errorDialogVisible"
     modal
-    header="Something went wrong"
+    :header="t('app.error.title')"
     :style="{ width: '32rem', maxWidth: '96vw' }"
     @hide="onHide"
   >
     <p>{{ message }}</p>
     <template #footer>
-      <Button label="OK" icon="pi pi-check" @click="dismissErrorDialog" />
+      <Button :label="t('common.ok')" icon="pi pi-check" @click="dismissErrorDialog" />
     </template>
   </Dialog>
 </template>
