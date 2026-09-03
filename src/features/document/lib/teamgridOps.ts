@@ -46,6 +46,8 @@ import type {
  *   deleted without physically removing it, so formulas can still report
  *   `#REF!` instead of losing identity.
  * - `addWorksheet`, `replaceWorksheet`, `renameWorksheet` handle workbook-level changes.
+ * - `moveWorksheet` reorders a tab; `repairWorksheetOrder` rewrites the whole
+ *   tab order and exists only for a list a merge left unsound.
  * - `setDocumentProperties` writes the title, tags, template flag, and workbook locale.
  */
 export type TeamGridOperation =
@@ -60,6 +62,8 @@ export type TeamGridOperation =
   | { type: "insertColumn"; worksheetId: WorksheetId; columnId: ColumnId; column: ColumnMeta; index: number }
   | { type: "tombstoneColumn"; worksheetId: WorksheetId; columnId: ColumnId; deletedAt: string }
   | { type: "addWorksheet"; worksheet: Worksheet; index: number }
+  | { type: "moveWorksheet"; worksheetId: WorksheetId; fromIndex: number; toIndex: number }
+  | { type: "repairWorksheetOrder"; order: WorksheetId[] }
   | { type: "replaceWorksheet"; worksheet: Worksheet }
   | { type: "renameWorksheet"; worksheetId: WorksheetId; title: string }
   | { type: "tombstoneWorksheet"; worksheetId: WorksheetId; deletedAt: string }
@@ -124,6 +128,21 @@ export function serializeTeamGridOperations(
       case "addWorksheet":
         pushSet(json, ["teamgrid", "workbook", "worksheetsById", operation.worksheet.id], operation.worksheet);
         pushListInsert(json, ["teamgrid", "workbook", "worksheetOrder"], operation.index, [operation.worksheet.id]);
+        break;
+      case "moveWorksheet":
+        // Automerge has no list move, so the tab travels as a removal and a
+        // re-insert of its id. `fromIndex` addresses the list as stored and
+        // `toIndex` the list after the removal, which only lines up because
+        // the host applies `listDelete` before `listInsert`.
+        pushListDelete(json, ["teamgrid", "workbook", "worksheetOrder"], operation.fromIndex, 1);
+        pushListInsert(json, ["teamgrid", "workbook", "worksheetOrder"], operation.toIndex, [operation.worksheetId]);
+        break;
+      case "repairWorksheetOrder":
+        // A whole-list write, so it drops a tab another client added
+        // concurrently. Reserved for a list that no longer reads back soundly,
+        // where the indices a move would send mean nothing; never use it for an
+        // ordinary reorder.
+        pushSet(json, ["teamgrid", "workbook", "worksheetOrder"], operation.order);
         break;
       case "replaceWorksheet":
         pushSet(json, worksheetPath(operation.worksheet.id), operation.worksheet);
@@ -216,6 +235,11 @@ function pushSet(json: MindooDBAppJsonPatch, path: Array<string | number>, value
 function pushListInsert(json: MindooDBAppJsonPatch, path: Array<string | number>, index: number, values: unknown[]) {
   json.listInsert ??= [];
   json.listInsert.push({ path, index, values: values.map(toJsonPatchValue) });
+}
+
+function pushListDelete(json: MindooDBAppJsonPatch, path: Array<string | number>, index: number, deleteCount: number) {
+  json.listDelete ??= [];
+  json.listDelete.push({ path, index, deleteCount });
 }
 
 function toJsonPatchValue(value: unknown) {

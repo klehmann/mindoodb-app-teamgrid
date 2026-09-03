@@ -237,6 +237,8 @@ const { openPropertiesDialog } = propertiesDialog;
 const worksheetDialogs = useWorksheetDialogs({ app, activeWorksheetId });
 const {
   addWorksheet,
+  moveWorksheet,
+  nudgeWorksheet,
   renameWorksheet,
   deleteWorksheet,
   openCreateViewSheetDialog,
@@ -1473,6 +1475,8 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
             @rename="renameWorksheet"
             @configure-view="openViewSheetSettings"
             @delete="deleteWorksheet"
+            @move="moveWorksheet"
+            @nudge="nudgeWorksheet"
           />
           <ContextMenu ref="cellContextMenu" :model="cellContextMenuItems" />
           <ContextMenu ref="axisContextMenu" :model="axisContextMenuItems" />

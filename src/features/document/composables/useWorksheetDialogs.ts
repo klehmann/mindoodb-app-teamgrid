@@ -15,6 +15,13 @@ import {
 } from "@/features/document/lib/teamgridDocument";
 import type { TeamGridAppApi } from "@/features/document/composables/useTeamGridDocument";
 import {
+  isWorksheetOrderSound,
+  planWorksheetMoveTo,
+  planWorksheetNudge,
+  resolveWorksheetOrder,
+  type WorksheetMovePlan,
+} from "@/features/document/lib/worksheetOrder";
+import {
   materializeViewSheet,
   type ViewSheetSettings,
 } from "@/features/view-sheets/lib/viewSheetMaterialization";
@@ -64,6 +71,39 @@ export function useWorksheetDialogs(options: UseWorksheetDialogsOptions) {
       grid.workbook.worksheetsById[worksheetId] = worksheet;
       activeWorksheetId.value = worksheetId;
       return [{ type: "addWorksheet", worksheet, index: grid.workbook.worksheetOrder.length - 1 }];
+    });
+  }
+
+  /**
+   * Drop a tab onto another one, or step it one place with the keyboard.
+   *
+   * The plan is made against the repaired list so its two indices and its
+   * resulting order always describe the same move. Only a list that already
+   * read back soundly can carry the minimal delete-plus-insert patch — for any
+   * other, those indices would address entries that are not there, so the
+   * whole order is rewritten once and the document is sound again afterwards.
+   */
+  function moveWorksheet(worksheetId: WorksheetId, toIndex: number) {
+    applyWorksheetMove((grid) =>
+      planWorksheetMoveTo(resolveWorksheetOrder(grid.workbook), worksheetId, toIndex));
+  }
+
+  function nudgeWorksheet(worksheetId: WorksheetId, offset: -1 | 1) {
+    applyWorksheetMove((grid) => planWorksheetNudge(grid.workbook, worksheetId, offset));
+  }
+
+  function applyWorksheetMove(plan: (grid: TeamGridDocumentV1) => WorksheetMovePlan | null) {
+    app.updateGrid((grid) => {
+      const move = plan(grid);
+      if (!move) {
+        return [];
+      }
+      const wasSound = isWorksheetOrderSound(grid.workbook);
+      const worksheetId = move.order[move.toIndex];
+      grid.workbook.worksheetOrder = move.order;
+      return wasSound && worksheetId
+        ? [{ type: "moveWorksheet", worksheetId, fromIndex: move.fromIndex, toIndex: move.toIndex }]
+        : [{ type: "repairWorksheetOrder", order: [...move.order] }];
     });
   }
 
@@ -241,6 +281,8 @@ export function useWorksheetDialogs(options: UseWorksheetDialogsOptions) {
     viewSheetSaving,
     configuredViews: app.configuredViews,
     addWorksheet,
+    moveWorksheet,
+    nudgeWorksheet,
     renameWorksheet,
     applyWorksheetRename,
     deleteWorksheet,

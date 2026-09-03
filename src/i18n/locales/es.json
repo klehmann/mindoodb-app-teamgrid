@@ -384,6 +384,8 @@
       "delete": "Eliminar hoja",
       "rename": "Renombrar",
       "viewSettings": "Configuración de la hoja de vista...",
+      "moveLeft": "Mover a la izquierda",
+      "moveRight": "Mover a la derecha",
       "addSheet": "Añadir hoja",
       "addViewSheet": "Añadir hoja de vista virtual"
     },

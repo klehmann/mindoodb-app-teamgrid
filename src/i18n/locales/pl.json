@@ -384,6 +384,8 @@
       "delete": "Usuń arkusz",
       "rename": "Zmień nazwę",
       "viewSettings": "Ustawienia arkusza widoku...",
+      "moveLeft": "Przenieś w lewo",
+      "moveRight": "Przenieś w prawo",
       "addSheet": "Dodaj arkusz",
       "addViewSheet": "Dodaj wirtualny arkusz widoku"
     },

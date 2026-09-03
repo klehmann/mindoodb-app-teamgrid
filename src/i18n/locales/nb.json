@@ -384,6 +384,8 @@
       "delete": "Slett ark",
       "rename": "Gi nytt navn",
       "viewSettings": "Innstillinger for visningsark...",
+      "moveLeft": "Flytt til venstre",
+      "moveRight": "Flytt til høyre",
       "addSheet": "Legg til ark",
       "addViewSheet": "Legg til virtuelt visningsark"
     },

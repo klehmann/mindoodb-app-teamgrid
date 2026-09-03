@@ -261,6 +261,43 @@ describe("teamgrid operation serialization", () => {
     });
   });
 
+  it("serializes a tab move as a removal plus a re-insert of its id", () => {
+    expect(serializeTeamGridOperations([{
+      type: "moveWorksheet",
+      worksheetId: "sheet_3",
+      fromIndex: 2,
+      toIndex: 0,
+    }], { baseHeads: ["head_1"] })).toEqual({
+      json: {
+        baseHeads: ["head_1"],
+        listDelete: [{
+          path: ["teamgrid", "workbook", "worksheetOrder"],
+          index: 2,
+          deleteCount: 1,
+        }],
+        listInsert: [{
+          path: ["teamgrid", "workbook", "worksheetOrder"],
+          index: 0,
+          values: ["sheet_3"],
+        }],
+      },
+    });
+  });
+
+  it("serializes an order repair as one whole-list write", () => {
+    expect(serializeTeamGridOperations([{
+      type: "repairWorksheetOrder",
+      order: ["sheet_2", "sheet_1"],
+    }])).toEqual({
+      json: {
+        set: [{
+          path: ["teamgrid", "workbook", "worksheetOrder"],
+          value: ["sheet_2", "sheet_1"],
+        }],
+      },
+    });
+  });
+
   it("serializes generated worksheet replacements at the worksheet path", () => {
     expect(serializeTeamGridOperations([{
       type: "replaceWorksheet",

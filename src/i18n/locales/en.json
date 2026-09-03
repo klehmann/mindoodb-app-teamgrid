@@ -384,6 +384,8 @@
       "delete": "Delete worksheet",
       "rename": "Rename",
       "viewSettings": "View Sheet Settings...",
+      "moveLeft": "Move Left",
+      "moveRight": "Move Right",
       "addSheet": "Add Sheet",
       "addViewSheet": "Add Virtual View Sheet"
     },

@@ -1,4 +1,5 @@
 import { DEFAULT_COLUMN_WIDTH } from "@/shared/lib/gridDimensions";
+import { resolveWorksheetOrder } from "@/features/document/lib/worksheetOrder";
 
 export const TEAMGRID_DOCUMENT_KIND = "mindoodb.teamgrid";
 export const TEAMGRID_DOCUMENT_FORM = "teamgrid";
@@ -371,7 +372,7 @@ export function isTeamGridDocument(data: unknown): data is TeamGridDocumentV1 {
 }
 
 export function getFirstVisibleWorksheet(document: TeamGridDocumentV1) {
-  return document.workbook.worksheetOrder
+  return resolveWorksheetOrder(document.workbook)
     .map((id) => document.workbook.worksheetsById[id])
     .find((worksheet) => worksheet && !worksheet.deletedAt) ?? null;
 }

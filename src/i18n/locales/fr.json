@@ -384,6 +384,8 @@
       "delete": "Supprimer la feuille",
       "rename": "Renommer",
       "viewSettings": "Paramètres de la feuille de vue...",
+      "moveLeft": "Déplacer vers la gauche",
+      "moveRight": "Déplacer vers la droite",
       "addSheet": "Ajouter une feuille",
       "addViewSheet": "Ajouter une feuille de vue virtuelle"
     },

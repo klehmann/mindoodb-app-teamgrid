@@ -384,6 +384,8 @@
       "delete": "Arbeitsblatt löschen",
       "rename": "Umbenennen",
       "viewSettings": "Blatteinstellungen...",
+      "moveLeft": "Nach links verschieben",
+      "moveRight": "Nach rechts verschieben",
       "addSheet": "Blatt hinzufügen",
       "addViewSheet": "Virtuelles Ansichtsblatt hinzufügen"
     },

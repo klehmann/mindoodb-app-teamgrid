@@ -384,6 +384,8 @@
       "delete": "Elimina foglio",
       "rename": "Rinomina",
       "viewSettings": "Impostazioni foglio vista...",
+      "moveLeft": "Sposta a sinistra",
+      "moveRight": "Sposta a destra",
       "addSheet": "Aggiungi foglio",
       "addViewSheet": "Aggiungi foglio vista virtuale"
     },

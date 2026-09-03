@@ -384,6 +384,8 @@
       "delete": "Werkblad verwijderen",
       "rename": "Hernoemen",
       "viewSettings": "Instellingen weergaveblad...",
+      "moveLeft": "Naar links verplaatsen",
+      "moveRight": "Naar rechts verplaatsen",
       "addSheet": "Blad toevoegen",
       "addViewSheet": "Virtueel weergaveblad toevoegen"
     },
