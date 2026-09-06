@@ -50,7 +50,7 @@ describe("useTeamGridDocument open sessions", () => {
       preferredDatabaseId: "db1",
       runtime: "iframe",
       theme: {},
-      uiPreferences: { iosMultitaskingOptimized: false },
+      uiPreferences: { iosMultitaskingOptimized: false, reduceMotion: false },
       locale: "en",
       user: { id: "u1", username: "cn=Test/o=Acme" },
     });
