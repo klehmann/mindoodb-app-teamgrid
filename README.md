@@ -1,5 +1,5 @@
 # Mindoo TeamGrid
-
+ 
 TeamGrid is a collaborative spreadsheet sample app for MindooDB Haven. It stores one workbook in one MindooDB Automerge document and lets multiple users edit cells, rows, columns, worksheet tabs, formulas, formatting, and embedded charts at the same time, on the same device or on different devices, online or offline. When edits sync, Automerge merges them deterministically — formulas keep pointing at the cells the author meant, even if a row or column was inserted or removed concurrently.
 
 The code is intentionally readable rather than feature-complete. It is meant as a tutorial-grade example for platform developers building document-style Haven apps that need granular structured editing.
