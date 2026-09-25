@@ -1484,11 +1484,13 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
         </div>
       </template>
       <section v-else class="empty-state">
-        <h1>Collaborative spreadsheets</h1>
-        <p>Create a new spreadsheet or open an existing one. Edit cells, write formulas, organize your work across multiple sheet tabs, and see your teammates' changes in real time.</p>
-        <div class="empty-state__actions">
-          <Button :label="t('app.welcome.newDocument')" icon="pi pi-file-plus" :disabled="!app.canCreate.value" @click="newSpreadsheetDialogVisible = true" />
-          <Button :label="t('app.welcome.openDocument')" icon="pi pi-folder-open" severity="secondary" @click="openFileDialog" />
+        <div class="empty-state__panel">
+          <h1>{{ t("app.welcome.title") }}</h1>
+          <p>{{ t("app.welcome.body") }}</p>
+          <div class="empty-state__actions">
+            <Button :label="t('app.welcome.newDocument')" icon="pi pi-file-plus" :disabled="!app.canCreate.value" @click="newSpreadsheetDialogVisible = true" />
+            <Button :label="t('app.welcome.openDocument')" icon="pi pi-folder-open" severity="secondary" @click="openFileDialog" />
+          </div>
         </div>
       </section>
     </section>
