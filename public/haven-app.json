@@ -1,0 +1,102 @@
+{
+  "format": "mindoodb.haven.app",
+  "formatVersion": 1,
+  "appId": "mindoodb-app-teamgrid",
+  "label": "Mindoo TeamGrid",
+  "description": "Collaborative spreadsheets with formulas, formatting, and revision time travel.",
+  "version": "1.0.0",
+  "runtime": "iframe",
+  "hosting": "external",
+  "defaultLaunchDatabaseId": "teamgrid",
+  "databases": [
+    {
+      "logicalDatabaseId": "teamgrid",
+      "label": "Shared teamgrid database",
+      "databaseId": "teamgrid",
+      "permissions": [
+        "write",
+        "delete",
+        "history",
+        "attachments",
+        "views"
+      ]
+    }
+  ],
+  "listing": {
+    "summary": {
+      "en": "Collaborative spreadsheets with formulas, formatting, and revision time travel.",
+      "de": "Kollaborative Tabellenkalkulation mit Formeln, Formatierung und Zeitreise durch Revisionen.",
+      "es": "Hojas de cálculo colaborativas con fórmulas, formato y viaje en el tiempo por revisiones.",
+      "fr": "Tableurs collaboratifs avec formules, mise en forme et voyage dans le temps des révisions.",
+      "it": "Fogli di calcolo collaborativi con formule, formattazione e viaggio nel tempo tra le revisioni.",
+      "nb": "Samarbeidsbaserte regneark med formler, formatering og tidsreise i revisjoner.",
+      "nl": "Gezamenlijke spreadsheets met formules, opmaak en tijdreizen door revisies.",
+      "pl": "Wspólne arkusze kalkulacyjne z formułami, formatowaniem i podróżą w czasie po rewizjach."
+    },
+    "description": {
+      "de": "Mindoo TeamGrid ist eine kollaborative Tabellenkalkulations-Beispielanwendung, bei der jede Arbeitsmappe in einem gemeinsamen MindooDB-Dokument lebt.\n\n• Zellen, Zeilen, Spalten und Arbeitsblatt-Reiter gemeinsam bearbeiten; gleichzeitige Änderungen mehrerer Nutzer werden automatisch zusammengeführt\n\n• Formeln mit SUM, AVERAGE, MIN, MAX, COUNT, CONCAT und TODAY schreiben – mit Inline-Hilfe und Live-Hervorhebung referenzierter Zellen\n\n• Zellen formatieren mit Text- und Füllfarben, Schriftart und -größe sowie Fett-, Kursiv- und Unterstreichungsstilen\n\n• Frühere Revisionen schreibgeschützt durchstöbern – per Haven-Zeitreise und Revisionsauswahl\n\n• Quellcode: github.com/klehmann/mindoodb-app-teamgrid",
+      "en": "Mindoo TeamGrid is a collaborative spreadsheet sample app where each workbook lives inside one shared MindooDB document.\n\n• Edit cells, rows, columns, and worksheet tabs together; concurrent changes from multiple users are merged automatically\n\n• Write formulas with SUM, AVERAGE, MIN, MAX, COUNT, CONCAT, and TODAY, with inline help and live highlighting of referenced cells\n\n• Format cells with text and fill colors, font family and size, and bold, italic, and underline styles\n\n• Browse historical revisions read-only through Haven time travel and the revision picker\n\n• Source code: github.com/klehmann/mindoodb-app-teamgrid",
+      "es": "Mindoo TeamGrid es una aplicación de ejemplo de hoja de cálculo colaborativa en la que cada libro de trabajo vive dentro de un documento MindooDB compartido.\n\n• Edita celdas, filas, columnas y pestañas de hojas en equipo; los cambios simultáneos de varios usuarios se fusionan automáticamente\n\n• Escribe fórmulas con SUM, AVERAGE, MIN, MAX, COUNT, CONCAT y TODAY, con ayuda integrada y resaltado en vivo de las celdas referenciadas\n\n• Da formato a las celdas con colores de texto y relleno, familia y tamaño de fuente, y estilos de negrita, cursiva y subrayado\n\n• Explora revisiones históricas en modo de solo lectura mediante el viaje en el tiempo de Haven y el selector de revisiones\n\n• Código fuente: github.com/klehmann/mindoodb-app-teamgrid",
+      "fr": "Mindoo TeamGrid est une application d'exemple de tableur collaboratif où chaque classeur vit dans un document MindooDB partagé.\n\n• Modifiez ensemble cellules, lignes, colonnes et onglets de feuilles ; les modifications simultanées de plusieurs utilisateurs sont fusionnées automatiquement\n\n• Écrivez des formules avec SUM, AVERAGE, MIN, MAX, COUNT, CONCAT et TODAY, avec aide intégrée et mise en surbrillance en direct des cellules référencées\n\n• Mettez en forme les cellules avec couleurs de texte et de remplissage, police et taille de caractères, ainsi que les styles gras, italique et souligné\n\n• Parcourez les révisions historiques en lecture seule grâce au voyage dans le temps de Haven et au sélecteur de révisions\n\n• Code source : github.com/klehmann/mindoodb-app-teamgrid",
+      "it": "Mindoo TeamGrid è un'applicazione di esempio di foglio di calcolo collaborativo in cui ogni cartella di lavoro vive all'interno di un documento MindooDB condiviso.\n\n• Modifica insieme celle, righe, colonne e schede dei fogli; le modifiche simultanee di più utenti vengono unite automaticamente\n\n• Scrivi formule con SUM, AVERAGE, MIN, MAX, COUNT, CONCAT e TODAY, con guida integrata ed evidenziazione dal vivo delle celle referenziate\n\n• Formatta le celle con colori di testo e riempimento, famiglia e dimensione del carattere e stili grassetto, corsivo e sottolineato\n\n• Sfoglia le revisioni storiche in sola lettura tramite il viaggio nel tempo di Haven e il selettore delle revisioni\n\n• Codice sorgente: github.com/klehmann/mindoodb-app-teamgrid",
+      "nb": "Mindoo TeamGrid er en eksempelapp for samarbeidsbaserte regneark der hver arbeidsbok lever i ett delt MindooDB-dokument.\n\n• Rediger celler, rader, kolonner og arkfaner sammen; samtidige endringer fra flere brukere flettes automatisk\n\n• Skriv formler med SUM, AVERAGE, MIN, MAX, COUNT, CONCAT og TODAY, med innebygd hjelp og direkte utheving av refererte celler\n\n• Formater celler med tekst- og fyllfarger, skrifttype og -størrelse, samt fet, kursiv og understreket stil\n\n• Bla gjennom historiske revisjoner skrivebeskyttet med Havens tidsreise og revisjonsvelgeren\n\n• Kildekode: github.com/klehmann/mindoodb-app-teamgrid",
+      "nl": "Mindoo TeamGrid is een voorbeeldapp voor gezamenlijke spreadsheets waarbij elke werkmap in één gedeeld MindooDB-document leeft.\n\n• Bewerk cellen, rijen, kolommen en werkbladtabs samen; gelijktijdige wijzigingen van meerdere gebruikers worden automatisch samengevoegd\n\n• Schrijf formules met SUM, AVERAGE, MIN, MAX, COUNT, CONCAT en TODAY, met ingebouwde hulp en live markering van gerefereerde cellen\n\n• Maak cellen op met tekst- en vulkleuren, lettertype en -grootte, en vet, cursief en onderstreept\n\n• Blader alleen-lezen door historische revisies via Haven-tijdreizen en de revisiekiezer\n\n• Broncode: github.com/klehmann/mindoodb-app-teamgrid",
+      "pl": "Mindoo TeamGrid to przykładowa aplikacja arkusza kalkulacyjnego do pracy zespołowej, w której każdy skoroszyt żyje w jednym wspólnym dokumencie MindooDB.\n\n• Edytuj komórki, wiersze, kolumny i karty arkuszy razem z innymi; równoczesne zmiany wielu użytkowników są scalane automatycznie\n\n• Pisz formuły z SUM, AVERAGE, MIN, MAX, COUNT, CONCAT i TODAY, z pomocą w edytorze i podświetlaniem na żywo komórek, do których się odwołujesz\n\n• Formatuj komórki kolorami tekstu i wypełnienia, krojem i rozmiarem czcionki oraz stylami pogrubienia, kursywy i podkreślenia\n\n• Przeglądaj historyczne rewizje w trybie tylko do odczytu dzięki podróży w czasie Haven i wyborowi rewizji\n\n• Kod źródłowy: github.com/klehmann/mindoodb-app-teamgrid"
+    },
+    "descriptionMarkdown": {
+      "de": "**Mindoo TeamGrid** ist eine kollaborative Tabellenkalkulations-Beispielanwendung, bei der jede Arbeitsmappe in einem gemeinsamen MindooDB-Dokument lebt.\n\n- Zellen, Zeilen, Spalten und Arbeitsblatt-Reiter gemeinsam bearbeiten; gleichzeitige Änderungen mehrerer Nutzer werden automatisch zusammengeführt\n- Formeln mit `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT` und `TODAY` schreiben – mit Inline-Hilfe und Live-Hervorhebung referenzierter Zellen\n- Zellen formatieren mit Text- und Füllfarben, Schriftart und -größe sowie Fett-, Kursiv- und Unterstreichungsstilen\n- Frühere Revisionen schreibgeschützt durchstöbern – per Haven-Zeitreise und Revisionsauswahl\n- Quellcode: [github.com/klehmann/mindoodb-app-teamgrid](https://github.com/klehmann/mindoodb-app-teamgrid)",
+      "en": "**Mindoo TeamGrid** is a collaborative spreadsheet sample app where each workbook lives inside one shared MindooDB document.\n\n- Edit cells, rows, columns, and worksheet tabs together; concurrent changes from multiple users are merged automatically\n- Write formulas with `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT`, and `TODAY`, with inline help and live highlighting of referenced cells\n- Format cells with text and fill colors, font family and size, and bold, italic, and underline styles\n- Browse historical revisions read-only through Haven time travel and the revision picker\n- Source code: [github.com/klehmann/mindoodb-app-teamgrid](https://github.com/klehmann/mindoodb-app-teamgrid)",
+      "es": "**Mindoo TeamGrid** es una aplicación de ejemplo de hoja de cálculo colaborativa en la que cada libro de trabajo vive dentro de un documento MindooDB compartido.\n\n- Edita celdas, filas, columnas y pestañas de hojas en equipo; los cambios simultáneos de varios usuarios se fusionan automáticamente\n- Escribe fórmulas con `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT` y `TODAY`, con ayuda integrada y resaltado en vivo de las celdas referenciadas\n- Da formato a las celdas con colores de texto y relleno, familia y tamaño de fuente, y estilos de negrita, cursiva y subrayado\n- Explora revisiones históricas en modo de solo lectura mediante el viaje en el tiempo de Haven y el selector de revisiones\n- Código fuente: [github.com/klehmann/mindoodb-app-teamgrid](https://github.com/klehmann/mindoodb-app-teamgrid)",
+      "fr": "**Mindoo TeamGrid** est une application d'exemple de tableur collaboratif où chaque classeur vit dans un document MindooDB partagé.\n\n- Modifiez ensemble cellules, lignes, colonnes et onglets de feuilles ; les modifications simultanées de plusieurs utilisateurs sont fusionnées automatiquement\n- Écrivez des formules avec `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT` et `TODAY`, avec aide intégrée et mise en surbrillance en direct des cellules référencées\n- Mettez en forme les cellules avec couleurs de texte et de remplissage, police et taille de caractères, ainsi que les styles gras, italique et souligné\n- Parcourez les révisions historiques en lecture seule grâce au voyage dans le temps de Haven et au sélecteur de révisions\n- Code source : [github.com/klehmann/mindoodb-app-teamgrid](https://github.com/klehmann/mindoodb-app-teamgrid)",
+      "it": "**Mindoo TeamGrid** è un'applicazione di esempio di foglio di calcolo collaborativo in cui ogni cartella di lavoro vive all'interno di un documento MindooDB condiviso.\n\n- Modifica insieme celle, righe, colonne e schede dei fogli; le modifiche simultanee di più utenti vengono unite automaticamente\n- Scrivi formule con `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT` e `TODAY`, con guida integrata ed evidenziazione dal vivo delle celle referenziate\n- Formatta le celle con colori di testo e riempimento, famiglia e dimensione del carattere e stili grassetto, corsivo e sottolineato\n- Sfoglia le revisioni storiche in sola lettura tramite il viaggio nel tempo di Haven e il selettore delle revisioni\n- Codice sorgente: [github.com/klehmann/mindoodb-app-teamgrid](https://github.com/klehmann/mindoodb-app-teamgrid)",
+      "nb": "**Mindoo TeamGrid** er en eksempelapp for samarbeidsbaserte regneark der hver arbeidsbok lever i ett delt MindooDB-dokument.\n\n- Rediger celler, rader, kolonner og arkfaner sammen; samtidige endringer fra flere brukere flettes automatisk\n- Skriv formler med `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT` og `TODAY`, med innebygd hjelp og direkte utheving av refererte celler\n- Formater celler med tekst- og fyllfarger, skrifttype og -størrelse, samt fet, kursiv og understreket stil\n- Bla gjennom historiske revisjoner skrivebeskyttet med Havens tidsreise og revisjonsvelgeren\n- Kildekode: [github.com/klehmann/mindoodb-app-teamgrid](https://github.com/klehmann/mindoodb-app-teamgrid)",
+      "nl": "**Mindoo TeamGrid** is een voorbeeldapp voor gezamenlijke spreadsheets waarbij elke werkmap in één gedeeld MindooDB-document leeft.\n\n- Bewerk cellen, rijen, kolommen en werkbladtabs samen; gelijktijdige wijzigingen van meerdere gebruikers worden automatisch samengevoegd\n- Schrijf formules met `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT` en `TODAY`, met ingebouwde hulp en live markering van gerefereerde cellen\n- Maak cellen op met tekst- en vulkleuren, lettertype en -grootte, en vet, cursief en onderstreept\n- Blader alleen-lezen door historische revisies via Haven-tijdreizen en de revisiekiezer\n- Broncode: [github.com/klehmann/mindoodb-app-teamgrid](https://github.com/klehmann/mindoodb-app-teamgrid)",
+      "pl": "**Mindoo TeamGrid** to przykładowa aplikacja arkusza kalkulacyjnego do pracy zespołowej, w której każdy skoroszyt żyje w jednym wspólnym dokumencie MindooDB.\n\n- Edytuj komórki, wiersze, kolumny i karty arkuszy razem z innymi; równoczesne zmiany wielu użytkowników są scalane automatycznie\n- Pisz formuły z `SUM`, `AVERAGE`, `MIN`, `MAX`, `COUNT`, `CONCAT` i `TODAY`, z pomocą w edytorze i podświetlaniem na żywo komórek, do których się odwołujesz\n- Formatuj komórki kolorami tekstu i wypełnienia, krojem i rozmiarem czcionki oraz stylami pogrubienia, kursywy i podkreślenia\n- Przeglądaj historyczne rewizje w trybie tylko do odczytu dzięki podróży w czasie Haven i wyborowi rewizji\n- Kod źródłowy: [github.com/klehmann/mindoodb-app-teamgrid](https://github.com/klehmann/mindoodb-app-teamgrid)"
+    },
+    "icon": "listing/icon.webp",
+    "screenshots": [
+      {
+        "file": "listing/01-charts.webp",
+        "caption": {
+          "en": "Mindoo TeamGrid is a collaborative spreadsheet for Haven with Column, Bar, Line, and Pie charts, around 280 Excel-compatible formula functions, and a +tab menu that adds either an empty sheet or a sheet sourced from a Haven Virtual View.",
+          "de": "Mindoo TeamGrid ist eine kollaborative Tabellenkalkulation für Haven mit Säulen-, Balken-, Linien- und Kreisdiagrammen, rund 280 Excel-kompatiblen Formelfunktionen und einem +Tab-Menü, das ein leeres Blatt oder ein Blatt aus einer Haven Virtual View hinzufügt.",
+          "es": "Mindoo TeamGrid es una hoja de cálculo colaborativa para Haven con gráficos de columnas, barras, líneas y circulares, unas 280 funciones de fórmula compatibles con Excel y un menú de pestaña + que añade una hoja vacía o una hoja alimentada por una Virtual View de Haven.",
+          "fr": "Mindoo TeamGrid est un tableur collaboratif pour Haven avec des graphiques en colonnes, barres, lignes et secteurs, environ 280 fonctions de formule compatibles Excel et un menu d'onglet + qui ajoute une feuille vide ou une feuille alimentée par une Virtual View de Haven.",
+          "it": "Mindoo TeamGrid è un foglio di calcolo collaborativo per Haven con grafici a colonne, barre, linee e torta, circa 280 funzioni di formula compatibili con Excel e un menu della scheda + che aggiunge un foglio vuoto o un foglio alimentato da una Virtual View di Haven.",
+          "nb": "Mindoo TeamGrid er et samarbeidsbasert regneark for Haven med kolonne-, stolpe-, linje- og sektordiagrammer, rundt 280 Excel-kompatible formelfunksjoner og en +fane-meny som legger til enten et tomt ark eller et ark hentet fra en Haven Virtual View.",
+          "nl": "Mindoo TeamGrid is een gezamenlijke spreadsheet voor Haven met kolom-, staaf-, lijn- en cirkeldiagrammen, zo'n 280 Excel-compatibele formulefuncties en een +tab-menu dat een leeg blad toevoegt of een blad gevoed door een Haven Virtual View.",
+          "pl": "Mindoo TeamGrid to wspólny arkusz kalkulacyjny dla Haven z wykresami kolumnowymi, słupkowymi, liniowymi i kołowymi, około 280 funkcjami formuł zgodnymi z Excelem oraz menu karty +, które dodaje pusty arkusz lub arkusz zasilany z Virtual View w Haven."
+        }
+      },
+      {
+        "file": "listing/02-view-dialog.webp",
+        "caption": {
+          "en": "The Add Virtual View Sheet dialog picks any virtual view configured for the app – including views that combine your private data with work data and a partner company's tenant.",
+          "de": "Der Dialog „Virtual-View-Blatt hinzufügen“ wählt jede für die App konfigurierte Virtual View aus – auch Views, die private Daten mit Arbeitsdaten und dem Tenant eines Partnerunternehmens kombinieren.",
+          "es": "El diálogo para añadir una hoja de Virtual View elige cualquier vista virtual configurada para la app, incluidas vistas que combinan tus datos privados con datos de trabajo y el tenant de una empresa asociada.",
+          "fr": "La boîte de dialogue d'ajout d'une feuille Virtual View sélectionne n'importe quelle vue virtuelle configurée pour l'application, y compris des vues qui combinent vos données privées avec des données professionnelles et le tenant d'une entreprise partenaire.",
+          "it": "La finestra di dialogo per aggiungere un foglio Virtual View seleziona qualsiasi vista virtuale configurata per l'app, incluse viste che combinano i tuoi dati privati con dati di lavoro e il tenant di un'azienda partner.",
+          "nb": "Dialogen for å legge til et Virtual View-ark velger en hvilken som helst virtuell visning konfigurert for appen – inkludert visninger som kombinerer dine private data med arbeidsdata og et partnerselskaps tenant.",
+          "nl": "Het dialoogvenster voor het toevoegen van een Virtual View-blad kiest elke virtuele view die voor de app is geconfigureerd – inclusief views die je privégegevens combineren met werkgegevens en de tenant van een partnerbedrijf.",
+          "pl": "Okno dodawania arkusza Virtual View wybiera dowolny widok wirtualny skonfigurowany dla aplikacji – w tym widoki łączące Twoje dane prywatne z danymi służbowymi i tenantem firmy partnerskiej."
+        }
+      },
+      {
+        "file": "listing/03-view-sheet.webp",
+        "caption": {
+          "en": "The resulting virtual view sheet materializes view rows as ordinary cells, so the full TeamGrid feature set – around 280 Excel formulas, charts, and XLSX export – works on top of cross-tenant Haven data.",
+          "de": "Das resultierende Virtual-View-Blatt materialisiert View-Zeilen als normale Zellen – der volle TeamGrid-Funktionsumfang mit rund 280 Excel-Formeln, Diagrammen und XLSX-Export arbeitet so auf tenant-übergreifenden Haven-Daten.",
+          "es": "La hoja de vista virtual resultante materializa las filas de la vista como celdas normales, de modo que todo el conjunto de funciones de TeamGrid —unas 280 fórmulas de Excel, gráficos y exportación XLSX— funciona sobre datos de Haven de varios tenants.",
+          "fr": "La feuille de vue virtuelle obtenue matérialise les lignes de la vue sous forme de cellules ordinaires, si bien que tout l'éventail de fonctions de TeamGrid — environ 280 formules Excel, graphiques et export XLSX — fonctionne sur des données Haven multi-tenants.",
+          "it": "Il foglio di vista virtuale risultante materializza le righe della vista come celle normali, così l'intero set di funzionalità di TeamGrid — circa 280 formule Excel, grafici ed esportazione XLSX — funziona su dati Haven multi-tenant.",
+          "nb": "Det resulterende Virtual View-arket materialiserer visningsrader som vanlige celler, slik at hele TeamGrid-funksjonssettet – rundt 280 Excel-formler, diagrammer og XLSX-eksport – fungerer oppå Haven-data på tvers av tenants.",
+          "nl": "Het resulterende virtual-view-blad materialiseert viewrijen als gewone cellen, zodat de volledige TeamGrid-functieset – zo'n 280 Excel-formules, diagrammen en XLSX-export – werkt bovenop tenant-overstijgende Haven-gegevens.",
+          "pl": "Powstały arkusz widoku wirtualnego materializuje wiersze widoku jako zwykłe komórki, dzięki czemu pełny zestaw funkcji TeamGrid – około 280 formuł Excela, wykresy i eksport XLSX – działa na danych Haven z wielu tenantów."
+        }
+      }
+    ],
+    "publisher": {
+      "name": "Mindoo GmbH"
+    }
+  }
+}

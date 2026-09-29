@@ -36,7 +36,7 @@
     "exceljs": "^4.4.0",
     "fast-formula-parser": "^1.0.19",
     "fflate": "^0.8.3",
-    "mindoodb-app-sdk": "0.0.51",
+    "mindoodb-app-sdk": "0.0.53",
     "mindoodb-view-language": "0.0.16",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
@@ -49,6 +49,7 @@
     "vue-i18n": "^11.4.8"
   },
   "devDependencies": {
+    "@automerge/automerge": "^3.4.1",
     "@types/d3-scale": "^4.0.9",
     "@types/d3-shape": "^3.1.8",
     "@types/node": "25.5.0",

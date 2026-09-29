@@ -1,0 +1,22 @@
+# Cross-origin reads Haven needs from this app's own origin.
+#
+# haven-app.json is what Haven fetches to install or update this app: one URL is
+# enough, but only if the browser is allowed to read the file from another origin.
+# haven-bundle.* are the same story for hosted-bundle installation. Without these
+# headers the install fails from haven.mindoodb.com or a local Haven.
+#
+# `*` rather than an origin allowlist: Cloudflare's static `_headers` can only emit one
+# fixed value, and browsers reject a multi-valued Access-Control-Allow-Origin. These
+# three files are public app metadata — they contain no user data.
+
+/haven-app.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: no-cache
+
+/haven-bundle.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: no-cache
+
+/haven-bundle.zip
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300
