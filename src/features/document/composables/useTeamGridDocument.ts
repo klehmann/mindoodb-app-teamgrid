@@ -38,6 +38,7 @@ import {
   type MindooDBAppDocumentHistoryEntry,
   type MindooDBAppDocumentRevisionId,
   type MindooDBAppDocumentSummary,
+  type MindooDBAppEmbedContext,
   type MindooDBAppHistoricalDocument,
   type MindooDBAppCreateViewNavigatorInput,
   type MindooDBAppResolvedViewDefinition,
@@ -60,6 +61,7 @@ import {
 import {
   createTeamGridDocument,
   cloneTeamGridDocument,
+  isTeamGridEnvelope,
   migrateTeamGridDocument,
   readSubject,
   type TeamGridDocumentEnvelope,
@@ -112,6 +114,9 @@ export function useTeamGridDocument() {
   const pendingOpsBaseHeads = ref<string[]>([]);
   const openSpreadsheetSessions = ref<OpenSpreadsheetSession[]>([]);
   const activeSpreadsheetSessionId = ref("");
+  /** Set when another app (a CRM, …) shows TeamGrid as its spreadsheet component. */
+  const embedContext = ref<MindooDBAppEmbedContext | null>(null);
+  const embedded = computed(() => embedContext.value !== null);
 
   let cleanupTheme: (() => void) | null = null;
   let cleanupUiPreferences: (() => void) | null = null;
@@ -191,10 +196,69 @@ export function useTeamGridDocument() {
         ?? context.databases[0]?.id
         ?? "";
       status.value = t("app.status.connected");
+      if (context.embed) {
+        embedContext.value = context.embed;
+        selectedDatabaseId.value = context.embed.databaseId;
+        nextSession.onBeforeClose(async () => {
+          if (canSave.value) {
+            await saveDocument();
+          }
+        });
+        await openEmbeddedDocument(context.embed);
+      }
     } catch (error) {
       showError(error);
     }
   });
+
+  /**
+   * Opens the one document the embedding app handed over. A host creates it with
+   * the component's `create` fields only, so the first open writes the workbook.
+   */
+  async function openEmbeddedDocument(embed: MindooDBAppEmbedContext) {
+    const database = await openDatabaseById(embed.databaseId);
+    let document = await database.documents.get(embed.docId);
+    if (!document) {
+      throw new Error(t("app.status.selectDocument"));
+    }
+    const canWrite = embed.intent === "edit" && currentCanUpdateFor(embed.databaseId);
+    if (!isTeamGridEnvelope(document.data) && canWrite) {
+      const envelope = migrateTeamGridDocument(document.data);
+      document = await database.documents.update(embed.docId, {
+        set: {
+          kind: envelope.kind,
+          subject: envelope.subject,
+          tags: envelope.tags,
+          istemplate: envelope.istemplate,
+          teamgrid: envelope.teamgrid,
+        },
+      });
+    }
+    loadDocument(database, embed.databaseId, document);
+    status.value = t("app.status.openedId", { id: document.id });
+  }
+
+  function currentCanUpdateFor(databaseId: string) {
+    return databases.value.find((database) => database.id === databaseId)?.capabilities.includes("update") ?? false;
+  }
+
+  /** Embedded: save, then tell the host we are done. Haven closes this launch. */
+  async function finishEmbedding() {
+    if (!session.value || !embedContext.value) {
+      return;
+    }
+    try {
+      if (canSave.value) {
+        await saveDocument();
+      }
+      await session.value.embedding.complete({
+        docId: embedContext.value.docId,
+        subject: currentEnvelope.value?.subject ?? "",
+      });
+    } catch (error) {
+      showError(error);
+    }
+  }
 
   onBeforeUnmount(async () => {
     cleanupTheme?.();
@@ -696,6 +760,9 @@ export function useTeamGridDocument() {
   }
 
   return {
+    embedContext,
+    embedded,
+    finishEmbedding,
     databases,
     configuredViews,
     selectedDatabaseId,

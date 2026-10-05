@@ -290,7 +290,10 @@
       "title": "Rename worksheet",
       "name": "Name"
     },
-    "importedSpreadsheet": "Imported spreadsheet"
+    "importedSpreadsheet": "Imported spreadsheet",
+    "embed": {
+      "done": "Done"
+    }
   },
   "newDocument": {
     "title": "New spreadsheet",

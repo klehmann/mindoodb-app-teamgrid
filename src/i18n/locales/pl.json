@@ -290,7 +290,10 @@
       "title": "Zmień nazwę arkusza",
       "name": "Nazwa"
     },
-    "importedSpreadsheet": "Zaimportowany arkusz"
+    "importedSpreadsheet": "Zaimportowany arkusz",
+    "embed": {
+      "done": "Gotowe"
+    }
   },
   "newDocument": {
     "title": "New spreadsheet",

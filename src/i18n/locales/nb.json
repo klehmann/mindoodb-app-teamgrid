@@ -290,7 +290,10 @@
       "title": "Gi ark nytt navn",
       "name": "Navn"
     },
-    "importedSpreadsheet": "Importert regneark"
+    "importedSpreadsheet": "Importert regneark",
+    "embed": {
+      "done": "Ferdig"
+    }
   },
   "newDocument": {
     "title": "New spreadsheet",

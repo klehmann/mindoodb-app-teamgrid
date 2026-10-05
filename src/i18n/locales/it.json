@@ -290,7 +290,10 @@
       "title": "Rinomina foglio",
       "name": "Nome"
     },
-    "importedSpreadsheet": "Foglio importato"
+    "importedSpreadsheet": "Foglio importato",
+    "embed": {
+      "done": "Fatto"
+    }
   },
   "newDocument": {
     "title": "New spreadsheet",
