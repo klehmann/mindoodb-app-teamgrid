@@ -29,7 +29,7 @@
  *   those modes rather than throwing, because the UI already disables the
  *   triggering menu/toolbar items via {@link canMutateGrid}.
  */
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   createMindooDBAppBridge,
   type MindooDBAppDatabase,
@@ -204,6 +204,16 @@ export function useTeamGridDocument() {
             await saveDocument();
           }
         });
+        // The host marks us and asks before closing; Havens that predate this
+        // answer with an error, which only means nobody asks.
+        watch(
+          isDirty,
+          (dirty) => {
+            void nextSession.embedding.setDirty(dirty).catch(() => {});
+          },
+          { immediate: true },
+        );
+        nextSession.embedding.onSaveRequest(saveForHost);
         await openEmbeddedDocument(context.embed);
       }
     } catch (error) {
@@ -240,6 +250,19 @@ export function useTeamGridDocument() {
 
   function currentCanUpdateFor(databaseId: string) {
     return databases.value.find((database) => database.id === databaseId)?.capabilities.includes("update") ?? false;
+  }
+
+  /**
+   * Embedded: the host asked us to save (e.g. the user closes our tab and chose
+   * "Save"). Throws when the edits could not be saved, so the host keeps us open.
+   */
+  async function saveForHost() {
+    if (canSave.value) {
+      await saveDocument();
+    }
+    if (isDirty.value) {
+      throw new Error(status.value || t("app.status.saveNeedsWrite"));
+    }
   }
 
   /** Embedded: save, then tell the host we are done. Haven closes this launch. */
