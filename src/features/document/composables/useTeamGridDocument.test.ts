@@ -29,6 +29,8 @@ const fakeSession = {
   openDatabase: vi.fn(),
   createViewNavigator: vi.fn(),
   disconnect: vi.fn(),
+  onBeforeClose: vi.fn(() => vi.fn()),
+  embedding: { complete: vi.fn(), cancel: vi.fn() },
 };
 
 vi.mock("mindoodb-app-sdk", () => ({
@@ -163,6 +165,63 @@ describe("useTeamGridDocument open sessions", () => {
     expect(app.status.value).toBe("JSON patch failed");
     expect(app.isDirty.value).toBe(true);
     wrapper.unmount();
+  });
+});
+
+describe("useTeamGridDocument embedded as a component", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fakeSession.getLaunchContext.mockResolvedValue({
+      databases: [{ id: "embed", name: "CRM", capabilities: ["read", "update"] }],
+      preferredDatabaseId: "embed",
+      runtime: "iframe",
+      theme: {},
+      uiPreferences: { iosMultitaskingOptimized: false, reduceMotion: false },
+      locale: "en",
+      user: { id: "u1", username: "cn=Test/o=Acme" },
+      embed: {
+        embedId: "e1",
+        componentId: "spreadsheet",
+        intent: "edit",
+        databaseId: "embed",
+        docId: "root1",
+        hostAppLabel: "CRM",
+        features: { create: false, open: false },
+      },
+    });
+    fakeSession.openDatabase.mockResolvedValue(fakeDatabase);
+    // What a host creates from the component's `create` + `match` fields.
+    fakeDatabase.documents.get.mockResolvedValue({
+      id: "root1",
+      data: { form: "teamgrid", kind: "mindoodb.teamgrid", subject: "", tags: [], istemplate: false, crm: { folders: ["Offers"] } },
+      heads: ["h1"],
+    });
+    fakeDatabase.documents.update.mockImplementation(async (id: string, patch: { set: Record<string, unknown> }) => ({
+      id,
+      data: { form: "teamgrid", crm: { folders: ["Offers"] }, ...structuredClone(patch.set) },
+      heads: ["h2"],
+    }));
+  });
+
+  it("writes the workbook into the host's empty root and opens it", async () => {
+    const wrapper = mountHarness();
+    await flushPromises();
+    const app = wrapper.vm.app;
+
+    expect(app.embedded.value).toBe(true);
+    expect(fakeDatabase.documents.update).toHaveBeenCalledTimes(1);
+    const [docId, patch] = fakeDatabase.documents.update.mock.calls[0]!;
+    expect(docId).toBe("root1");
+    // Only the component's own fields: the host's match fields and namespace stay untouched.
+    expect(Object.keys(patch.set).sort()).toEqual(["istemplate", "kind", "subject", "tags", "teamgrid"]);
+    expect(app.activeGrid.value?.workbook.worksheetOrder).toHaveLength(1);
+  });
+
+  it("hands control back to the host when done", async () => {
+    const wrapper = mountHarness();
+    await flushPromises();
+    await wrapper.vm.app.finishEmbedding();
+    expect(fakeSession.embedding.complete).toHaveBeenCalledWith({ docId: "root1", subject: "Untitled spreadsheet" });
   });
 });
 

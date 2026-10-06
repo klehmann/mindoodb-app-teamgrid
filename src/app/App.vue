@@ -314,18 +314,37 @@ watch(
  * `disabled` flags and `command` closures stay reactive to the document
  * lifecycle (read-only mode, selection, dirty state, etc.).
  */
-const menuItems = computed<MenuItem[]>(() => [
+/**
+ * Embedded in another app the document is fixed: no new, open, import or delete,
+ * and no window list. "Done" hands control back to the host.
+ */
+const EMBED_HIDDEN_FILE_ITEMS = new Set(["new", "newFromTemplate", "open", "importXlsx", "delete"]);
+
+const menuItems = computed<MenuItem[]>(() =>
+  app.embedded.value
+    ? allMenuItems.value
+        .filter((item) => item.key !== "window")
+        .map((item) =>
+          item.key === "file"
+            ? { ...item, items: (item.items ?? []).filter((entry) => !EMBED_HIDDEN_FILE_ITEMS.has(String(entry.key))) }
+            : item,
+        )
+    : allMenuItems.value,
+);
+
+const allMenuItems = computed<MenuItem[]>(() => [
   {
+    key: "file",
     label: t("app.menu.file"),
     items: [
-      { label: t("app.menu.new"), icon: "pi pi-file-plus", disabled: !app.canCreate.value, command: () => { newSpreadsheetDialogVisible.value = true; } },
-      { label: t("app.menu.newFromTemplate"), icon: "pi pi-copy", disabled: !app.canCreate.value, command: () => void openTemplateDialog() },
-      { label: t("app.menu.open"), icon: "pi pi-folder-open", command: () => void openFileDialog() },
+      { key: "new", label: t("app.menu.new"), icon: "pi pi-file-plus", disabled: !app.canCreate.value, command: () => { newSpreadsheetDialogVisible.value = true; } },
+      { key: "newFromTemplate", label: t("app.menu.newFromTemplate"), icon: "pi pi-copy", disabled: !app.canCreate.value, command: () => void openTemplateDialog() },
+      { key: "open", label: t("app.menu.open"), icon: "pi pi-folder-open", command: () => void openFileDialog() },
       { separator: true },
       { label: t("app.menu.save"), icon: "pi pi-save", disabled: !app.canSave.value || saveInFlight.value, command: () => void saveCurrentDocument() },
-      { label: t("app.menu.importXlsx"), icon: "pi pi-upload", disabled: !app.canCreate.value, command: () => xlsxImportInput.value?.click() },
+      { key: "importXlsx", label: t("app.menu.importXlsx"), icon: "pi pi-upload", disabled: !app.canCreate.value, command: () => xlsxImportInput.value?.click() },
       { label: t("app.menu.exportXlsx"), icon: "pi pi-download", disabled: !app.activeGrid.value, command: () => void exportCurrentWorkbook() },
-      { label: t("app.menu.delete"), icon: "pi pi-trash", disabled: !app.canDelete.value, command: () => { deleteDialogVisible.value = true; } },
+      { key: "delete", label: t("app.menu.delete"), icon: "pi pi-trash", disabled: !app.canDelete.value, command: () => { deleteDialogVisible.value = true; } },
     ],
   },
   {
@@ -372,6 +391,7 @@ const menuItems = computed<MenuItem[]>(() => [
     ],
   },
   {
+    key: "window",
     label: t("app.menu.window"),
     items: [
       ...app.openSessions.value.map((session) => ({
@@ -1368,6 +1388,7 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
           {{ documentTitle }}
         </button>
         <button
+          v-if="!app.embedded.value"
           class="toolbar__document-close"
           type="button"
           :aria-label="t('app.menu.closeCurrent')"
@@ -1378,6 +1399,17 @@ function resizeRow(payload: { rowId: RowId; height: number }) {
         </button>
       </div>
       <div class="toolbar__meta">
+        <Button
+          v-if="app.embedded.value"
+          class="toolbar__embed-done"
+          :label="t('app.embed.done')"
+          icon="pi pi-check"
+          size="small"
+          :loading="saveInFlight"
+          :disabled="saveInFlight"
+          data-testid="teamgrid-embed-done"
+          @click="void app.finishEmbedding()"
+        />
         <Button
           v-if="app.canSave.value"
           class="toolbar__save-changes"

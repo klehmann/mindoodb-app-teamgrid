@@ -290,7 +290,10 @@
       "title": "Renommer la feuille",
       "name": "Nom"
     },
-    "importedSpreadsheet": "Feuille importée"
+    "importedSpreadsheet": "Feuille importée",
+    "embed": {
+      "done": "Terminé"
+    }
   },
   "newDocument": {
     "title": "New spreadsheet",

@@ -290,7 +290,10 @@
       "title": "Werkblad hernoemen",
       "name": "Naam"
     },
-    "importedSpreadsheet": "Geïmporteerde spreadsheet"
+    "importedSpreadsheet": "Geïmporteerde spreadsheet",
+    "embed": {
+      "done": "Klaar"
+    }
   },
   "newDocument": {
     "title": "New spreadsheet",

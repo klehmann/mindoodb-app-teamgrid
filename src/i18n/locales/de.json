@@ -290,7 +290,10 @@
       "title": "Arbeitsblatt umbenennen",
       "name": "Name"
     },
-    "importedSpreadsheet": "Importierte Tabelle"
+    "importedSpreadsheet": "Importierte Tabelle",
+    "embed": {
+      "done": "Fertig"
+    }
   },
   "newDocument": {
     "title": "Neue Tabelle",

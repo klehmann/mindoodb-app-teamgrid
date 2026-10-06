@@ -290,7 +290,10 @@
       "title": "Renombrar hoja",
       "name": "Nombre"
     },
-    "importedSpreadsheet": "Hoja importada"
+    "importedSpreadsheet": "Hoja importada",
+    "embed": {
+      "done": "Listo"
+    }
   },
   "newDocument": {
     "title": "New spreadsheet",
