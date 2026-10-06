@@ -30,7 +30,12 @@ const fakeSession = {
   createViewNavigator: vi.fn(),
   disconnect: vi.fn(),
   onBeforeClose: vi.fn(() => vi.fn()),
-  embedding: { complete: vi.fn(), cancel: vi.fn() },
+  embedding: {
+    complete: vi.fn(),
+    cancel: vi.fn(),
+    setDirty: vi.fn(async () => {}),
+    onSaveRequest: vi.fn((_handler: () => Promise<void>) => vi.fn()),
+  },
 };
 
 vi.mock("mindoodb-app-sdk", () => ({
@@ -215,6 +220,32 @@ describe("useTeamGridDocument embedded as a component", () => {
     // Only the component's own fields: the host's match fields and namespace stay untouched.
     expect(Object.keys(patch.set).sort()).toEqual(["istemplate", "kind", "subject", "tags", "teamgrid"]);
     expect(app.activeGrid.value?.workbook.worksheetOrder).toHaveLength(1);
+  });
+
+  it("tells the host about unsaved edits and saves when the host asks", async () => {
+    const wrapper = mountHarness();
+    await flushPromises();
+    const app = wrapper.vm.app;
+    expect(fakeSession.embedding.setDirty).toHaveBeenLastCalledWith(false);
+    const saveForHost = fakeSession.embedding.onSaveRequest.mock.calls[0]![0];
+
+    app.updateGrid((_grid, envelope) => {
+      envelope.subject = "Offer 2027";
+      return [{ type: "setDocumentProperties", subject: "Offer 2027", tags: [], isTemplate: envelope.istemplate, locale: envelope.teamgrid.settings.locale }];
+    });
+    await flushPromises();
+    expect(fakeSession.embedding.setDirty).toHaveBeenLastCalledWith(true);
+
+    // A failed save keeps the edits, and the host learns why.
+    fakeDatabase.documents.update.mockRejectedValueOnce(new Error("Disk full"));
+    await expect(saveForHost()).rejects.toThrow("Disk full");
+    expect(app.isDirty.value).toBe(true);
+
+    await saveForHost();
+    await flushPromises();
+    expect(app.isDirty.value).toBe(false);
+    expect(fakeSession.embedding.setDirty).toHaveBeenLastCalledWith(false);
+    wrapper.unmount();
   });
 
   it("hands control back to the host when done", async () => {
