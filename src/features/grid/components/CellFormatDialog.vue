@@ -360,7 +360,7 @@ const fontSizeModel = computed<number | string>({
 .cell-format-dialog__sample {
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 0.65rem;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.04);
 }
 
@@ -381,7 +381,7 @@ const fontSizeModel = computed<number | string>({
   gap: 0.25rem;
   padding: 0.25rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.04);
 }
 
@@ -389,7 +389,7 @@ const fontSizeModel = computed<number | string>({
 .cell-format-dialog__presets button,
 .cell-format-dialog__border-toggle {
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -474,7 +474,7 @@ const fontSizeModel = computed<number | string>({
   min-height: 14rem;
   padding: 2.4rem;
   border: 1px solid var(--border);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
 }
 
 .cell-format-dialog__border-sample {

@@ -176,7 +176,7 @@ watch(
   gap: 0.75rem;
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.03);
   color: inherit;
   cursor: pointer;
@@ -210,7 +210,7 @@ watch(
 .revision-row__chip {
   flex: 0 0 auto;
   padding: 0.2rem 0.45rem;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.08);
   color: var(--muted);
   font-size: 0.78rem;

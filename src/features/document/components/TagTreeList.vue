@@ -75,7 +75,7 @@ defineEmits<{
   gap: 0.5rem;
   padding: 0.45rem 0.55rem;
   border: 1px solid transparent;
-  border-radius: 0.65rem;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text);
   cursor: pointer;
