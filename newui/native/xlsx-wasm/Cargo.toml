@@ -1,0 +1,28 @@
+[package]
+name = "xlsx-wasm"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+description = "Browser (WASM) build of GenOffice's xlsx sidecar read path"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Read path only: no IronCalc recalc, no calamine legacy import.
+xlsx-sidecar = { path = "../../vendor/genoffice/apps/sheets/native/xlsx-engine", default-features = false }
+base64 = "0.22.1"
+js-sys = "0.3"
+serde = "1"
+serde_json = "1"
+wasm-bindgen = "0.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Os", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

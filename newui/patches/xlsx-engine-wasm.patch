@@ -1,0 +1,1054 @@
+diff -ruN a/apps/sheets/native/xlsx-engine/Cargo.toml b/apps/sheets/native/xlsx-engine/Cargo.toml
+--- a/apps/sheets/native/xlsx-engine/Cargo.toml
++++ b/apps/sheets/native/xlsx-engine/Cargo.toml
+@@ -5,16 +5,31 @@
+ license = "Apache-2.0"
+ publish = false
+ 
++[features]
++default = ["native"]
++# Desktop-only subsystems: formula recalc (IronCalc) and legacy-format
++# import (calamine). The browser (wasm32) build of the read path omits them.
++native = ["dep:calamine", "dep:ironcalc"]
++
++[[bin]]
++name = "xlsx-sidecar"
++path = "src/main.rs"
++required-features = ["native"]
++
+ [dependencies]
+ base64 = "0.22.1"
+-calamine = "0.36.0"
+-ironcalc = "0.7.1"
++calamine = { version = "0.36.0", optional = true }
++ironcalc = { version = "0.7.1", optional = true }
+ quick-xml = { version = "0.38", features = ["encoding"] }
+ roxmltree = "0.21.1"
+ serde = { version = "1", features = ["derive"] }
+ serde_json = "1"
+ uuid = { version = "1", features = ["v4"] }
+ zip = { version = "4", default-features = false, features = ["deflate"] }
++
++[target.'cfg(target_arch = "wasm32")'.dependencies]
++# Session ids come from crypto.getRandomValues in the browser.
++uuid = { version = "1", features = ["v4", "js"] }
+ 
+ [dev-dependencies]
+ tempfile = "3"
+diff -ruN a/apps/sheets/native/xlsx-engine/src/archive.rs b/apps/sheets/native/xlsx-engine/src/archive.rs
+--- a/apps/sheets/native/xlsx-engine/src/archive.rs
++++ b/apps/sheets/native/xlsx-engine/src/archive.rs
+@@ -389,7 +389,9 @@
+     Some(name)
+ }
+ 
+-pub(crate) fn validate_entries(archive: &mut ZipArchive<File>) -> Result<(), SidecarError> {
++pub(crate) fn validate_entries<R: crate::ZipSource>(
++    archive: &mut ZipArchive<R>,
++) -> Result<(), SidecarError> {
+     if archive.len() > MAX_ENTRY_COUNT {
+         return Err(SidecarError::Workbook(
+             "Workbook contains too many ZIP entries.".into(),
+diff -ruN a/apps/sheets/native/xlsx-engine/src/cell_images.rs b/apps/sheets/native/xlsx-engine/src/cell_images.rs
+--- a/apps/sheets/native/xlsx-engine/src/cell_images.rs
++++ b/apps/sheets/native/xlsx-engine/src/cell_images.rs
+@@ -6,12 +6,14 @@
+ 
+ /// WPS image names resolve through cellimages.xml and its relationships. Like
+ /// optional Excel richData, malformed or missing picture parts are ignored.
+-pub(crate) fn read_wps_cell_images(archive: &mut ZipArchive<File>) -> HashMap<String, String> {
++pub(crate) fn read_wps_cell_images<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
++) -> HashMap<String, String> {
+     read_wps_cell_images_inner(archive).unwrap_or_default()
+ }
+ 
+-fn read_wps_cell_images_inner(
+-    archive: &mut ZipArchive<File>,
++fn read_wps_cell_images_inner<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+ ) -> Result<HashMap<String, String>, SidecarError> {
+     const PART: &str = "xl/cellimages.xml";
+     let Some(xml) = visuals::read_optional_xml(archive, PART)? else {
+@@ -68,8 +70,8 @@
+ 
+ /// One record per cell, even when several WPS formulas reuse one image name.
+ /// Empty cells cannot capture a later cell's formula.
+-pub(crate) fn read_sheet_cell_images(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_sheet_cell_images<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+     images_by_vm: &HashMap<u32, String>,
+     images_by_name: &HashMap<String, String>,
+diff -ruN a/apps/sheets/native/xlsx-engine/src/lib.rs b/apps/sheets/native/xlsx-engine/src/lib.rs
+--- a/apps/sheets/native/xlsx-engine/src/lib.rs
++++ b/apps/sheets/native/xlsx-engine/src/lib.rs
+@@ -1,10 +1,12 @@
+ use std::collections::{HashMap, HashSet};
+ use std::fs::{self, File};
+-use std::io::{BufReader, BufWriter, Read, Write};
++use std::io::{BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write};
+ use std::path::{Path, PathBuf};
+ use std::sync::atomic::{AtomicBool, Ordering};
+ use std::sync::{Arc, Condvar, Mutex};
+-use std::thread::{self, JoinHandle};
++#[cfg(not(target_arch = "wasm32"))]
++use std::thread;
++use std::thread::JoinHandle;
+ use std::time::Duration;
+ 
+ use quick_xml::Reader;
+@@ -14,7 +16,9 @@
+ use zip::ZipArchive;
+ 
+ pub mod archive;
++#[cfg(feature = "native")]
+ pub mod convert;
++#[cfg(feature = "native")]
+ pub mod recalc;
+ mod richdata;
+ mod shared_formulas;
+@@ -51,6 +55,59 @@
+ const RANGE_WAIT_MAX_LAG_ROWS: usize = 16 * CHUNK_ROW_COUNT;
+ const MAX_FORMULA_CELLS: usize = 100_000;
+ 
++/// Anything the package readers can pull ZIP bytes from: a file natively,
++/// an in-memory buffer for workbooks opened from bytes (the WASM build).
++pub trait ZipSource: Read + Seek {}
++
++impl<T: Read + Seek> ZipSource for T {}
++
++/// Where a session's package lives; reopened per indexer / media read.
++#[derive(Clone)]
++enum WorkbookSource {
++    Path(PathBuf),
++    Memory(Arc<[u8]>),
++}
++
++enum SourceReader {
++    File(File),
++    Memory(Cursor<Arc<[u8]>>),
++}
++
++impl Read for SourceReader {
++    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
++        match self {
++            Self::File(file) => file.read(buffer),
++            Self::Memory(cursor) => cursor.read(buffer),
++        }
++    }
++}
++
++impl Seek for SourceReader {
++    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
++        match self {
++            Self::File(file) => file.seek(position),
++            Self::Memory(cursor) => cursor.seek(position),
++        }
++    }
++}
++
++impl WorkbookSource {
++    fn archive(&self) -> Result<ZipArchive<SourceReader>, SidecarError> {
++        let reader = match self {
++            Self::Path(path) => SourceReader::File(File::open(path)?),
++            Self::Memory(bytes) => SourceReader::Memory(Cursor::new(Arc::clone(bytes))),
++        };
++        Ok(ZipArchive::new(reader)?)
++    }
++}
++
++/// An indexed chunk: spilled to the session's cache directory, or kept in
++/// memory when the session has none (byte-backed sessions).
++enum ChunkSlot {
++    File(PathBuf),
++    Memory(Arc<ChunkData>),
++}
++
+ #[derive(Debug, Default, Deserialize, Serialize)]
+ struct ChunkData {
+     cells: Vec<CellRecord>,
+@@ -122,8 +179,44 @@
+         short_date_format: Option<&str>,
+     ) -> Result<WorkbookMetadata, SidecarError> {
+         let canonical_path = path.canonicalize()?;
+-        let file = File::open(&canonical_path)?;
+-        let mut archive = ZipArchive::new(file)?;
++        let name = canonical_path
++            .file_name()
++            .and_then(|value| value.to_str())
++            .unwrap_or("workbook.xlsx")
++            .to_owned();
++        self.open_source(
++            WorkbookSource::Path(canonical_path),
++            name,
++            locale,
++            short_date_format,
++        )
++    }
++
++    /// Opens a workbook held in memory (the browser build has no files).
++    /// Its chunk cache stays in memory too.
++    pub fn open_bytes(
++        &mut self,
++        bytes: impl Into<Arc<[u8]>>,
++        name: &str,
++        locale: &str,
++        short_date_format: Option<&str>,
++    ) -> Result<WorkbookMetadata, SidecarError> {
++        self.open_source(
++            WorkbookSource::Memory(bytes.into()),
++            name.to_owned(),
++            locale,
++            short_date_format,
++        )
++    }
++
++    fn open_source(
++        &mut self,
++        source: WorkbookSource,
++        name: String,
++        locale: &str,
++        short_date_format: Option<&str>,
++    ) -> Result<WorkbookMetadata, SidecarError> {
++        let mut archive = source.archive()?;
+         archive::validate_entries(&mut archive)?;
+         let entry_count = archive.len();
+         let mut color_context = visuals::read_theme_palette(&mut archive)?;
+@@ -300,17 +393,19 @@
+         }
+ 
+         let session_id = Uuid::new_v4().to_string();
+-        let cache_directory = std::env::temp_dir().join(format!("genspark-ai-excel-{session_id}"));
+-        fs::create_dir(&cache_directory)?;
+-        let name = canonical_path
+-            .file_name()
+-            .and_then(|value| value.to_str())
+-            .unwrap_or("workbook.xlsx")
+-            .to_owned();
++        let cache_directory = match source {
++            WorkbookSource::Path(_) => {
++                let directory =
++                    std::env::temp_dir().join(format!("genspark-ai-excel-{session_id}"));
++                fs::create_dir(&directory)?;
++                Some(directory)
++            }
++            WorkbookSource::Memory(_) => None,
++        };
+         self.sessions.insert(
+             session_id.clone(),
+             WorkbookSession {
+-                path: canonical_path,
++                source,
+                 sheets: sheets.clone(),
+                 runtimes,
+                 shared_strings,
+@@ -391,7 +486,10 @@
+     pub fn session_path(&self, session_id: &str) -> Option<PathBuf> {
+         self.sessions
+             .get(session_id)
+-            .map(|session| session.path.clone())
++            .and_then(|session| match &session.source {
++                WorkbookSource::Path(path) => Some(path.clone()),
++                WorkbookSource::Memory(_) => None,
++            })
+     }
+ 
+     pub fn read_media(
+@@ -424,8 +522,7 @@
+             .map(str::to_owned)
+             .or_else(|| session.header_footer_picture_path(visual_id))
+             .ok_or_else(|| SidecarError::InvalidRequest("Unknown workbook image.".into()))?;
+-        let file = File::open(&session.path)?;
+-        let mut archive = ZipArchive::new(file)?;
++        let mut archive = session.source.archive()?;
+         visuals::read_media(&mut archive, &media_path)
+     }
+ }
+@@ -445,14 +542,14 @@
+ }
+ 
+ struct WorkbookSession {
+-    path: PathBuf,
++    source: WorkbookSource,
+     sheets: Vec<SheetMetadata>,
+     runtimes: Vec<SheetRuntime>,
+     shared_strings: Arc<Vec<SharedString>>,
+     styled_xfs: Arc<Vec<bool>>,
+     color_context: Arc<ColorContext>,
+     visuals: Vec<VisualObject>,
+-    cache_directory: PathBuf,
++    cache_directory: Option<PathBuf>,
+     cancelled: Arc<AtomicBool>,
+ }
+ 
+@@ -475,10 +572,11 @@
+ 
+     fn ensure_parser(&mut self, sheet_index: usize) -> Result<(), SidecarError> {
+         let runtime = &mut self.runtimes[sheet_index];
+-        if runtime.handle.is_some() {
++        if runtime.started {
+             return Ok(());
+         }
+-        let path = self.path.clone();
++        runtime.started = true;
++        let source = self.source.clone();
+         let worksheet_path = runtime.worksheet_path.clone();
+         let cache_directory = self.cache_directory.clone();
+         let state = Arc::clone(&runtime.state);
+@@ -495,31 +593,39 @@
+                 .collect(),
+         );
+         let cancelled = Arc::clone(&self.cancelled);
+-        let handle = thread::Builder::new()
+-            .name(format!("xlsx-index-{sheet_index}"))
+-            .spawn(move || {
+-                let result = index_worksheet(
+-                    &path,
+-                    &worksheet_path,
+-                    sheet_index,
+-                    &cache_directory,
+-                    &shared_strings,
+-                    &styled_xfs,
+-                    &color_context,
+-                    &rich_image_cells,
+-                    &state,
+-                    &cancelled,
+-                );
+-                let (lock, condition) = &*state;
+-                if let Ok(mut index) = lock.lock() {
+-                    match result {
+-                        Ok(()) => index.complete = true,
+-                        Err(error) => index.error = Some(error.to_string()),
+-                    }
+-                    condition.notify_all();
++        let job = move || {
++            let result = index_worksheet(
++                &source,
++                &worksheet_path,
++                sheet_index,
++                cache_directory.as_deref(),
++                &shared_strings,
++                &styled_xfs,
++                &color_context,
++                &rich_image_cells,
++                &state,
++                &cancelled,
++            );
++            let (lock, condition) = &*state;
++            if let Ok(mut index) = lock.lock() {
++                match result {
++                    Ok(()) => index.complete = true,
++                    Err(error) => index.error = Some(error.to_string()),
+                 }
+-            })?;
+-        runtime.handle = Some(handle);
++                condition.notify_all();
++            }
++        };
++        // No threads in the browser: index the whole sheet up front, so the
++        // read below never has to wait on the condvar.
++        #[cfg(target_arch = "wasm32")]
++        job();
++        #[cfg(not(target_arch = "wasm32"))]
++        {
++            let handle = thread::Builder::new()
++                .name(format!("xlsx-index-{sheet_index}"))
++                .spawn(job)?;
++            runtime.handle = Some(handle);
++        }
+         Ok(())
+     }
+ 
+@@ -539,7 +645,9 @@
+                 .indexed_through_row
+                 .map_or(range.start_row, |row| range.start_row.saturating_sub(row))
+                 >= RANGE_WAIT_MAX_LAG_ROWS;
+-        let index = if far_ahead {
++        // WASM indexes synchronously (nothing to wait for), and its
++        // wait_timeout would panic reading the missing clock.
++        let index = if far_ahead || cfg!(target_arch = "wasm32") {
+             index
+         } else {
+             condition
+@@ -630,32 +738,41 @@
+             .map(|row| row.min(range.end_row))
+             .unwrap_or(0);
+         let last_chunk = last_available_row / CHUNK_ROW_COUNT;
+-        let paths = if indexed_through_row.is_none() || last_available_row < range.start_row {
++        let slots = if indexed_through_row.is_none() || last_available_row < range.start_row {
+             Vec::new()
+         } else {
+             (first_chunk..=last_chunk)
+-                .filter_map(|chunk| index.chunk_files.get(&chunk).cloned())
++                .filter_map(|chunk| match index.chunk_files.get(&chunk)? {
++                    ChunkSlot::File(path) => Some(ChunkSlot::File(path.clone())),
++                    ChunkSlot::Memory(data) => Some(ChunkSlot::Memory(Arc::clone(data))),
++                })
+                 .collect::<Vec<_>>()
+         };
+         drop(index);
+ 
++        let in_range = |cell: &CellRecord| {
++            cell.row >= range.start_row
++                && cell.row <= range.end_row
++                && cell.column >= range.start_column
++                && cell.column <= range.end_column
++        };
++        let row_in_range =
++            |row: &RowProperty| row.row >= range.start_row && row.row <= range.end_row;
+         let mut cells = Vec::new();
+         let mut rows = Vec::new();
+-        for path in paths {
+-            let file = File::open(path)?;
+-            let chunk: ChunkData = serde_json::from_reader(BufReader::new(file))?;
+-            cells.extend(chunk.cells.into_iter().filter(|cell| {
+-                cell.row >= range.start_row
+-                    && cell.row <= range.end_row
+-                    && cell.column >= range.start_column
+-                    && cell.column <= range.end_column
+-            }));
+-            rows.extend(
+-                chunk
+-                    .rows
+-                    .into_iter()
+-                    .filter(|row| row.row >= range.start_row && row.row <= range.end_row),
+-            );
++        for slot in slots {
++            match slot {
++                ChunkSlot::File(path) => {
++                    let file = File::open(path)?;
++                    let chunk: ChunkData = serde_json::from_reader(BufReader::new(file))?;
++                    cells.extend(chunk.cells.into_iter().filter(in_range));
++                    rows.extend(chunk.rows.into_iter().filter(row_in_range));
++                }
++                ChunkSlot::Memory(chunk) => {
++                    cells.extend(chunk.cells.iter().filter(|cell| in_range(cell)).cloned());
++                    rows.extend(chunk.rows.iter().filter(|row| row_in_range(row)).cloned());
++                }
++            }
+         }
+         Ok(RangeResult {
+             cells,
+@@ -705,8 +822,10 @@
+                 let _ = handle.join();
+             }
+         }
+-        if self.cache_directory.exists() {
+-            fs::remove_dir_all(&self.cache_directory)?;
++        if let Some(directory) = &self.cache_directory
++            && directory.exists()
++        {
++            fs::remove_dir_all(directory)?;
+         }
+         Ok(())
+     }
+@@ -715,6 +834,7 @@
+ struct SheetRuntime {
+     worksheet_path: String,
+     state: Arc<(Mutex<SheetIndex>, Condvar)>,
++    started: bool,
+     handle: Option<JoinHandle<()>>,
+ }
+ 
+@@ -723,6 +843,7 @@
+         Self {
+             worksheet_path,
+             state: Arc::new((Mutex::new(SheetIndex::default()), Condvar::new())),
++            started: false,
+             handle: None,
+         }
+     }
+@@ -733,7 +854,7 @@
+     indexed_through_row: Option<usize>,
+     complete: bool,
+     error: Option<String>,
+-    chunk_files: HashMap<usize, PathBuf>,
++    chunk_files: HashMap<usize, ChunkSlot>,
+     merges: Vec<MergedRange>,
+     hyperlinks: Vec<HyperlinkRecord>,
+     conditional_rules: Vec<ConditionalRule>,
+diff -ruN a/apps/sheets/native/xlsx-engine/src/richdata.rs b/apps/sheets/native/xlsx-engine/src/richdata.rs
+--- a/apps/sheets/native/xlsx-engine/src/richdata.rs
++++ b/apps/sheets/native/xlsx-engine/src/richdata.rs
+@@ -2,8 +2,8 @@
+ //! carries a `vm` index and a cached #VALUE! error; the picture itself lives
+ //! behind xl/metadata.xml → xl/richData/richValueRel.xml → xl/media/*.
+ 
++use crate::ZipSource;
+ use std::collections::HashMap;
+-use std::fs::File;
+ 
+ use roxmltree::Node;
+ use zip::ZipArchive;
+@@ -14,12 +14,12 @@
+ /// `vm` attribute value (1-based valueMetadata record index) → media part
+ /// path, for records whose rich value is a `_localImage`. Absent or
+ /// malformed richData parts degrade to "no in-cell pictures".
+-pub fn read_rich_value_images(archive: &mut ZipArchive<File>) -> HashMap<u32, String> {
++pub fn read_rich_value_images<R: ZipSource>(archive: &mut ZipArchive<R>) -> HashMap<u32, String> {
+     read_rich_value_images_inner(archive).unwrap_or_default()
+ }
+ 
+-fn read_rich_value_images_inner(
+-    archive: &mut ZipArchive<File>,
++fn read_rich_value_images_inner<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+ ) -> Result<HashMap<u32, String>, SidecarError> {
+     let workbook_rels = read_relationships(archive, "xl/workbook.xml")?;
+     let part_by_type = |suffix: &str| {
+diff -ruN a/apps/sheets/native/xlsx-engine/src/sparklines.rs b/apps/sheets/native/xlsx-engine/src/sparklines.rs
+--- a/apps/sheets/native/xlsx-engine/src/sparklines.rs
++++ b/apps/sheets/native/xlsx-engine/src/sparklines.rs
+@@ -29,8 +29,8 @@
+         .then(|| format!("#{}", hex.to_ascii_uppercase()))
+ }
+ 
+-pub(crate) fn read_sheet_sparklines(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_sheet_sparklines<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+ ) -> Result<Vec<SparklineGroupInfo>, SidecarError> {
+     let entry = zip_entry(archive, worksheet_path)?;
+diff -ruN a/apps/sheets/native/xlsx-engine/src/table_styles.rs b/apps/sheets/native/xlsx-engine/src/table_styles.rs
+--- a/apps/sheets/native/xlsx-engine/src/table_styles.rs
++++ b/apps/sheets/native/xlsx-engine/src/table_styles.rs
+@@ -47,8 +47,8 @@
+ }
+ 
+ /// styles.xml `<tableStyles>` → per-style band palette.
+-pub(crate) fn read_custom_table_styles(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_custom_table_styles<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     dxf_styles: &[visuals::CellStyle],
+ ) -> HashMap<String, CustomTablePalette> {
+     let mut palettes = HashMap::new();
+@@ -678,8 +678,8 @@
+     palette
+ }
+ 
+-pub(crate) fn read_sheet_tables(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_sheet_tables<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+     colors: &ColorContext,
+     custom_styles: &HashMap<String, CustomTablePalette>,
+diff -ruN a/apps/sheets/native/xlsx-engine/src/tests.rs b/apps/sheets/native/xlsx-engine/src/tests.rs
+--- a/apps/sheets/native/xlsx-engine/src/tests.rs
++++ b/apps/sheets/native/xlsx-engine/src/tests.rs
+@@ -3925,3 +3925,65 @@
+     }
+     assert_eq!(seen, CHARTS.len(), "every chart visual was resolved");
+ }
++
++/// A byte-backed session (the browser build's only kind) keeps its chunks
++/// in memory but must answer exactly like the file-backed one.
++#[test]
++fn byte_backed_session_matches_file_backed_session() {
++    let (_dir, path) = open_fixture(&[
++        (
++            "xl/workbook.xml",
++            r#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
++        ),
++        (
++            "xl/_rels/workbook.xml.rels",
++            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#,
++        ),
++        (
++            "xl/worksheets/sheet1.xml",
++            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
++<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><f>A1*2</f><v>2</v></c></row>
++<row r="300"><c r="C300"><v>3</v></c></row></sheetData>
++<mergeCells count="1"><mergeCell ref="A2:B3"/></mergeCells>
++</worksheet>"#,
++        ),
++    ]);
++    let read_all = |sessions: &mut WorkbookSessions, metadata: &WorkbookMetadata| {
++        let sheet_id = metadata.sheets[0].id.clone();
++        let range = CellRange {
++            start_row: 0,
++            end_row: 299,
++            start_column: 0,
++            end_column: 2,
++        };
++        let result = loop {
++            let result = sessions
++                .read_range(&metadata.session_id, &sheet_id, &range)
++                .unwrap();
++            if result.indexing_complete {
++                break result;
++            }
++            std::thread::sleep(std::time::Duration::from_millis(5));
++        };
++        let formulas = sessions
++            .read_formula_cells(&metadata.session_id, &sheet_id)
++            .unwrap();
++        (
++            serde_json::to_value(result).unwrap(),
++            serde_json::to_value(formulas).unwrap(),
++        )
++    };
++    let mut sessions = WorkbookSessions::new();
++    let from_file = sessions.open(&path).unwrap();
++    let bytes = std::fs::read(&path).unwrap();
++    let from_bytes = sessions
++        .open_bytes(bytes, "fixture.xlsx", "zh", None)
++        .unwrap();
++    assert_eq!(from_bytes.name, "fixture.xlsx");
++    assert!(sessions.session_path(&from_bytes.session_id).is_none());
++    let file_result = read_all(&mut sessions, &from_file);
++    let bytes_result = read_all(&mut sessions, &from_bytes);
++    assert_eq!(file_result, bytes_result);
++    assert_eq!(file_result.0["cells"].as_array().unwrap().len(), 3);
++    sessions.close(&from_bytes.session_id).unwrap();
++}
+diff -ruN a/apps/sheets/native/xlsx-engine/src/visuals/charts.rs b/apps/sheets/native/xlsx-engine/src/visuals/charts.rs
+--- a/apps/sheets/native/xlsx-engine/src/visuals/charts.rs
++++ b/apps/sheets/native/xlsx-engine/src/visuals/charts.rs
+@@ -38,8 +38,8 @@
+         })
+ }
+ 
+-pub(crate) fn read_chart(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_chart<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     chart_path: &str,
+     colors: &ColorContext,
+     formats: &mut SourceFormats,
+@@ -126,8 +126,8 @@
+ 
+ /// Every `c:f` reference in a chart part, so the source-format lookup can be
+ /// warmed in one worksheet pass instead of one prefix scan per reference.
+-pub(crate) fn chart_formula_references(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn chart_formula_references<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     chart_path: &str,
+ ) -> Vec<String> {
+     let Ok(xml) = read_xml(archive, chart_path) else {
+diff -ruN a/apps/sheets/native/xlsx-engine/src/visuals/colors.rs b/apps/sheets/native/xlsx-engine/src/visuals/colors.rs
+--- a/apps/sheets/native/xlsx-engine/src/visuals/colors.rs
++++ b/apps/sheets/native/xlsx-engine/src/visuals/colors.rs
+@@ -273,8 +273,8 @@
+ 
+ /// styles.xml `<colors><indexedColors>` — a legacy-palette override written
+ /// by workbooks converted from .xls. Entries are ARGB ("00RRGGBB").
+-pub fn read_indexed_palette(
+-    archive: &mut ZipArchive<File>,
++pub fn read_indexed_palette<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     colors: &mut ColorContext,
+ ) -> Result<(), SidecarError> {
+     let Some(xml) = read_optional_xml(archive, "xl/styles.xml")? else {
+@@ -315,7 +315,9 @@
+     format!("#{red:02X}{green:02X}{blue:02X}")
+ }
+ 
+-pub fn read_theme_palette(archive: &mut ZipArchive<File>) -> Result<ColorContext, SidecarError> {
++pub fn read_theme_palette<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
++) -> Result<ColorContext, SidecarError> {
+     let Some(xml) = read_optional_xml(archive, "xl/theme/theme1.xml")? else {
+         return Ok(ColorContext::default());
+     };
+diff -ruN a/apps/sheets/native/xlsx-engine/src/visuals/drawing.rs b/apps/sheets/native/xlsx-engine/src/visuals/drawing.rs
+--- a/apps/sheets/native/xlsx-engine/src/visuals/drawing.rs
++++ b/apps/sheets/native/xlsx-engine/src/visuals/drawing.rs
+@@ -92,8 +92,8 @@
+         .collect()
+ }
+ 
+-pub(crate) fn read_drawing(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_drawing<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     drawing_path: &str,
+     sheet_id: &str,
+     id_offset: usize,
+diff -ruN a/apps/sheets/native/xlsx-engine/src/visuals/source_formats.rs b/apps/sheets/native/xlsx-engine/src/visuals/source_formats.rs
+--- a/apps/sheets/native/xlsx-engine/src/visuals/source_formats.rs
++++ b/apps/sheets/native/xlsx-engine/src/visuals/source_formats.rs
+@@ -3,8 +3,8 @@
+ //! attribute's own formatCode is a stale copy some writers (Numbers) never
+ //! refresh, and their numCache carries no formatCode either.
+ 
++use crate::ZipSource;
+ use std::collections::{HashMap, HashSet};
+-use std::fs::File;
+ use std::io::BufReader;
+ 
+ use quick_xml::Reader;
+@@ -68,9 +68,9 @@
+     /// Number format of the first cell of `'Sheet'!$B$4:$C$8` — the cell
+     /// Excel takes a linked format from. General and text (`@`) formats
+     /// resolve to None so callers fall through to the next candidate.
+-    pub fn first_cell_format(
++    pub fn first_cell_format<R: ZipSource>(
+         &mut self,
+-        archive: &mut ZipArchive<File>,
++        archive: &mut ZipArchive<R>,
+         reference: &str,
+     ) -> Option<String> {
+         let (sheet_name, cell) = split_first_cell(reference)?;
+@@ -92,7 +92,7 @@
+     /// byte zero on a cache miss, so a workbook whose charts carry many
+     /// source-linked series used to rescan the same large worksheet once per
+     /// referenced cell.
+-    pub fn prefetch(&mut self, archive: &mut ZipArchive<File>, references: &[String]) {
++    pub fn prefetch<R: ZipSource>(&mut self, archive: &mut ZipArchive<R>, references: &[String]) {
+         // (worksheet path, cells still wanted) grouped per sheet, so each part
+         // is opened at most once no matter how many charts point into it.
+         let mut wanted: HashMap<String, HashSet<String>> = HashMap::new();
+@@ -134,9 +134,9 @@
+     /// wanted cell. Rows are emitted in ascending order, so the pass stops
+     /// after the last wanted row; cells the sheet does not define resolve to
+     /// None just as a single-cell lookup would.
+-    fn resolve_cells(
++    fn resolve_cells<R: ZipSource>(
+         &mut self,
+-        archive: &mut ZipArchive<File>,
++        archive: &mut ZipArchive<R>,
+         path: &str,
+         wanted: &HashSet<String>,
+     ) {
+@@ -239,7 +239,11 @@
+ }
+ 
+ /// Streams the sheet part until the wanted cell (or past its row).
+-fn cell_style_index(archive: &mut ZipArchive<File>, path: &str, cell: &str) -> Option<usize> {
++fn cell_style_index<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
++    path: &str,
++    cell: &str,
++) -> Option<usize> {
+     let target_row = row_of(cell)?;
+     let entry = zip_entry(archive, path).ok()?;
+     count_sheet_pass();
+diff -ruN a/apps/sheets/native/xlsx-engine/src/visuals/styles.rs b/apps/sheets/native/xlsx-engine/src/visuals/styles.rs
+--- a/apps/sheets/native/xlsx-engine/src/visuals/styles.rs
++++ b/apps/sheets/native/xlsx-engine/src/visuals/styles.rs
+@@ -3,8 +3,8 @@
+ 
+ use super::*;
+ 
+-pub fn read_styles(
+-    archive: &mut ZipArchive<File>,
++pub fn read_styles<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     colors: &ColorContext,
+     theme_fonts: Option<&ThemeFonts>,
+     locale: &str,
+diff -ruN a/apps/sheets/native/xlsx-engine/src/visuals.rs b/apps/sheets/native/xlsx-engine/src/visuals.rs
+--- a/apps/sheets/native/xlsx-engine/src/visuals.rs
++++ b/apps/sheets/native/xlsx-engine/src/visuals.rs
+@@ -1,5 +1,5 @@
++use crate::ZipSource;
+ use std::collections::{HashMap, HashSet};
+-use std::fs::File;
+ use std::io::Read;
+ use std::path::Path;
+ 
+@@ -709,8 +709,8 @@
+     pub minor_ea: Option<String>,
+ }
+ 
+-pub fn read_theme_fonts(
+-    archive: &mut ZipArchive<File>,
++pub fn read_theme_fonts<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+ ) -> Result<Option<ThemeFonts>, SidecarError> {
+     let Some(xml) = read_optional_xml(archive, "xl/theme/theme1.xml")? else {
+         return Ok(None);
+@@ -794,8 +794,8 @@
+     !stem.is_empty() && !stem.contains('/')
+ }
+ 
+-pub fn read_visual_objects(
+-    archive: &mut ZipArchive<File>,
++pub fn read_visual_objects<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     sheets: &[SheetVisualSource],
+     colors: &ColorContext,
+     formats: &mut SourceFormats,
+@@ -942,8 +942,8 @@
+ 
+ /// Slicer/timeline part name → caption for the sheet's `xl/slicers/*.xml`
+ /// and `xl/timelines/*.xml` parts; the drawing frame carries only the name.
+-fn read_slicer_captions(
+-    archive: &mut ZipArchive<File>,
++fn read_slicer_captions<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+     relationships: &HashMap<String, Relationship>,
+ ) -> HashMap<String, String> {
+@@ -1000,8 +1000,8 @@
+ /// objectPr with the anchor and preview, the `mc:Fallback` copy is bare) and
+ /// older writers emit the bare form only, in which case the legacy VML
+ /// drawing supplies the anchor and preview picture.
+-pub(crate) fn read_ole_objects(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_ole_objects<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+     sheet_relationships: &HashMap<String, Relationship>,
+ ) -> Result<Vec<OleObjectRecord>, SidecarError> {
+@@ -1119,8 +1119,8 @@
+ /// `filled`/`stroked` from its `v:shapetype`; VML's own default is true).
+ /// Malformed VML (some third-party writers) is treated as absent rather
+ /// than failing the whole workbook.
+-pub(crate) fn read_vml_object_shapes(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_vml_object_shapes<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     vml_path: &str,
+ ) -> Result<HashMap<u32, VmlObjectShape>, SidecarError> {
+     let Some(xml) = read_optional_xml(archive, vml_path)? else {
+@@ -1240,8 +1240,8 @@
+     })
+ }
+ 
+-pub fn read_media(
+-    archive: &mut ZipArchive<File>,
++pub fn read_media<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     media_path: &str,
+ ) -> Result<MediaResult, SidecarError> {
+     let mut entry = crate::zip_entry(archive, media_path)?;
+@@ -1349,8 +1349,8 @@
+         .collect()
+ }
+ 
+-pub fn read_pivot_tables(
+-    archive: &mut ZipArchive<File>,
++pub fn read_pivot_tables<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+ ) -> Result<Vec<PivotPartInfo>, SidecarError> {
+     let relationships = read_relationships(archive, worksheet_path)?;
+@@ -1420,8 +1420,8 @@
+     Ok(infos)
+ }
+ 
+-pub fn read_comments(
+-    archive: &mut ZipArchive<File>,
++pub fn read_comments<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+ ) -> Result<Vec<(String, String, String)>, SidecarError> {
+     let relationships = read_relationships(archive, worksheet_path)?;
+@@ -1479,8 +1479,8 @@
+ /// at the media part through the VML part's own relationships. Legacy VML
+ /// is not always well-formed XML — an unparseable part loses the pictures,
+ /// not the sheet.
+-pub fn read_header_footer_pictures(
+-    archive: &mut ZipArchive<File>,
++pub fn read_header_footer_pictures<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+     relationship_id: &str,
+     sheet_index: usize,
+@@ -1604,8 +1604,8 @@
+ }
+ 
+ /// Package paths of the table parts attached to a worksheet.
+-pub fn table_part_paths(
+-    archive: &mut ZipArchive<File>,
++pub fn table_part_paths<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+ ) -> Result<Vec<String>, SidecarError> {
+     let relationships = read_relationships(archive, worksheet_path)?;
+@@ -1620,8 +1620,8 @@
+ 
+ /// Relationship id → hyperlink target for a worksheet part. Internal
+ /// (location-only) links carry no relationship and are not included here.
+-pub fn hyperlink_targets(
+-    archive: &mut ZipArchive<File>,
++pub fn hyperlink_targets<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+ ) -> Result<HashMap<String, String>, SidecarError> {
+     Ok(read_relationships(archive, worksheet_path)?
+@@ -1631,8 +1631,8 @@
+         .collect())
+ }
+ 
+-pub(crate) fn read_relationships(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_relationships<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     source_path: &str,
+ ) -> Result<HashMap<String, Relationship>, SidecarError> {
+     let source = Path::new(source_path);
+@@ -1669,13 +1669,13 @@
+     crate::archive::resolve_relationship_target(source_path, target)
+ }
+ 
+-fn read_xml(archive: &mut ZipArchive<File>, path: &str) -> Result<String, SidecarError> {
++fn read_xml<R: ZipSource>(archive: &mut ZipArchive<R>, path: &str) -> Result<String, SidecarError> {
+     read_optional_xml(archive, path)?
+         .ok_or_else(|| SidecarError::Workbook(format!("Workbook is missing {path}.")))
+ }
+ 
+-pub(crate) fn read_optional_xml(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_optional_xml<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     path: &str,
+ ) -> Result<Option<String>, SidecarError> {
+     let Ok(mut entry) = crate::zip_entry(archive, path) else {
+diff -ruN a/apps/sheets/native/xlsx-engine/src/workbook.rs b/apps/sheets/native/xlsx-engine/src/workbook.rs
+--- a/apps/sheets/native/xlsx-engine/src/workbook.rs
++++ b/apps/sheets/native/xlsx-engine/src/workbook.rs
+@@ -4,8 +4,8 @@
+ 
+ use super::*;
+ 
+-pub(crate) fn read_sheet_declarations(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_sheet_declarations<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+ ) -> Result<
+     (
+         Vec<SheetDeclaration>,
+@@ -78,8 +78,8 @@
+     Ok((sheets, protection, active_tab, date_1904))
+ }
+ 
+-pub(crate) fn read_workbook_relationships(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_workbook_relationships<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+ ) -> Result<HashMap<String, String>, SidecarError> {
+     let xml = read_zip_string(archive, "xl/_rels/workbook.xml.rels")?;
+     let mut reader = Reader::from_str(&xml);
+@@ -146,8 +146,8 @@
+         .filter(|value| *value != 100)
+ }
+ 
+-pub(crate) fn read_sheet_dimensions(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_sheet_dimensions<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     worksheet_path: &str,
+     colors: &ColorContext,
+ ) -> Result<SheetDimensions, SidecarError> {
+@@ -409,8 +409,8 @@
+     Ok((row + 1, column + 1))
+ }
+ 
+-pub(crate) fn read_shared_strings(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_shared_strings<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     colors: &ColorContext,
+ ) -> Result<Vec<SharedString>, SidecarError> {
+     let Ok(entry) = zip_entry(archive, "xl/sharedStrings.xml") else {
+@@ -561,8 +561,8 @@
+     pub(crate) titles: Option<String>,
+ }
+ 
+-pub(crate) fn read_defined_names(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_defined_names<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+ ) -> Result<
+     (
+         Vec<DefinedName>,
+diff -ruN a/apps/sheets/native/xlsx-engine/src/worksheet.rs b/apps/sheets/native/xlsx-engine/src/worksheet.rs
+--- a/apps/sheets/native/xlsx-engine/src/worksheet.rs
++++ b/apps/sheets/native/xlsx-engine/src/worksheet.rs
+@@ -6,10 +6,10 @@
+ 
+ #[allow(clippy::too_many_arguments)]
+ pub(crate) fn index_worksheet(
+-    workbook_path: &Path,
++    source: &WorkbookSource,
+     worksheet_path: &str,
+     sheet_index: usize,
+-    cache_directory: &Path,
++    cache_directory: Option<&Path>,
+     shared_strings: &[SharedString],
+     styled_xfs: &[bool],
+     colors: &ColorContext,
+@@ -17,8 +17,7 @@
+     state: &Arc<(Mutex<SheetIndex>, Condvar)>,
+     cancelled: &AtomicBool,
+ ) -> Result<(), SidecarError> {
+-    let file = File::open(workbook_path)?;
+-    let mut archive = ZipArchive::new(file)?;
++    let mut archive = source.archive()?;
+     let link_targets = visuals::hyperlink_targets(&mut archive, worksheet_path)?;
+     let entry = zip_entry(&mut archive, worksheet_path)?;
+     let mut reader = Reader::from_reader(BufReader::new(entry));
+@@ -1198,26 +1197,31 @@
+     chunk_index: usize,
+     chunk: &mut ChunkData,
+     pending_formulas: &mut Vec<CellRecord>,
+-    cache_directory: &Path,
++    cache_directory: Option<&Path>,
+     state: &Arc<(Mutex<SheetIndex>, Condvar)>,
+     indexed_through_row: usize,
+ ) -> Result<(), SidecarError> {
+-    let path = cache_directory.join(format!("sheet-{sheet_index}-chunk-{chunk_index}.json"));
+     let has_data = !chunk.cells.is_empty() || !chunk.rows.is_empty();
+-    if has_data {
++    let slot = if !has_data {
++        None
++    } else if let Some(cache_directory) = cache_directory {
++        let path = cache_directory.join(format!("sheet-{sheet_index}-chunk-{chunk_index}.json"));
+         let file = File::create(&path)?;
+         let mut writer = BufWriter::new(file);
+         serde_json::to_writer(&mut writer, chunk)?;
+         writer.flush()?;
+         chunk.cells.clear();
+         chunk.rows.clear();
+-    }
++        Some(ChunkSlot::File(path))
++    } else {
++        Some(ChunkSlot::Memory(Arc::new(std::mem::take(chunk))))
++    };
+     let (lock, condition) = &**state;
+     let mut index = lock
+         .lock()
+         .map_err(|_| SidecarError::Io("Worksheet index lock was poisoned.".into()))?;
+-    if has_data {
+-        index.chunk_files.insert(chunk_index, path);
++    if let Some(slot) = slot {
++        index.chunk_files.insert(chunk_index, slot);
+     }
+     if !pending_formulas.is_empty() {
+         let room = MAX_FORMULA_CELLS.saturating_sub(index.formula_cells.len());
+diff -ruN a/apps/sheets/native/xlsx-engine/src/xml_util.rs b/apps/sheets/native/xlsx-engine/src/xml_util.rs
+--- a/apps/sheets/native/xlsx-engine/src/xml_util.rs
++++ b/apps/sheets/native/xlsx-engine/src/xml_util.rs
+@@ -45,10 +45,10 @@
+ /// Entry lookup tolerant of non-conformant producers: '\' separators,
+ /// leading '/', and case drift in entry names. Excel opens such packages
+ /// (tdf131575: .NET-written `xl\workbook.xml` with `sharedstrings.xml`).
+-pub(crate) fn zip_entry<'a>(
+-    archive: &'a mut ZipArchive<File>,
++pub(crate) fn zip_entry<'a, R: ZipSource>(
++    archive: &'a mut ZipArchive<R>,
+     name: &str,
+-) -> zip::result::ZipResult<zip::read::ZipFile<'a, File>> {
++) -> zip::result::ZipResult<zip::read::ZipFile<'a, R>> {
+     let resolved = if archive.index_for_name(name).is_some() {
+         None
+     } else {
+@@ -72,8 +72,8 @@
+     archive.by_name(resolved.as_deref().unwrap_or(name))
+ }
+ 
+-pub(crate) fn read_zip_string(
+-    archive: &mut ZipArchive<File>,
++pub(crate) fn read_zip_string<R: ZipSource>(
++    archive: &mut ZipArchive<R>,
+     path: &str,
+ ) -> Result<String, SidecarError> {
+     let mut entry = zip_entry(archive, path)?;
