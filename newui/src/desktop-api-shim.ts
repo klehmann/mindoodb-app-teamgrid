@@ -14,12 +14,13 @@ import type {
   WorkbookFile,
 } from '../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { connectHaven, listWorkbooks, type HavenConnection } from './haven/connection'
-import { pickWorkbook } from './haven/picker'
+import { chooseWorkbook, closeWelcome, showWelcome, welcomeStrings } from './haven/welcome'
 import { changedSinceLoad } from './haven/store'
 import { loadXlsxEngine } from './xlsx/engine'
 import {
   closeSession,
   createEmptyDocument,
+  createFromTemplate,
   importXlsxAsDocument,
   openStoredWorkbook,
   openWorkbookBytes,
@@ -57,6 +58,8 @@ const menuHandlers = new Set<(action: MenuAction) => void>()
 const MENU_SHORTCUTS: Record<string, MenuAction> = { o: 'open', s: 'save', S: 'save-as', p: 'print' }
 
 let language: Lang = 'en'
+/** Haven's UI language for our own screens (TeamGrid's languages, not GenOffice's). */
+let welcomeLanguage = 'en'
 /** Stored workbook to reopen on the next open request, without asking. */
 let reopenDocumentId: string | null = null
 let activeSessionId: string | null = null
@@ -103,25 +106,53 @@ function opened(file: WorkbookFile): WorkbookFile {
   return file
 }
 
-/** Haven: the workbook picker, looping until a workbook is open or the user cancels. */
+/**
+ * Haven: with no workbook open, the welcome screen (new, open, from template,
+ * import) until something opened; with one open, the list of workbooks.
+ */
 async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFile | null> {
   if (reopenDocumentId) {
     const id = reopenDocumentId
     reopenDocumentId = null
     return opened(await openStoredWorkbook(haven, id, language))
   }
-  const choice = await pickWorkbook(await listWorkbooks(haven), haven.canWrite)
-  if (!choice) return null
-  if (choice.kind === 'open') return opened(await openStoredWorkbook(haven, choice.id, language))
-  if (choice.kind === 'new') {
-    const id = await createEmptyDocument(haven, 'Neue Arbeitsmappe', 'Tabelle1')
-    return opened(await openStoredWorkbook(haven, id, language))
+  if (activeSessionId) {
+    const strings = welcomeStrings(welcomeLanguage)
+    const all = await listWorkbooks(haven)
+    const picked = await chooseWorkbook(
+      all.filter((workbook) => !workbook.istemplate),
+      strings.openTitle,
+      strings.empty,
+      strings,
+    )
+    return picked ? opened(await openStoredWorkbook(haven, picked.id, language)) : null
   }
-  const file = await pickFile('.xlsx,.xlsm')
-  if (!file) return null
-  const subject = file.name.replace(/\.xls[xm]$/i, '')
-  const id = await importXlsxAsDocument(haven, new Uint8Array(await file.arrayBuffer()), subject, language)
-  return opened(await openStoredWorkbook(haven, id, language))
+  for (;;) {
+    const choice = await showWelcome({
+      language: welcomeLanguage,
+      canCreate: haven.canWrite,
+      listWorkbooks: () => listWorkbooks(haven),
+    })
+    try {
+      let id: string | null = null
+      if (choice.kind === 'open') id = choice.id
+      else if (choice.kind === 'new') id = await createEmptyDocument(haven, choice.subject, 'Tabelle1')
+      else if (choice.kind === 'template') id = await createFromTemplate(haven, choice.id, choice.subject, language)
+      else {
+        const file = await pickFile('.xlsx,.xlsm')
+        if (file) {
+          const subject = file.name.replace(/\.xls[xm]$/i, '')
+          id = await importXlsxAsDocument(haven, new Uint8Array(await file.arrayBuffer()), subject, language)
+        }
+      }
+      if (!id) continue
+      const file = await openStoredWorkbook(haven, id, language)
+      closeWelcome()
+      return opened(file)
+    } catch (error) {
+      console.error('[newui] opening the workbook failed', error)
+    }
+  }
 }
 
 /** Reopens the active stored workbook when someone else changed it and nothing is pending here. */
@@ -205,6 +236,7 @@ export async function installDesktopApiShim(): Promise<void> {
     console.error('[newui] could not connect to Haven; continuing without it', error)
   }
   language = toLang(haven?.context.locale ?? navigator.language)
+  welcomeLanguage = (haven?.context.locale ?? navigator.language).slice(0, 2).toLowerCase()
   const api = new Proxy(createApi(haven), {
     get(target, property) {
       if (typeof property !== 'string') return undefined

@@ -14,6 +14,7 @@ import { TEAMGRID_FORM, TEAMGRID_SCHEMA_VERSION, type Workbook } from '../model/
 export interface WorkbookSummary {
   id: string
   subject: string
+  istemplate: boolean
   updatedAt?: string
 }
 
@@ -54,13 +55,14 @@ export async function listWorkbooks(haven: HavenConnection): Promise<WorkbookSum
       cursor,
       limit: 200,
       filter: { form: TEAMGRID_FORM },
-      fields: ['subject', 'form'],
+      fields: ['subject', 'form', 'istemplate'],
     })
     for (const item of page.items) {
       if (item.data?.form !== TEAMGRID_FORM) continue
       workbooks.push({
         id: item.id,
         subject: typeof item.data.subject === 'string' && item.data.subject ? item.data.subject : item.id,
+        istemplate: item.data.istemplate === true,
         ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}),
       })
     }

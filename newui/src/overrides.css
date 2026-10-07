@@ -1,0 +1,7 @@
+/* GenOffice's AI panel is left out (VITE_GENOFFICE_AI=false): the sheet takes
+   the whole width instead of leaving the panel's grid column empty. */
+.sheet-body {
+  grid-template-columns: minmax(0, 1fr) !important;
+  /* no column to animate; the grid must have its final width when Univer measures it */
+  transition: none !important;
+}

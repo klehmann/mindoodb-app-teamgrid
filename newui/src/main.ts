@@ -1,5 +1,6 @@
 import { installDesktopApiShim } from './desktop-api-shim'
 import { installEditorInputFix } from './editor-input-fix'
+import './overrides.css'
 
 installEditorInputFix()
 await installDesktopApiShim()

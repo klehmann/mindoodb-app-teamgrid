@@ -136,6 +136,15 @@ export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8A
   }
 }
 
+/** A new workbook with a template's content (pictures included) and fresh ids. */
+export async function createFromTemplate(haven: HavenConnection, templateId: string, subject: string, locale: string) {
+  const template = await loadWorkbook(haven, templateId)
+  const { bytes } = await workbookToXlsx(template.stored.workbook, await loadXlsxEngine(), {
+    loadImage: (attachment) => readAttachmentBase64(haven, templateId, attachment),
+  })
+  return importXlsxAsDocument(haven, bytes, subject, locale)
+}
+
 export async function createEmptyDocument(haven: HavenConnection, subject: string, sheetName: string) {
   const workbook = newWorkbook(sheetName)
   return createWorkbook(haven, subject, workbook, {

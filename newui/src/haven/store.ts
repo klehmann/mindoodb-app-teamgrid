@@ -184,6 +184,7 @@ export async function createWorkbook(haven: HavenConnection, subject: string, ne
       kind: TEAMGRID_KIND,
       subject,
       tags: [],
+      istemplate: false,
       teamgrid: { schemaVersion: TEAMGRID_SCHEMA_VERSION, workbook: topWorkbook(next) },
     }) as Record<string, unknown>,
   })
