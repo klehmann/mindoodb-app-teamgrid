@@ -12,38 +12,47 @@ export type WelcomeChoice =
   | { kind: 'template'; id: string; subject: string }
   | { kind: 'import' }
 
+// Buttons and type follow TeamEdit / classic TeamGrid (PrimeVue Aura with
+// the Mindoo preset): flat 2px corners, Mindoo blue for the primary action,
+// Aura's surface colors for secondary ones, the gold focus ring.
 const STYLE = `
-.tg-welcome{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--surface);color:var(--text);font:15px/1.5 system-ui,sans-serif}
-.tg-welcome__inner{max-width:640px;text-align:center}
-.tg-welcome h1{margin:0 0 16px;font-size:clamp(28px,4vw,40px);line-height:1.15;font-weight:700}
-.tg-welcome p{margin:0 0 28px;color:var(--text-secondary);font-size:17px}
-.tg-welcome__actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:12px}
-.tg-btn{display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface-subtle);color:var(--text);font:inherit;font-size:16px;cursor:pointer}
-.tg-btn:hover{background:var(--hover)}
-.tg-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.tg-btn--primary{background:var(--accent);border-color:var(--accent);color:var(--sheets-on-accent)}
-.tg-btn--primary:hover{background:var(--accent-dark,var(--accent))}
-.tg-btn--link{border-color:transparent;background:none;color:var(--text-secondary);font-size:14px;padding:6px 10px}
-.tg-btn svg{width:20px;height:20px;flex:none}
+:root{--tg-primary:#1f3a8a;--tg-primary-hover:#243c8f;--tg-primary-active:#182a63;--tg-on-primary:#ffffff;--tg-secondary-bg:#f4f6f8;--tg-secondary-hover:#e8eaee;--tg-secondary-active:#d5d9e0;--tg-secondary-text:#475569;--tg-focus-ring:rgba(212,160,23,.38);--tg-muted:#667795;--tg-radius:2px}
+:root[data-theme="dark"]{--tg-secondary-bg:#27272a;--tg-secondary-hover:#3f3f46;--tg-secondary-active:#52525b;--tg-secondary-text:#d4d4d8;--tg-muted:#a7b4cf}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--tg-secondary-bg:#27272a;--tg-secondary-hover:#3f3f46;--tg-secondary-active:#52525b;--tg-secondary-text:#d4d4d8;--tg-muted:#a7b4cf}}
+.tg-welcome{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.25rem 1.5rem;background:var(--surface);color:var(--text);font:16px/1.55 Figtree,Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.tg-welcome__inner{max-width:36rem;display:grid;gap:.85rem;text-align:center}
+.tg-welcome h1{margin:0;font-size:clamp(1.5rem,3.5vw,2.4rem);line-height:1.15;font-weight:700}
+.tg-welcome p{margin:0;color:var(--tg-muted)}
+.tg-welcome__actions{display:flex;flex-wrap:wrap;gap:.55rem;justify-content:center}
+.tg-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.5rem .75rem;border-radius:var(--tg-radius);border:1px solid var(--tg-secondary-bg);background:var(--tg-secondary-bg);color:var(--tg-secondary-text);font:500 1rem/1.2 Figtree,Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer;transition:background-color .2s,border-color .2s,color .2s}
+.tg-btn:hover{background:var(--tg-secondary-hover);border-color:var(--tg-secondary-hover)}
+.tg-btn:active{background:var(--tg-secondary-active);border-color:var(--tg-secondary-active)}
+.tg-btn:focus-visible{outline:2px solid var(--tg-focus-ring);outline-offset:2px}
+.tg-btn--primary{background:var(--tg-primary);border-color:var(--tg-primary);color:var(--tg-on-primary)}
+.tg-btn--primary:hover{background:var(--tg-primary-hover);border-color:var(--tg-primary-hover)}
+.tg-btn--primary:active{background:var(--tg-primary-active);border-color:var(--tg-primary-active)}
+.tg-btn svg{width:1rem;height:1rem;flex:none}
 .tg-dialog-backdrop{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--text) 30%,transparent)}
-.tg-dialog{width:min(520px,calc(100vw - 32px));max-height:min(640px,calc(100vh - 32px));display:flex;flex-direction:column;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 32px color-mix(in srgb,var(--text) 25%,transparent);font:14px/1.4 system-ui,sans-serif}
+.tg-dialog{width:min(520px,calc(100vw - 32px));max-height:min(640px,calc(100vh - 32px));display:flex;flex-direction:column;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;box-shadow:0 8px 32px color-mix(in srgb,var(--text) 25%,transparent);font:14px/1.4 Figtree,Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 .tg-dialog h2{margin:0;padding:16px 20px 8px;font-size:16px;font-weight:600}
 .tg-dialog ul{list-style:none;margin:0;padding:4px 8px;overflow:auto;flex:1;min-height:80px}
-.tg-dialog li button{all:unset;box-sizing:border-box;width:100%;padding:8px 12px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;gap:12px}
+.tg-dialog li button{all:unset;box-sizing:border-box;width:100%;padding:8px 12px;border-radius:var(--tg-radius);cursor:pointer;display:flex;justify-content:space-between;gap:12px}
 .tg-dialog li button:hover,.tg-dialog li button:focus-visible{background:var(--hover)}
 .tg-dialog .tg-date{color:var(--text-secondary);font-size:12px;white-space:nowrap}
 .tg-dialog .tg-empty{padding:16px 12px;color:var(--text-secondary)}
 .tg-dialog label{display:block;padding:8px 20px 4px;color:var(--text-secondary)}
-.tg-dialog input{box-sizing:border-box;width:calc(100% - 40px);margin:0 20px 16px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);color:var(--text);font:inherit}
-.tg-dialog textarea{box-sizing:border-box;width:calc(100% - 40px);margin:0 20px 4px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);color:var(--text);font:inherit;min-height:84px;resize:vertical}
+.tg-dialog input{box-sizing:border-box;width:calc(100% - 40px);margin:0 20px 16px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--tg-radius);background:var(--surface);color:var(--text);font:inherit}
+.tg-dialog input:focus-visible,.tg-dialog textarea:focus-visible{outline:2px solid var(--tg-focus-ring);outline-offset:1px}
+.tg-dialog textarea{box-sizing:border-box;width:calc(100% - 40px);margin:0 20px 4px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--tg-radius);background:var(--surface);color:var(--text);font:inherit;min-height:84px;resize:vertical}
 .tg-dialog .tg-hint{margin:0 20px 12px;color:var(--text-secondary);font-size:12px}
 .tg-dialog .tg-check{display:flex;align-items:center;gap:8px;padding:4px 20px 16px;color:var(--text)}
 .tg-dialog .tg-check input{width:auto;margin:0}
 .tg-dialog footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--border)}
-.tg-dialog footer .tg-btn{font-size:14px;padding:6px 14px}
+.tg-dialog footer .tg-btn{font-size:.875rem;padding:.4rem .7rem}
 `
 
 const ICONS = {
+  import: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
   new: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></svg>',
   open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H3z"/><path d="M3 10h18l-2 9H5z"/></svg>',
   template: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h2"/></svg>',
@@ -214,8 +223,7 @@ export function showWelcome(options: WelcomeOptions): Promise<WelcomeChoice> {
   const inner = element('div', 'tg-welcome__inner')
   inner.append(element('h1', undefined, strings.title), element('p', undefined, strings.body))
   const actions = element('div', 'tg-welcome__actions')
-  const more = element('div', 'tg-welcome__actions')
-  inner.append(actions, more)
+  inner.append(actions)
   page.append(inner)
   document.body.append(page)
 
@@ -223,10 +231,10 @@ export function showWelcome(options: WelcomeOptions): Promise<WelcomeChoice> {
     const newButton = button(`${strings.newDocument}…`, 'tg-btn--primary', ICONS.new)
     const openButton = button(strings.openDocument, '', ICONS.open)
     const templateButton = button(strings.newFromTemplate.replace(/\.\.\.$/, '…'), '', ICONS.template)
-    const importButton = button(strings.importXlsx.replace(/\.\.\.$/, '…'), 'tg-btn--link')
+    const importButton = button(strings.importXlsx.replace(/\.\.\.$/, '…'), '', ICONS.import)
     if (options.canCreate) actions.append(newButton)
     actions.append(openButton)
-    if (options.canCreate) more.append(templateButton, importButton)
+    if (options.canCreate) actions.append(templateButton, importButton)
 
     newButton.addEventListener('click', async () => {
       const subject = await askTitle(strings.newTitle, '', strings)
