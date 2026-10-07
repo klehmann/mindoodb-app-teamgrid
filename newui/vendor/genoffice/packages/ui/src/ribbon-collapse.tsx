@@ -30,11 +30,13 @@ export const RIBBON_COMPACT_SHORTCUT = IS_MAC ? '⌥⌘K' : 'Ctrl+Alt+K'
  */
 export type RibbonDensity = 'full' | 'compact' | 'collapsed'
 
-export function readRibbonCollapsed(storageKey: string): boolean {
+/** The stored choice, or `fallback` while the user has made none. */
+export function readRibbonCollapsed(storageKey: string, fallback = false): boolean {
   try {
-    return localStorage.getItem(storageKey) === '1'
+    const stored = localStorage.getItem(storageKey)
+    return stored == null ? fallback : stored === '1'
   } catch {
-    return false
+    return fallback
   }
 }
 
@@ -118,12 +120,14 @@ export interface RibbonCollapse {
 export function useRibbonCollapse(
   storageKey: string,
   labels: RibbonCollapseLabels,
+  /** `defaultCollapsed`: the state before the user ever toggles (say on a small screen) */
+  options?: { defaultCollapsed?: boolean },
 ): RibbonCollapse {
   const compactEnabled = Boolean(labels.compact && labels.expandFull)
   const [density, setDensity] = useState<RibbonDensity>(() =>
     compactEnabled
       ? readRibbonDensity(storageKey)
-      : readRibbonCollapsed(storageKey)
+      : readRibbonCollapsed(storageKey, options?.defaultCollapsed)
         ? 'collapsed'
         : 'full',
   )

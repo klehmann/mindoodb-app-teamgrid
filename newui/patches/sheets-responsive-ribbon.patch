@@ -1,0 +1,480 @@
+--- a/packages/ui/src/ribbon-collapse.tsx
++++ b/packages/ui/src/ribbon-collapse.tsx
+@@ -30,11 +30,13 @@
+  */
+ export type RibbonDensity = 'full' | 'compact' | 'collapsed'
+ 
+-export function readRibbonCollapsed(storageKey: string): boolean {
++/** The stored choice, or `fallback` while the user has made none. */
++export function readRibbonCollapsed(storageKey: string, fallback = false): boolean {
+   try {
+-    return localStorage.getItem(storageKey) === '1'
++    const stored = localStorage.getItem(storageKey)
++    return stored == null ? fallback : stored === '1'
+   } catch {
+-    return false
++    return fallback
+   }
+ }
+ 
+@@ -118,12 +120,14 @@
+ export function useRibbonCollapse(
+   storageKey: string,
+   labels: RibbonCollapseLabels,
++  /** `defaultCollapsed`: the state before the user ever toggles (say on a small screen) */
++  options?: { defaultCollapsed?: boolean },
+ ): RibbonCollapse {
+   const compactEnabled = Boolean(labels.compact && labels.expandFull)
+   const [density, setDensity] = useState<RibbonDensity>(() =>
+     compactEnabled
+       ? readRibbonDensity(storageKey)
+-      : readRibbonCollapsed(storageKey)
++      : readRibbonCollapsed(storageKey, options?.defaultCollapsed)
+         ? 'collapsed'
+         : 'full',
+   )
+--- a/apps/sheets/src/renderer/ExcelShell.tsx
++++ b/apps/sheets/src/renderer/ExcelShell.tsx
+@@ -1,5 +1,5 @@
+ import type { IFunctionInfo } from '@univerjs/engine-formula'
+-import { useEffect, useMemo, useRef, useState } from 'react'
++import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+ import { platformShortcuts } from '@genoffice/i18n'
+ import {
+   Dropdown,
+@@ -140,6 +140,140 @@
+ /// lights / caption buttons — the ribbon must not reserve space for them.
+ const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab'
+ const IS_MAC = navigator.platform.toLowerCase().includes('mac')
++
++/**
++ * [TeamGrid] Narrow windows (a tablet, a component inside another app, a
++ * phone). Below COMPACT_TABS_QUERY the tab row uses short labels, and tabs
++ * that still do not fit go into "More"; ribbon groups that do not fit fold
++ * into dropdown buttons from the right (RibbonFoldHost). On a phone a tab's
++ * commands open as a bottom sheet. newui/src/responsive.css does the styling.
++ */
++const COMPACT_TABS_QUERY = '(max-width: 1100px)'
++const PHONE_QUERY = '(max-width: 640px)'
++/** room the "More" button needs in the tab row (its label plus caret) */
++const MORE_TAB_WIDTH = 76
++const tgGerman = (): boolean => document.documentElement.lang.toLowerCase().startsWith('de')
++const tgShortTabLabel = (tab: string): string | null => {
++  const short: Record<string, [de: string, en: string]> = {
++    'Page Layout': ['Layout', 'Layout'],
++    Review: ['Prüfen', 'Review'],
++    'Chart Design': ['Diagramm', 'Chart'],
++  }
++  const pair = short[tab]
++  return pair ? (tgGerman() ? pair[0] : pair[1]) : null
++}
++const tgMoreLabel = (): string => (tgGerman() ? 'Mehr' : 'More')
++const tgCloseLabel = (): string => (tgGerman() ? 'Schließen' : 'Close')
++
++function useMediaQuery(query: string): boolean {
++  const [matches, setMatches] = useState(() => window.matchMedia(query).matches)
++  useEffect(() => {
++    const list = window.matchMedia(query)
++    const onChange = (): void => setMatches(list.matches)
++    list.addEventListener('change', onChange)
++    return () => list.removeEventListener('change', onChange)
++  }, [query])
++  return matches
++}
++
++/** [TeamGrid] Groups folded for lack of room, and the one whose dropdown is open. */
++interface RibbonFold {
++  readonly folded: readonly string[]
++  readonly open: string | null
++  readonly toggle: (group: string) => void
++  readonly close: () => void
++}
++const RibbonFoldContext = createContext<RibbonFold | null>(null)
++
++/** [TeamGrid] Icon of a folded group: a small grid of commands. */
++function GroupFoldIcon(): React.JSX.Element {
++  return (
++    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
++      <rect x="3" y="3" width="6" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
++      <rect x="11" y="3" width="6" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
++      <rect x="3" y="11" width="6" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
++      <rect x="11" y="11" width="6" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
++    </svg>
++  )
++}
++
++/**
++ * [TeamGrid] Folds the band's groups that do not fit into dropdown buttons,
++ * from the right; the first group stays. Expanded widths are cached per tab
++ * and group, as a folded group cannot be measured; a tab whose groups were
++ * never measured renders unfolded once to be. On a phone nothing folds: the
++ * bottom sheet shows every group in full.
++ */
++function RibbonFoldHost({
++  tab,
++  phone,
++  children,
++}: {
++  readonly tab: string
++  readonly phone: boolean
++  readonly children: React.ReactNode
++}): React.JSX.Element {
++  const hostRef = useRef<HTMLDivElement>(null)
++  const [folded, setFolded] = useState<string[]>([])
++  const [open, setOpen] = useState<string | null>(null)
++  const expanded = useRef(new Map<string, number>())
++  const foldedWidth = useRef(new Map<string, number>())
++  useEffect(() => setOpen(null), [tab, phone])
++  useLayoutEffect(() => {
++    const band = hostRef.current?.querySelector<HTMLElement>('[data-ribbon-body]')
++    if (!band) return undefined
++    if (phone) {
++      if (folded.length) setFolded([])
++      return undefined
++    }
++    const evaluate = (): void => {
++      // hidden (collapsed ribbon): offsets read 0 and would poison the caches
++      if (!band.clientWidth) return
++      const groups = Array.from(band.querySelectorAll<HTMLElement>(':scope > .ribbon-group[data-group]'))
++      const names = groups.map((group) => group.dataset['group']!)
++      for (const group of groups) {
++        const key = `${tab}|${group.dataset['group']}`
++        if (group.classList.contains('ribbon-group-folded')) foldedWidth.current.set(key, group.offsetWidth)
++        else expanded.current.set(key, group.offsetWidth)
++      }
++      if (names.some((name) => !expanded.current.has(`${tab}|${name}`))) {
++        if (folded.length) setFolded([])
++        return
++      }
++      const style = getComputedStyle(band)
++      const gap = parseFloat(style.columnGap) || 0
++      const avail = band.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
++      const width = (name: string, fold: boolean): number =>
++        (fold ? foldedWidth.current.get(`${tab}|${name}`) ?? 84 : expanded.current.get(`${tab}|${name}`)!) + gap
++      const next = new Set<string>()
++      const total = (): number => names.reduce((sum, name) => sum + width(name, next.has(name)), -gap)
++      for (const name of names.slice(1).reverse()) {
++        if (total() <= avail) break
++        next.add(name)
++      }
++      const list = names.filter((name) => next.has(name))
++      if (list.join('\u0001') !== folded.join('\u0001')) setFolded(list)
++    }
++    evaluate()
++    const observer = new ResizeObserver(evaluate)
++    observer.observe(band)
++    return () => observer.disconnect()
++  })
++  const fold = useMemo<RibbonFold>(
++    () => ({
++      folded,
++      open,
++      toggle: (group) => setOpen((current) => (current === group ? null : group)),
++      close: () => setOpen(null),
++    }),
++    [folded, open],
++  )
++  return (
++    <div className="ribbon-host" ref={hostRef}>
++      <RibbonFoldContext.Provider value={fold}>{children}</RibbonFoldContext.Provider>
++    </div>
++  )
++}
+ 
+ /// Univer's formula bar keeps its expanded state in React component state
+ /// with no command behind it; the fold arrow is the only way in.
+@@ -414,10 +548,25 @@
+ }: ExcelShellProps): React.JSX.Element {
+   const { t } = useI18n()
+   const [activeTab, setActiveTab] = useState<RibbonTab>('Home')
+-  const collapse = useRibbonCollapse('ai-sheets-ribbon-collapsed', {
+-    collapse: t('appRibbonCollapse'),
+-    expand: t('appRibbonExpand'),
+-  })
++  const collapse = useRibbonCollapse(
++    'ai-sheets-ribbon-collapsed',
++    {
++      collapse: t('appRibbonCollapse'),
++      expand: t('appRibbonExpand'),
++    },
++    // [TeamGrid] a phone or a low window starts with only the tab row, until the user decides
++    { defaultCollapsed: window.matchMedia('(max-width: 640px), (max-height: 600px)').matches },
++  )
++  // [TeamGrid] phone: a tab's commands in a bottom sheet; tabs that do not fit under "More"
++  const phone = useMediaQuery(PHONE_QUERY)
++  const [sheetOpen, setSheetOpen] = useState(false)
++  const [overflowTabs, setOverflowTabs] = useState<RibbonTab[]>([])
++  const [moreOpen, setMoreOpen] = useState(false)
++  const tabsRowRef = useRef<HTMLElement | null>(null)
++  const moreRef = useRef<HTMLDivElement | null>(null)
++  const tabWidths = useRef(new Map<string, number>())
++  const sheetRef = useRef<HTMLDivElement | null>(null)
++  useDismissablePopover(moreOpen, () => setMoreOpen(false), { inside: () => [moreRef.current] })
+   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
+   const [isCopilotOpen, setIsCopilotOpen] = useState(() =>
+     aiPanelInitiallyOpen('ai-sheets-show-ai'),
+@@ -589,6 +738,101 @@
+   const visibleTabs: readonly RibbonTab[] = selectedChart
+     ? [...ribbonTabs, 'Chart Design']
+     : ribbonTabs
++
++  // [TeamGrid] Tab row overflow: the tabs that fit stay in the row (the
++  // selected one always), the rest go into "More". Widths are cached per label
++  // mode, as hidden tabs cannot be measured; a tab never seen renders once.
++  useLayoutEffect(() => {
++    const row = tabsRowRef.current
++    if (!row) return undefined
++    const evaluate = (): void => {
++      if (!row.clientWidth) return
++      const mode = window.matchMedia(COMPACT_TABS_QUERY).matches ? 'compact' : 'full'
++      const widths = tabWidths.current
++      row.querySelectorAll<HTMLElement>('[data-tabkey]').forEach((button) => {
++        widths.set(`${mode}:${button.dataset['tabkey']}`, button.offsetWidth)
++      })
++      const width = (key: string): number | undefined => widths.get(`${mode}:${key}`)
++      if (visibleTabs.some((key) => width(key) == null)) {
++        if (overflowTabs.length) setOverflowTabs([])
++        return
++      }
++      const style = getComputedStyle(row)
++      const gap = parseFloat(style.columnGap) || 0
++      let fixed = 0
++      for (const child of Array.from(row.children) as HTMLElement[]) {
++        // the status line shrinks to whatever room the tabs leave
++        if (child.dataset['tabkey'] || child.matches('.ribbon-tabs-spacer, .ribbon-tabs-more, .workbook-status')) continue
++        fixed += child.offsetWidth + gap
++      }
++      const avail = row.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - fixed
++      const needed = visibleTabs.reduce((sum, key) => sum + width(key)! + gap, 0)
++      let next: RibbonTab[] = []
++      if (needed > avail) {
++        const budget = avail - MORE_TAB_WIDTH - gap
++        const selected = visibleTabs.includes(activeTab) ? activeTab : visibleTabs[0]!
++        const shown = new Set<RibbonTab>([selected])
++        let used = width(selected)! + gap
++        for (const key of visibleTabs) {
++          if (shown.has(key)) continue
++          const w = width(key)! + gap
++          if (used + w > budget) break
++          shown.add(key)
++          used += w
++        }
++        next = visibleTabs.filter((key) => !shown.has(key))
++      }
++      if (next.join() !== overflowTabs.join()) setOverflowTabs(next)
++    }
++    evaluate()
++    const observer = new ResizeObserver(evaluate)
++    observer.observe(row)
++    return () => observer.disconnect()
++  })
++
++  // [TeamGrid] while the phone sheet is open the grid shrinks above it, so the
++  // cells being formatted stay in view
++  useEffect(() => {
++    const sheet = sheetRef.current
++    if (!phone || !sheetOpen || !sheet) return undefined
++    const root = document.documentElement
++    const update = (): void => root.style.setProperty('--tg-sheet-h', `${sheet.offsetHeight}px`)
++    update()
++    root.classList.add('tg-sheet-open')
++    const observer = new ResizeObserver(update)
++    observer.observe(sheet)
++    return () => {
++      observer.disconnect()
++      root.classList.remove('tg-sheet-open')
++      root.style.removeProperty('--tg-sheet-h')
++    }
++  }, [phone, sheetOpen, activeTab])
++
++  /**
++   * [TeamGrid] A tab pressed: on a phone it opens its commands in the sheet
++   * (or closes the sheet when it is the open tab); elsewhere the ribbon's own
++   * collapse rules apply. `fromMenu`: picked under "More", never closes.
++   */
++  const pressTab = (tab: RibbonTab, fromMenu = false): void => {
++    if (phone) setSheetOpen((open) => fromMenu || !(open && activeTab === tab))
++    else collapse.onTabPress(!fromMenu && tab === activeTab)
++    setActiveTab(tab)
++  }
++  const tabClass = (tab: RibbonTab): string =>
++    phone ? (sheetOpen && tab === activeTab ? 'active' : '') : collapse.tabClass(tab === activeTab)
++  /** [TeamGrid] full label, plus a short one for narrow windows where there is one */
++  const tabLabel = (tab: RibbonTab): React.ReactNode => {
++    const full = t(TAB_LABEL[tab])
++    const short = tgShortTabLabel(tab)
++    return short && short !== full ? (
++      <>
++        <span className="ribbon-tab-full">{full}</span>
++        <span className="ribbon-tab-short">{short}</span>
++      </>
++    ) : (
++      full
++    )
++  }
+   const saveAsTitle = `${t('appSaveAs')} (${platformShortcuts('⇧⌘S')})`
+ 
+   return (
+@@ -597,11 +841,15 @@
+       inert={openingWorkbook}
+       aria-busy={openingWorkbook}
+     >
+-      <header className={`excel-header ${collapse.rootClass}`} ref={collapse.rootRef}>
++      <header
++        className={`excel-header ${phone ? 'tg-phone' : collapse.rootClass}${phone && sheetOpen ? ' tg-sheet' : ''}`}
++        ref={collapse.rootRef}
++      >
+         <nav
++          ref={tabsRowRef}
+           className={`ribbon-tabs ${IN_TAB ? '' : IS_MAC ? 'ribbon-tabs-mac' : 'ribbon-tabs-win'}`}
+           aria-label={t('appScopeWorkbook')}
+-          onDoubleClick={collapse.onTabsDoubleClick}
++          onDoubleClick={phone ? undefined : collapse.onTabsDoubleClick}
+         >
+           <button
+             type="button"
+@@ -656,25 +904,70 @@
+             />
+           </label>
+           <span className="qa-sep" aria-hidden="true" />
+-          {visibleTabs.map((tab) => (
+-            <button
+-              className={`${collapse.tabClass(tab === activeTab)} ${tab === 'Chart Design' ? 'contextual' : ''}`}
+-              data-tip={collapse.tabTip(tab === activeTab)}
+-              key={tab}
+-              onClick={() => {
+-                collapse.onTabPress(tab === activeTab)
+-                setActiveTab(tab)
+-              }}
+-            >
+-              {t(TAB_LABEL[tab])}
+-            </button>
+-          ))}
++          {visibleTabs
++            .filter((tab) => !overflowTabs.includes(tab))
++            .map((tab) => (
++              <button
++                className={`${tabClass(tab)} ${tab === 'Chart Design' ? 'contextual' : ''}`}
++                data-tip={phone ? undefined : collapse.tabTip(tab === activeTab)}
++                data-tabkey={tab}
++                key={tab}
++                onClick={() => pressTab(tab)}
++              >
++                {tabLabel(tab)}
++              </button>
++            ))}
++          {overflowTabs.length > 0 && (
++            <div className="ribbon-tabs-more" ref={moreRef}>
++              <button
++                type="button"
++                className={`ribbon-tab-more${moreOpen ? ' open' : ''}`}
++                aria-haspopup="menu"
++                aria-expanded={moreOpen}
++                onClick={() => setMoreOpen((open) => !open)}
++              >
++                {tgMoreLabel()} <CaretIcon />
++              </button>
++              {moreOpen && (
++                <div className="menu-select-drop ribbon-more-menu" role="menu">
++                  {overflowTabs.map((tab) => (
++                    <button
++                      type="button"
++                      role="menuitem"
++                      key={tab}
++                      onClick={() => {
++                        setMoreOpen(false)
++                        pressTab(tab, true)
++                      }}
++                    >
++                      {t(TAB_LABEL[tab])}
++                    </button>
++                  ))}
++                </div>
++              )}
++            </div>
++          )}
+           <span className="ribbon-tabs-spacer" />
+           <span className="workbook-status" role="status" aria-live="polite">
+             {statusMessage}
+           </span>
+         </nav>
+ 
++        <div className="ribbon-sheet" ref={sheetRef}>
++        {phone && (
++          <div className="ribbon-sheet-head">
++            <span className="ribbon-sheet-title">{t(TAB_LABEL[activeTab])}</span>
++            <button
++              type="button"
++              className="ribbon-sheet-close"
++              aria-label={tgCloseLabel()}
++              onClick={() => setSheetOpen(false)}
++            >
++              ×
++            </button>
++          </div>
++        )}
++        <RibbonFoldHost tab={activeTab} phone={phone}>
+         <Ribbon
+           activeTab={activeTab}
+           selectionFormat={selectionFormat}
+@@ -707,6 +1000,8 @@
+           aiOpen={isCopilotOpen}
+           onAiToggle={() => setIsCopilotOpen((open) => !open)}
+         />
++        </RibbonFoldHost>
++        </div>
+       </header>
+ 
+       {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
+@@ -3612,8 +3907,50 @@
+   readonly children: React.ReactNode
+ }): React.JSX.Element {
+   // No visible group captions — the label stays for assistive tech.
++  // [TeamGrid] Except in the phone sheet (responsive.css), and when the group
++  // folds for lack of room: then it is a button opening its commands below.
++  const fold = useContext(RibbonFoldContext)
++  const wrapRef = useRef<HTMLDivElement>(null)
++  const [at, setAt] = useState<{ left: number; top: number } | null>(null)
++  const isOpen = fold?.open === label
++  useDismissablePopover(isOpen, () => fold?.close(), { inside: () => [wrapRef.current] })
++  useLayoutEffect(() => {
++    if (!isOpen || !wrapRef.current) return
++    const rect = wrapRef.current.getBoundingClientRect()
++    setAt({ left: Math.max(8, Math.min(rect.left, window.innerWidth - 320)), top: rect.bottom + 4 })
++  }, [isOpen])
++  if (fold?.folded.includes(label)) {
++    return (
++      <section className="ribbon-group ribbon-group-folded" aria-label={label} data-group={label}>
++        <div className="ribbon-group-content" ref={wrapRef}>
++          <button
++            type="button"
++            className="ribbon-tool as-button large ribbon-fold-button"
++            aria-haspopup="true"
++            aria-expanded={isOpen}
++            data-tip={label}
++            onClick={() => fold.toggle(label)}
++          >
++            <span className="tool-icon-row">
++              <GroupFoldIcon />
++              <CaretIcon />
++            </span>
++            <span>
++              <strong>{label}</strong>
++            </span>
++          </button>
++          {isOpen && at && (
++            <div className="ribbon-fold-pop" role="group" aria-label={label} style={at}>
++              <div className="ribbon-group-content">{children}</div>
++            </div>
++          )}
++        </div>
++      </section>
++    )
++  }
+   return (
+-    <section className="ribbon-group" aria-label={label}>
++    <section className="ribbon-group" aria-label={label} data-group={label}>
++      <div className="ribbon-group-caption">{label}</div>
+       <div className="ribbon-group-content">{children}</div>
+     </section>
+   )

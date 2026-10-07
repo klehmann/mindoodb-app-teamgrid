@@ -55,6 +55,22 @@ sheet grew get ids derived from the row before them, so two people typing
 into the next empty row offline end up in the same row
 (`src/model/sync.test.ts` covers these cases in both merge directions).
 
+A cell's format is stored per property (`s.bold`, `s.fillColor`, …), so
+one person making a cell bold and another filling it yellow both keep their
+change. Two sheets added offline under the same name, and merged areas that
+overlap after a merge, are repaired the same way on every replica when the
+workbook loads and written by the next save
+(`src/model/merge-scenarios.test.ts`).
+
+## Small screens
+
+Below 1100px the tab row uses short labels and tabs that do not fit go
+into "More"; ribbon groups that do not fit fold into dropdown buttons from
+the right. On a phone (≤640px) a tab's commands open as a bottom sheet and
+the ribbon starts collapsed (also in windows lower than 600px). The logic is
+in `patches/sheets-responsive-ribbon.patch`, the styling in
+`src/responsive.css`; it follows TeamSlides.
+
 ## Spike status
 
 - Stored and round-tripped: values, formulas (references by row/column id),
