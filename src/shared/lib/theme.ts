@@ -26,9 +26,50 @@ const MINDOO_PRIMARY_SCALE = {
   950: "#0b1020",
 } as const;
 
+/* Flat look shared with TeamEdit and Vega: near-square fields, buttons and selects. */
+const FLAT_BORDER_RADIUS = {
+  none: "0",
+  xs: "1px",
+  sm: "2px",
+  md: "2px",
+  lg: "3px",
+  xl: "4px",
+} as const;
+
+/* Primary buttons in the Mindoo blue in both modes, as in TeamEdit. */
+const MINDOO_PRIMARY_COLORS = {
+  color: "#1f3a8a",
+  contrastColor: "#ffffff",
+  hoverColor: "#243c8f",
+  activeColor: "#182a63",
+} as const;
+
 const MINDOO_THEME_PRESET = definePreset(Aura, {
+  primitive: {
+    borderRadius: FLAT_BORDER_RADIUS,
+  },
   semantic: {
     primary: MINDOO_PRIMARY_SCALE,
+    colorScheme: {
+      light: {
+        primary: MINDOO_PRIMARY_COLORS,
+        highlight: {
+          background: "rgba(31, 58, 138, 0.12)",
+          focusBackground: "rgba(31, 58, 138, 0.18)",
+          color: "#17233b",
+          focusColor: "#0b1020",
+        },
+      },
+      dark: {
+        primary: MINDOO_PRIMARY_COLORS,
+        highlight: {
+          background: "rgba(31, 58, 138, 0.2)",
+          focusBackground: "rgba(31, 58, 138, 0.28)",
+          color: "#f4f7fb",
+          focusColor: "#ffffff",
+        },
+      },
+    },
     focusRing: {
       width: "2px",
       style: "solid",

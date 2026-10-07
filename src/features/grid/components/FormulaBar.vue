@@ -192,7 +192,7 @@ defineExpose({ applyFormulaAssistSuggestion });
 .formula-bar__address {
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 0.6rem;
+  border-radius: var(--radius-md);
   color: var(--muted);
   font-family: var(--font-code);
   font-size: 0.85rem;
@@ -203,7 +203,7 @@ defineExpose({ applyFormulaAssistSuggestion });
   min-height: 2.2rem;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 0.65rem;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.06);
   color: var(--text);
   /*

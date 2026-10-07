@@ -160,7 +160,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
   overflow-y: auto;
   padding: 0.75rem 2.35rem 0.75rem 0.75rem;
   border: 1px solid var(--border);
-  border-radius: 0.8rem;
+  border-radius: var(--radius-md);
   background: var(--bg-elevated);
   box-shadow: var(--shadow);
   overscroll-behavior: contain;
@@ -199,7 +199,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
   gap: 0.15rem;
   padding: 0.45rem 0.55rem;
   border: 1px solid transparent;
-  border-radius: 0.55rem;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text);
   cursor: pointer;

@@ -124,7 +124,7 @@ const {
   overflow: auto;
   padding: 0.35rem;
   border: 1px solid var(--border);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.025);
 }
 
@@ -141,7 +141,7 @@ const {
   gap: 0.2rem;
   padding: 0.75rem 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.03);
   color: inherit;
   cursor: pointer;

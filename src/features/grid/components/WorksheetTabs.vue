@@ -351,7 +351,7 @@ function handleKeydown(worksheetId: WorksheetId, event: KeyboardEvent) {
   min-width: 5rem;
   padding: 0.45rem 0.8rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.04);
   color: var(--text);
   cursor: pointer;

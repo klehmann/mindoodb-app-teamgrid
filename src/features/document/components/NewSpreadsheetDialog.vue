@@ -409,7 +409,7 @@ watch(
   width: 100%;
   padding: 0.7rem 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.04);
   color: inherit;
 }
@@ -443,7 +443,7 @@ watch(
   overflow: auto;
   padding: 0.35rem;
   border: 1px solid var(--border);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.025);
 }
 </style>

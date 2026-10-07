@@ -34,8 +34,9 @@
   --grid-cell-bg: rgba(12, 18, 34, 0.72);
   --formula-text: #bfceff;
   --shadow: 0 28px 80px rgba(1, 5, 16, 0.45);
-  --radius-lg: 24px;
-  --radius-md: 16px;
+  --radius-lg: 4px;
+  --radius-md: 2px;
+  --radius-sm: 2px;
   --font-body:
     Inter,
     ui-sans-serif,
@@ -267,7 +268,7 @@ select {
 }
 
 .toolbar__menubar .p-menubar-item-content {
-  border-radius: 0.6rem;
+  border-radius: var(--radius-md);
 }
 
 .toolbar__menubar .p-menubar-item-link {
@@ -288,7 +289,7 @@ select {
   min-width: 0;
   padding: 0.08rem 0.18rem 0.08rem 0.35rem;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
 }
 
 .toolbar__document-tab:hover,
@@ -378,7 +379,7 @@ select {
   max-width: 100%;
   padding: 0.22rem 0.75rem;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -413,7 +414,7 @@ select {
     max-width: calc(100vw - 1rem);
     padding: 0.45rem;
     border: 1px solid var(--border);
-    border-radius: 0.9rem;
+    border-radius: var(--radius-md);
     background: var(--bg-elevated);
     box-shadow: var(--shadow);
   }
@@ -428,7 +429,7 @@ select {
   flex: 0 0 auto;
   padding: 0.12rem 0.42rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.06);
   color: inherit;
   font: inherit;
@@ -548,7 +549,7 @@ button.toolbar__status-badge:focus-visible {
   width: 100%;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 0.65rem;
+  border-radius: var(--radius-md);
   background: rgb(255 255 255 / 0.06);
   color: var(--text);
 }
