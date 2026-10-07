@@ -13,8 +13,23 @@ import type {
   UiTheme,
   WorkbookFile,
 } from '../vendor/genoffice/apps/sheets/src/shared/desktop-api'
-import { connectHaven, listWorkbooks, type HavenConnection } from './haven/connection'
-import { chooseWorkbook, closeWelcome, showWelcome, welcomeStrings } from './haven/welcome'
+import {
+  connectHaven,
+  listWorkbooks,
+  readProperties,
+  writeProperties,
+  type HavenConnection,
+} from './haven/connection'
+import { installFileMenu, type FileAction } from './haven/file-menu'
+import {
+  askTitle,
+  chooseWorkbook,
+  closeWelcome,
+  editProperties,
+  showWelcome,
+  welcomeStrings,
+  type WelcomeChoice,
+} from './haven/welcome'
 import { changedSinceLoad } from './haven/store'
 import { loadXlsxEngine } from './xlsx/engine'
 import {
@@ -26,6 +41,7 @@ import {
   openWorkbookBytes,
   readPivotDefinition,
   saveSession,
+  sessionFor,
   storedDocumentOf,
 } from './xlsx/sessions'
 
@@ -60,8 +76,8 @@ const MENU_SHORTCUTS: Record<string, MenuAction> = { o: 'open', s: 'save', S: 's
 let language: Lang = 'en'
 /** Haven's UI language for our own screens (TeamGrid's languages, not GenOffice's). */
 let welcomeLanguage = 'en'
-/** Stored workbook to reopen on the next open request, without asking. */
-let reopenDocumentId: string | null = null
+/** Stored workbook the next open request opens without asking (reload, file menu). */
+let pendingDocumentId: string | null = null
 let activeSessionId: string | null = null
 let pendingEdits = 0
 
@@ -106,14 +122,25 @@ function opened(file: WorkbookFile): WorkbookFile {
   return file
 }
 
+/** Creates or picks the workbook a welcome-screen or file-menu choice stands for. */
+async function workbookForChoice(haven: HavenConnection, choice: WelcomeChoice): Promise<string | null> {
+  if (choice.kind === 'open') return choice.id
+  if (choice.kind === 'new') return createEmptyDocument(haven, choice.subject, 'Tabelle1')
+  if (choice.kind === 'template') return createFromTemplate(haven, choice.id, choice.subject, language)
+  const file = await pickFile('.xlsx,.xlsm')
+  if (!file) return null
+  const subject = file.name.replace(/\.xls[xm]$/i, '')
+  return importXlsxAsDocument(haven, new Uint8Array(await file.arrayBuffer()), subject, language)
+}
+
 /**
  * Haven: with no workbook open, the welcome screen (new, open, from template,
  * import) until something opened; with one open, the list of workbooks.
  */
 async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFile | null> {
-  if (reopenDocumentId) {
-    const id = reopenDocumentId
-    reopenDocumentId = null
+  if (pendingDocumentId) {
+    const id = pendingDocumentId
+    pendingDocumentId = null
     return opened(await openStoredWorkbook(haven, id, language))
   }
   if (activeSessionId) {
@@ -134,17 +161,7 @@ async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFil
       listWorkbooks: () => listWorkbooks(haven),
     })
     try {
-      let id: string | null = null
-      if (choice.kind === 'open') id = choice.id
-      else if (choice.kind === 'new') id = await createEmptyDocument(haven, choice.subject, 'Tabelle1')
-      else if (choice.kind === 'template') id = await createFromTemplate(haven, choice.id, choice.subject, language)
-      else {
-        const file = await pickFile('.xlsx,.xlsm')
-        if (file) {
-          const subject = file.name.replace(/\.xls[xm]$/i, '')
-          id = await importXlsxAsDocument(haven, new Uint8Array(await file.arrayBuffer()), subject, language)
-        }
-      }
+      const id = await workbookForChoice(haven, choice)
       if (!id) continue
       const file = await openStoredWorkbook(haven, id, language)
       closeWelcome()
@@ -152,6 +169,53 @@ async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFil
     } catch (error) {
       console.error('[newui] opening the workbook failed', error)
     }
+  }
+}
+
+/** Opens `id` through the editor's own open flow (which saves pending edits first). */
+function openInEditor(id: string): void {
+  pendingDocumentId = id
+  devHooks.menu('open')
+}
+
+async function waitForSave(timeoutMs = 15_000): Promise<void> {
+  if (pendingEdits === 0) return
+  devHooks.menu('save')
+  for (const started = Date.now(); pendingEdits > 0 && Date.now() - started < timeoutMs; ) {
+    await new Promise((resolve) => setTimeout(resolve, 200))
+  }
+}
+
+async function onFileAction(haven: HavenConnection, action: FileAction): Promise<void> {
+  const strings = welcomeStrings(welcomeLanguage)
+  const stored = activeSessionId ? storedDocumentOf(activeSessionId) : undefined
+  if (action === 'open') {
+    devHooks.menu('open')
+  } else if (action === 'new') {
+    const subject = await askTitle(strings.newTitle, '', strings)
+    if (subject !== null) openInEditor(await createEmptyDocument(haven, subject, 'Tabelle1'))
+  } else if (action === 'template') {
+    const templates = (await listWorkbooks(haven)).filter((workbook) => workbook.istemplate)
+    const template = await chooseWorkbook(templates, strings.templateTitle, strings.emptyTemplates, strings)
+    if (!template) return
+    const subject = await askTitle(strings.newTitle, strings.copyOf.replace('{title}', template.subject), strings)
+    if (subject !== null) openInEditor(await createFromTemplate(haven, template.id, subject, language))
+  } else if (action === 'import') {
+    const id = await workbookForChoice(haven, { kind: 'import' })
+    if (id) openInEditor(id)
+  } else if (action === 'export') {
+    if (!activeSessionId) return
+    await waitForSave()
+    const session = sessionFor(activeSessionId!)
+    // The title may have changed in the properties since the session opened.
+    download(session.bytes, storedDocumentOf(activeSessionId!)?.loaded.subject ?? session.name)
+  } else if (action === 'properties' && stored) {
+    const properties = await editProperties(await readProperties(haven, stored.loaded.id), strings)
+    if (!properties) return
+    await writeProperties(haven, stored.loaded.id, properties)
+    stored.loaded.subject = properties.subject
+    // Our own write must not look like someone else's change.
+    await changedSinceLoad(haven, stored.loaded)
   }
 }
 
@@ -166,8 +230,7 @@ function watchRemoteChanges(haven: HavenConnection): void {
     try {
       if ((await changedSinceLoad(haven, stored.loaded)) && pendingEdits === 0) {
         console.info('[newui] the workbook changed elsewhere; reloading it')
-        reopenDocumentId = stored.loaded.id
-        devHooks.menu('open')
+        openInEditor(stored.loaded.id)
       }
     } catch (error) {
       console.warn('[newui] checking for remote changes failed', error)
@@ -256,7 +319,12 @@ export async function installDesktopApiShim(): Promise<void> {
   })
   ;(window as unknown as { desktopApi: unknown }).desktopApi = api
   ;(window as unknown as { __newui: unknown }).__newui = devHooks
-  if (haven) watchRemoteChanges(haven)
+  if (haven) {
+    watchRemoteChanges(haven)
+    installFileMenu(welcomeStrings(welcomeLanguage), haven.canWrite, (action) => {
+      onFileAction(haven!, action).catch((error) => console.error(`[newui] ${action} failed`, error))
+    })
+  }
   window.addEventListener(
     'keydown',
     (event) => {

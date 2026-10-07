@@ -5,3 +5,9 @@
   /* no column to animate; the grid must have its final width when Univer measures it */
   transition: none !important;
 }
+
+/* Room for TeamGrid's "File" button left of the ribbon tabs (macOS layouts
+   already keep it free for the window controls). */
+.ribbon-tabs:not(.ribbon-tabs-mac) {
+  padding-left: 84px;
+}

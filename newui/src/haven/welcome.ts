@@ -35,6 +35,10 @@ const STYLE = `
 .tg-dialog .tg-empty{padding:16px 12px;color:var(--text-secondary)}
 .tg-dialog label{display:block;padding:8px 20px 4px;color:var(--text-secondary)}
 .tg-dialog input{box-sizing:border-box;width:calc(100% - 40px);margin:0 20px 16px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);color:var(--text);font:inherit}
+.tg-dialog textarea{box-sizing:border-box;width:calc(100% - 40px);margin:0 20px 4px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);color:var(--text);font:inherit;min-height:84px;resize:vertical}
+.tg-dialog .tg-hint{margin:0 20px 12px;color:var(--text-secondary);font-size:12px}
+.tg-dialog .tg-check{display:flex;align-items:center;gap:8px;padding:4px 20px 16px;color:var(--text)}
+.tg-dialog .tg-check input{width:auto;margin:0}
 .tg-dialog footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--border)}
 .tg-dialog footer .tg-btn{font-size:14px;padding:6px 14px}
 `
@@ -148,6 +152,46 @@ export function askTitle(title: string, initial: string, strings: WelcomeStrings
     const create = button(strings.create, 'tg-btn--primary')
     create.addEventListener('click', submit)
     return { body, actions: [create] }
+  })
+}
+
+export interface DocumentProperties {
+  subject: string
+  tags: string[]
+  istemplate: boolean
+}
+
+/** The workbook's title, tags and template flag; resolves with the edited values or null. */
+export function editProperties(initial: DocumentProperties, strings: WelcomeStrings): Promise<DocumentProperties | null> {
+  return dialog<DocumentProperties>(strings.propertiesTitle, strings, (done) => {
+    const body = element('div')
+    const titleLabel = element('label', undefined, strings.titleLabel)
+    const title = element('input')
+    title.placeholder = strings.titlePlaceholder
+    title.value = initial.subject
+    titleLabel.htmlFor = title.id = 'tg-title-input'
+    const tagsLabel = element('label', undefined, strings.tagsLabel)
+    const tags = element('textarea')
+    tags.placeholder = strings.tagsPlaceholder
+    tags.value = initial.tags.join('\n')
+    tagsLabel.htmlFor = tags.id = 'tg-tags-input'
+    const hint = element('div', 'tg-hint', strings.tagsHint)
+    const check = element('label', 'tg-check')
+    const template = element('input')
+    template.type = 'checkbox'
+    template.id = 'tg-template-input'
+    template.checked = initial.istemplate
+    check.append(template, document.createTextNode(strings.useAsTemplate))
+    body.append(titleLabel, title, tagsLabel, tags, hint, check)
+    const save = button(strings.save, 'tg-btn--primary')
+    save.addEventListener('click', () =>
+      done({
+        subject: title.value.trim() || strings.untitled,
+        tags: [...new Set(tags.value.split('\n').map((tag) => tag.trim()).filter(Boolean))],
+        istemplate: template.checked,
+      }),
+    )
+    return { body, actions: [save] }
   })
 }
 

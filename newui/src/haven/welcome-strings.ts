@@ -1,6 +1,6 @@
-// Welcome screen and dialog strings, taken from classic TeamGrid's locales
-// (src/i18n/locales/*.json) so both apps say the same. Languages outside
-// this list fall back to English.
+// Strings of TeamGrid's own screens (welcome, file menu, dialogs), taken from
+// classic TeamGrid's locales (src/i18n/locales/*.json) so both apps say the
+// same. Languages outside this list fall back to English.
 
 export const WELCOME_STRINGS = {
   "en": {
@@ -10,6 +10,8 @@ export const WELCOME_STRINGS = {
     "openDocument": "Open spreadsheet",
     "newFromTemplate": "New from template...",
     "importXlsx": "Import XLSX...",
+    "exportXlsx": "Export XLSX",
+    "file": "File",
     "openTitle": "Open spreadsheet",
     "templateTitle": "New from template",
     "empty": "No spreadsheets in this category.",
@@ -21,7 +23,13 @@ export const WELCOME_STRINGS = {
     "copyOf": "Copy of {title}",
     "cancel": "Cancel",
     "create": "Create",
-    "open": "Open"
+    "open": "Open",
+    "save": "Save",
+    "propertiesTitle": "Spreadsheet properties",
+    "tagsLabel": "Tags",
+    "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
+    "tagsHint": "Enter one tag per line. Use a backslash to create hierarchy, for example Work\\Planning.",
+    "useAsTemplate": "Use this spreadsheet as a template"
   },
   "de": {
     "title": "Gemeinsame Tabellen",
@@ -30,6 +38,8 @@ export const WELCOME_STRINGS = {
     "openDocument": "Tabelle öffnen",
     "newFromTemplate": "Neu aus Vorlage...",
     "importXlsx": "XLSX importieren...",
+    "exportXlsx": "XLSX exportieren",
+    "file": "Datei",
     "openTitle": "Tabelle öffnen",
     "templateTitle": "Neu aus Vorlage",
     "empty": "Keine Tabellen in dieser Kategorie.",
@@ -41,7 +51,13 @@ export const WELCOME_STRINGS = {
     "copyOf": "Kopie von {title}",
     "cancel": "Abbrechen",
     "create": "Erstellen",
-    "open": "Öffnen"
+    "open": "Öffnen",
+    "save": "Speichern",
+    "propertiesTitle": "Tabelleneigenschaften",
+    "tagsLabel": "Tags",
+    "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
+    "tagsHint": "Gib pro Zeile einen Tag ein. Verwende einen Backslash für Hierarchien, zum Beispiel Work\\Planning.",
+    "useAsTemplate": "Diese Tabelle als Vorlage verwenden"
   },
   "fr": {
     "title": "Collaborative spreadsheets",
@@ -50,6 +66,8 @@ export const WELCOME_STRINGS = {
     "openDocument": "Open spreadsheet",
     "newFromTemplate": "New from template...",
     "importXlsx": "Importer XLSX...",
+    "exportXlsx": "Exporter XLSX",
+    "file": "Fichier",
     "openTitle": "Ouvrir une feuille",
     "templateTitle": "Nouveau à partir d’un modèle",
     "empty": "Aucune feuille dans cette catégorie.",
@@ -61,7 +79,13 @@ export const WELCOME_STRINGS = {
     "copyOf": "Copy of {title}",
     "cancel": "Annuler",
     "create": "Créer",
-    "open": "Ouvrir"
+    "open": "Ouvrir",
+    "save": "Enregistrer",
+    "propertiesTitle": "Spreadsheet properties",
+    "tagsLabel": "Étiquettes",
+    "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
+    "tagsHint": "Saisissez une étiquette par ligne. Utilisez une barre oblique inverse pour créer une hiérarchie, par exemple Work\\Planning.",
+    "useAsTemplate": "Use this spreadsheet as a template"
   },
   "it": {
     "title": "Collaborative spreadsheets",
@@ -70,6 +94,8 @@ export const WELCOME_STRINGS = {
     "openDocument": "Open spreadsheet",
     "newFromTemplate": "New from template...",
     "importXlsx": "Importa XLSX...",
+    "exportXlsx": "Esporta XLSX",
+    "file": "File",
     "openTitle": "Apri foglio",
     "templateTitle": "Nuovo da modello",
     "empty": "Nessun foglio in questa categoria.",
@@ -81,7 +107,13 @@ export const WELCOME_STRINGS = {
     "copyOf": "Copy of {title}",
     "cancel": "Annulla",
     "create": "Crea",
-    "open": "Apri"
+    "open": "Apri",
+    "save": "Salva",
+    "propertiesTitle": "Spreadsheet properties",
+    "tagsLabel": "Tag",
+    "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
+    "tagsHint": "Inserisci un tag per riga. Usa una barra rovesciata per creare una gerarchia, ad esempio Work\\Planning.",
+    "useAsTemplate": "Use this spreadsheet as a template"
   },
   "es": {
     "title": "Collaborative spreadsheets",
@@ -90,6 +122,8 @@ export const WELCOME_STRINGS = {
     "openDocument": "Open spreadsheet",
     "newFromTemplate": "New from template...",
     "importXlsx": "Importar XLSX...",
+    "exportXlsx": "Exportar XLSX",
+    "file": "Archivo",
     "openTitle": "Abrir hoja",
     "templateTitle": "Nuevo desde plantilla",
     "empty": "No hay hojas en esta categoría.",
@@ -101,7 +135,13 @@ export const WELCOME_STRINGS = {
     "copyOf": "Copy of {title}",
     "cancel": "Cancelar",
     "create": "Crear",
-    "open": "Abrir"
+    "open": "Abrir",
+    "save": "Guardar",
+    "propertiesTitle": "Spreadsheet properties",
+    "tagsLabel": "Etiquetas",
+    "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
+    "tagsHint": "Introduce una etiqueta por línea. Usa una barra invertida para crear una jerarquía, por ejemplo Work\\Planning.",
+    "useAsTemplate": "Use this spreadsheet as a template"
   },
   "nl": {
     "title": "Collaborative spreadsheets",
@@ -110,6 +150,8 @@ export const WELCOME_STRINGS = {
     "openDocument": "Open spreadsheet",
     "newFromTemplate": "New from template...",
     "importXlsx": "XLSX importeren...",
+    "exportXlsx": "XLSX exporteren",
+    "file": "Bestand",
     "openTitle": "Spreadsheet openen",
     "templateTitle": "Nieuw van sjabloon",
     "empty": "Geen spreadsheets in deze categorie.",
@@ -121,7 +163,13 @@ export const WELCOME_STRINGS = {
     "copyOf": "Copy of {title}",
     "cancel": "Annuleren",
     "create": "Maken",
-    "open": "Openen"
+    "open": "Openen",
+    "save": "Opslaan",
+    "propertiesTitle": "Spreadsheet properties",
+    "tagsLabel": "Tags",
+    "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
+    "tagsHint": "Voer één tag per regel in. Gebruik een backslash om een hiërarchie te maken, bijvoorbeeld Work\\Planning.",
+    "useAsTemplate": "Use this spreadsheet as a template"
   },
   "nb": {
     "title": "Collaborative spreadsheets",
@@ -130,6 +178,8 @@ export const WELCOME_STRINGS = {
     "openDocument": "Open spreadsheet",
     "newFromTemplate": "New from template...",
     "importXlsx": "Importer XLSX...",
+    "exportXlsx": "Eksporter XLSX",
+    "file": "Fil",
     "openTitle": "Åpne regneark",
     "templateTitle": "Ny fra mal",
     "empty": "Ingen regneark i denne kategorien.",
@@ -141,7 +191,13 @@ export const WELCOME_STRINGS = {
     "copyOf": "Copy of {title}",
     "cancel": "Avbryt",
     "create": "Opprett",
-    "open": "Åpne"
+    "open": "Åpne",
+    "save": "Lagre",
+    "propertiesTitle": "Spreadsheet properties",
+    "tagsLabel": "Tagger",
+    "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
+    "tagsHint": "Skriv inn én tagg per linje. Bruk bakoverstrek for å lage hierarki, for eksempel Work\\Planning.",
+    "useAsTemplate": "Use this spreadsheet as a template"
   },
   "pl": {
     "title": "Collaborative spreadsheets",
@@ -150,6 +206,8 @@ export const WELCOME_STRINGS = {
     "openDocument": "Open spreadsheet",
     "newFromTemplate": "New from template...",
     "importXlsx": "Importuj XLSX...",
+    "exportXlsx": "Eksportuj XLSX",
+    "file": "Plik",
     "openTitle": "Otwórz arkusz",
     "templateTitle": "Nowy z szablonu",
     "empty": "Brak arkuszy w tej kategorii.",
@@ -161,7 +219,13 @@ export const WELCOME_STRINGS = {
     "copyOf": "Copy of {title}",
     "cancel": "Anuluj",
     "create": "Utwórz",
-    "open": "Otwórz"
+    "open": "Otwórz",
+    "save": "Zapisz",
+    "propertiesTitle": "Spreadsheet properties",
+    "tagsLabel": "Tagi",
+    "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
+    "tagsHint": "Wpisz jeden tag w wierszu. Użyj ukośnika wstecznego, aby utworzyć hierarchię, na przykład Work\\Planning.",
+    "useAsTemplate": "Use this spreadsheet as a template"
   }
 } as const
 

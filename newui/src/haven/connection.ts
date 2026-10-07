@@ -2,6 +2,7 @@
 // Outside a Haven frame (plain `pnpm dev`) there is no host, and the editor
 // falls back to opening and downloading xlsx files.
 import {
+  MindooDBAppValue,
   createMindooDBAppBridge,
   type MindooDBAppDatabase,
   type MindooDBAppDocument,
@@ -69,6 +70,37 @@ export async function listWorkbooks(haven: HavenConnection): Promise<WorkbookSum
     cursor = page.items.length > 0 ? page.nextCursor : null
   } while (cursor)
   return workbooks.sort((left, right) => left.subject.localeCompare(right.subject))
+}
+
+export interface WorkbookProperties {
+  subject: string
+  tags: string[]
+  istemplate: boolean
+}
+
+export async function readProperties(haven: HavenConnection, id: string): Promise<WorkbookProperties> {
+  const document = await haven.database.documents.get(id)
+  const data = document?.data ?? {}
+  return {
+    subject: typeof data.subject === 'string' ? data.subject : '',
+    tags: Array.isArray(data.tags) ? data.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+    istemplate: data.istemplate === true,
+  }
+}
+
+/** Writes title, tags and template flag; the tag list is replaced as a whole. */
+export async function writeProperties(haven: HavenConnection, id: string, properties: WorkbookProperties) {
+  const document = await haven.database.documents.get(id)
+  await haven.database.documents.update(id, {
+    json: {
+      ...(document?.heads?.length ? { baseHeads: document.heads } : {}),
+      set: [
+        { path: ['subject'], value: MindooDBAppValue.atomic(properties.subject) },
+        { path: ['tags'], value: properties.tags.map((tag) => MindooDBAppValue.atomic(tag)) },
+        { path: ['istemplate'], value: properties.istemplate },
+      ],
+    },
+  })
 }
 
 /** The top-document part of a stored workbook (sheets without their chunk fields). */
