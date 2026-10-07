@@ -3,7 +3,7 @@
 // produced) on a sheet's id order list. The result says which ids are new,
 // which were deleted, and how to turn the stored list into the new one with
 // list patches.
-import { createId } from './schema'
+import { createId, derivedId } from './schema'
 
 export interface AxisOp {
   kind: 'insert' | 'remove' | 'move'
@@ -22,11 +22,19 @@ export interface ReplayResult {
   deleted: Set<string>
 }
 
+/**
+ * Replays the operations on one axis. Explicitly inserted rows/columns get
+ * random ids (two people inserting a row each means two rows); rows/columns
+ * that only exist because the sheet grew past its end get ids derived from
+ * the last id in the list (see `derivedId`), so the same growth on two
+ * replicas yields the same ids. `emptyAnchor` stands in for an empty list.
+ */
 export function replayAxis(
   baseOrder: readonly string[],
   baseLive: readonly string[],
   ops: readonly AxisOp[],
-  prefix: string,
+  prefix: 'r' | 'c',
+  emptyAnchor: string,
 ): ReplayResult {
   const order = [...baseOrder]
   const live = [...baseLive]
@@ -40,12 +48,7 @@ export function replayAxis(
     })
   // Raw position in front of which ids for live position `index` belong.
   const rawPosition = (index: number) => (index < live.length ? order.indexOf(live[index]!) : order.length)
-  const ensureLength = (length: number) => {
-    if (live.length >= length) return
-    const ids = fresh(length - live.length)
-    order.push(...ids)
-    live.push(...ids)
-  }
+  const ensureLength = (length: number) => grow({ order, live, created, deleted }, length, prefix, emptyAnchor)
   for (const op of ops) {
     if (op.kind === 'insert') {
       ensureLength(op.index)
@@ -77,10 +80,15 @@ export function replayAxis(
   return { order, live, created, deleted }
 }
 
-/** Appends ids until the live list covers `length` positions. */
-export function extendAxis(result: ReplayResult, length: number, prefix: string): void {
-  while (result.live.length < length) {
-    const id = createId(prefix)
+/** Appends derived ids until the live list covers `length` positions. */
+export function grow(result: ReplayResult, length: number, prefix: 'r' | 'c', emptyAnchor: string): void {
+  if (result.live.length >= length) return
+  const anchor = result.order[result.order.length - 1] ?? emptyAnchor
+  const existing = new Set(result.order)
+  for (let n = 1; result.live.length < length; n += 1) {
+    const id = derivedId(prefix, anchor, n)
+    // A derived id already in the list (deleted earlier) must not come back.
+    if (existing.has(id)) continue
     result.created.add(id)
     result.order.push(id)
     result.live.push(id)

@@ -1,24 +1,36 @@
-// TeamGrid workbook document, schema version 4.
+// TeamGrid workbook, schema version 5.
 //
-// One MindooDB document holds one workbook. Everything with identity is keyed
-// by a stable id instead of a position, so concurrent edits from several
-// people merge in Automerge without shifting each other's cells:
+// A workbook is one top document plus row-block ("chunk") documents, after
+// the pattern of mindoodb-word-journal's Word storage:
 //
-// - rows and columns are ordered by id lists (`rowOrder`, `columnOrder`);
-//   deleting one leaves the id in the list and marks it with `deletedAt`
+// - The top document is the workbook MindooDB lists: subject, tags, sheets
+//   with their settings, column order and formats, merges, the style
+//   registry, and per sheet `chunkOrder`, the order of its row blocks.
+// - A chunk document (`type: "gridChunk"`, `parentId`) holds a contiguous
+//   block of a sheet's rows: their order, their formats and their cells.
+//   A save only touches the blocks it changed, and two people working in
+//   different parts of a sheet write to different documents.
+//
+// Everything with identity is keyed by a stable id instead of a position, so
+// concurrent edits merge in Automerge without shifting each other's cells:
+//
+// - rows and columns are ordered by id lists; deleting one leaves the id in
+//   the list and marks it with `deletedAt`
 // - a cell is keyed `<rowId>:<columnId>` and patched field by field, so a
 //   value change and a format change of the same cell both survive a merge
 // - formula references point at row/column ids (see formula-refs.ts)
-// - styles live in a workbook-wide registry keyed by a hash of their content,
-//   so two people creating the same format end up with one entry
+// - styles live in a registry keyed by a hash of their content, so two people
+//   creating the same format end up with one entry
+// - rows and columns that only exist because the sheet grew (typing below the
+//   last row) get ids derived from the id before them, so two people who
+//   both type into "the next row" offline end up in the same row
 //
-// Technical ids and enum-like strings are written as MindooDBAppValue.atomic()
-// (see write.ts); reads return them as plain strings, which is all these
-// types describe.
+// Every string is written as MindooDBAppValue.atomic(); reads return plain
+// strings, which is all these types describe. The in-memory `Worksheet` is
+// the assembled view over the top document and its chunks (store.ts).
 //
-// The shapes of cell styles, values and sheet settings follow GenOffice's
-// sidecar read format (vendor/.../shared/desktop-api.ts), which is what the
-// editor loads from.
+// Cell styles, values and sheet settings follow GenOffice's formats
+// (vendor/.../shared/desktop-api.ts), which is what the editor loads from.
 
 import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 
@@ -26,13 +38,17 @@ import type { WorkbookFile } from '../../vendor/genoffice/apps/sheets/src/shared
 
 export const TEAMGRID_FORM = 'teamgrid-next'
 export const TEAMGRID_KIND = 'mindoodb.teamgrid.next'
-export const TEAMGRID_SCHEMA_VERSION = 4
+export const TEAMGRID_SCHEMA_VERSION = 5
+/** Form of row-block documents; workbook lists never show them. */
+export const TEAMGRID_CHUNK_TYPE = 'gridChunk'
 
 export type SheetId = string
 export type RowId = string
 export type ColumnId = string
 export type StyleId = string
 export type CellKey = `${RowId}:${ColumnId}`
+/** Id of a chunk document (a MindooDB document id). */
+export type ChunkId = string
 
 export type CellScalar = string | number | boolean | null
 
@@ -47,7 +63,7 @@ export type BorderEdge = NonNullable<CellStyle['borderTop']>
  */
 export type StoredStyle = WorkbookStyleEdit
 
-/** One reference inside a formula, bound to row/column ids. */
+/** One reference inside a formula, bound to row/column ids (see formula-refs.ts). */
 export interface FormulaRef {
   /** Absent: the sheet the formula lives on. */
   sheetId?: SheetId
@@ -60,12 +76,13 @@ export interface FormulaRef {
   absolute: [boolean, boolean, boolean, boolean]
 }
 
-export type FormulaSegment = { text: string } | { ref: FormulaRef }
-
+/**
+ * A stored formula: the text with every reference replaced by U+0001, and
+ * the references in order, each packed into one string (formula-refs.ts).
+ */
 export interface Formula {
-  /** A1 text when it was written; informational, the segments are authoritative. */
-  source: string
-  segments: FormulaSegment[]
+  t: string
+  r: string[]
 }
 
 export interface Cell {
@@ -113,23 +130,18 @@ export interface Worksheet {
   cellsById: Record<CellKey, Cell>
   /** Keyed by the merge's four corner ids, so the same merge never doubles. */
   mergesById: Record<string, Merge>
+  /** Row blocks in order (top document). */
+  chunkOrder: ChunkId[]
   deletedAt?: string
 }
+
+/** Fields of a sheet that live in its chunk documents, not in the top document. */
+export const CHUNK_FIELDS = ['rowOrder', 'rowsById', 'cellsById'] as const
 
 export interface Workbook {
   worksheetOrder: SheetId[]
   worksheetsById: Record<SheetId, Worksheet>
   stylesById: Record<StyleId, StoredStyle>
-}
-
-export interface TeamGridDocument {
-  form: typeof TEAMGRID_FORM
-  kind: typeof TEAMGRID_KIND
-  subject: string
-  teamgrid: {
-    schemaVersion: typeof TEAMGRID_SCHEMA_VERSION
-    workbook: Workbook
-  }
 }
 
 export function cellKey(rowId: RowId, columnId: ColumnId): CellKey {
@@ -165,6 +177,37 @@ export function liveIds(order: readonly string[], meta: Record<string, { deleted
   return ids
 }
 
-export function createId(prefix: string): string {
-  return `${prefix}_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
+const ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+
+/** A short random id: a one-letter prefix and 10 base-62 characters (~59 bits). */
+export function createId(prefix: 'r' | 'c' | 's'): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(10))
+  let id = prefix
+  for (const byte of bytes) id += ID_ALPHABET[byte % 62]
+  return id
+}
+
+/**
+ * The id of the `n`-th row/column appended after `anchor` (the last id of the
+ * order list, deleted or not). Deterministic, so replicas that grow the same
+ * sheet from the same state create the same ids.
+ */
+export function derivedId(prefix: 'r' | 'c', anchor: string, n: number): string {
+  let h1 = 0xdeadbeef
+  let h2 = 0x41c6ce57
+  const text = `${anchor}>${n}`
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index)
+    h1 = Math.imul(h1 ^ code, 2654435761)
+    h2 = Math.imul(h2 ^ code, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  let value = 4294967296 * (2097151 & h2) + (h1 >>> 0)
+  let id = ''
+  for (let index = 0; index < 10; index += 1) {
+    id += ID_ALPHABET[value % 62]
+    value = Math.floor(value / 62)
+  }
+  return `${prefix}${id}`
 }

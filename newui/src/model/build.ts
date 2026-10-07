@@ -100,14 +100,14 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     const key = cellKey(rowId, columnId)
     const cell: Cell = {}
     if (record.formula !== undefined) {
-      const segments = parseFormula(record.formula, home, input.axes)
+      const formula = parseFormula(record.formula, home, input.axes)
       // Same references by id = same formula, even if its A1 text moved with
-      // an inserted row: keep the stored one so nothing is rewritten. Likewise
-      // a recalculated result is not an edit: the stored value only changes
-      // with the formula, so every open does not rewrite every result.
+      // an inserted row: nothing is rewritten. Likewise a recalculated result
+      // is not an edit: the stored value only changes with the formula, so
+      // every open does not rewrite every result.
       const before = previous.cellsById[key]
-      const unchanged = before?.formula && JSON.stringify(before.formula.segments) === JSON.stringify(segments)
-      cell.formula = unchanged ? before.formula! : { source: record.formula, segments }
+      const unchanged = before?.formula && JSON.stringify(before.formula) === JSON.stringify(formula)
+      cell.formula = unchanged ? before.formula! : formula
       const value = unchanged ? before.value : record.value
       if (value !== null && value !== undefined) cell.value = value
     } else if (record.value !== null) {
@@ -140,6 +140,7 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     columnsById,
     cellsById,
     mergesById,
+    chunkOrder: previous.chunkOrder,
   }
   if (meta.hidden) next.hidden = true
   if (meta.tabColor) next.tabColor = meta.tabColor

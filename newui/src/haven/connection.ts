@@ -5,13 +5,11 @@ import {
   createMindooDBAppBridge,
   type MindooDBAppDatabase,
   type MindooDBAppDocument,
-  type MindooDBAppJsonPatch,
   type MindooDBAppLaunchContext,
   type MindooDBAppSession,
 } from 'mindoodb-app-sdk'
 
-import { TEAMGRID_FORM, TEAMGRID_KIND, TEAMGRID_SCHEMA_VERSION, type Workbook } from '../model/schema'
-import { toStored } from '../model/sync'
+import { TEAMGRID_FORM, TEAMGRID_SCHEMA_VERSION, type Workbook } from '../model/schema'
 
 export interface WorkbookSummary {
   id: string
@@ -69,30 +67,11 @@ export async function listWorkbooks(haven: HavenConnection): Promise<WorkbookSum
   return workbooks.sort((left, right) => left.subject.localeCompare(right.subject))
 }
 
-export function workbookOf(document: MindooDBAppDocument): Workbook {
+/** The top-document part of a stored workbook (sheets without their chunk fields). */
+export function topWorkbookOf(document: MindooDBAppDocument): Workbook {
   const teamgrid = document.data.teamgrid as { schemaVersion?: number; workbook?: Workbook } | undefined
   if (!teamgrid?.workbook || teamgrid.schemaVersion !== TEAMGRID_SCHEMA_VERSION) {
     throw new Error('This document is not a TeamGrid workbook of this version.')
   }
   return teamgrid.workbook
-}
-
-export async function createWorkbookDocument(haven: HavenConnection, subject: string, workbook: Workbook) {
-  return haven.database.documents.create({
-    set: toStored({
-      form: TEAMGRID_FORM,
-      kind: TEAMGRID_KIND,
-      subject,
-      tags: [],
-      teamgrid: { schemaVersion: TEAMGRID_SCHEMA_VERSION, workbook },
-    }) as Record<string, unknown>,
-  })
-}
-
-export async function updateWorkbookDocument(
-  haven: HavenConnection,
-  id: string,
-  patch: MindooDBAppJsonPatch,
-): Promise<MindooDBAppDocument> {
-  return haven.database.documents.update(id, { json: patch })
 }

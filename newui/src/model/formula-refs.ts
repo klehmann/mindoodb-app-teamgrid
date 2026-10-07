@@ -1,14 +1,14 @@
-// A1 formula text ↔ id-bound segments.
+// A1 formula text ↔ stored formulas with id-bound references.
 //
 // Stored formulas keep their references as row/column ids, so a row another
 // person inserts above a referenced cell moves the reference with it instead
-// of leaving it pointing at the old position. At load time the segments are
+// of leaving it pointing at the old position. At load time the references are
 // rendered back to A1 against the current row/column order.
 //
 // A reference outside the materialized grid (no id at that position) stays
 // plain text; so do defined names, structured table references and anything
 // else that is not an A1 cell, range, column or row reference.
-import type { ColumnId, FormulaRef, FormulaSegment, RowId, SheetId } from './schema'
+import type { ColumnId, Formula, FormulaRef, RowId, SheetId } from './schema'
 
 /** Index ↔ id lookup of one sheet's live rows and columns. */
 export interface SheetAxes {
@@ -91,17 +91,45 @@ function columnLabel(index: number): string {
   return label
 }
 
+/** Marks a reference's place in a stored formula's text. */
+const REF_MARK = '\u0001'
+const KIND_CODE: Record<FormulaRef['kind'], string> = { cell: 'c', range: 'g', columns: 'C', rows: 'R' }
+const KIND_OF: Record<string, FormulaRef['kind']> = { c: 'cell', g: 'range', C: 'columns', R: 'rows' }
+
+/** One reference as one string: `<kind><$ bits>|sheet|startRow|startColumn|endRow|endColumn`. */
+export function packRef(ref: FormulaRef): string {
+  const bits = ref.absolute.reduce((value, flag, index) => value | (flag ? 1 << index : 0), 0)
+  return [
+    `${KIND_CODE[ref.kind]}${bits.toString(16)}`,
+    ref.sheetId ?? '',
+    ref.startRowId ?? '',
+    ref.startColumnId ?? '',
+    ref.endRowId ?? '',
+    ref.endColumnId ?? '',
+  ].join('|')
+}
+
+export function unpackRef(packed: string): FormulaRef | null {
+  const [head = '', sheetId, startRowId, startColumnId, endRowId, endColumnId] = packed.split('|')
+  const kind = KIND_OF[head[0] ?? '']
+  if (!kind) return null
+  const bits = parseInt(head.slice(1), 16) || 0
+  const ref: FormulaRef = { kind, absolute: [!!(bits & 1), !!(bits & 2), !!(bits & 4), !!(bits & 8)] }
+  if (sheetId) ref.sheetId = sheetId
+  if (startRowId) ref.startRowId = startRowId
+  if (startColumnId) ref.startColumnId = startColumnId
+  if (endRowId) ref.endRowId = endRowId
+  if (endColumnId) ref.endColumnId = endColumnId
+  return ref
+}
+
 /**
  * Splits A1 formula text into text and id-bound references, resolved against
  * the sheet the formula lives on (`home`) and the workbook's other sheets.
  */
-export function parseFormula(source: string, home: SheetAxes, sheets: AxesLookup): FormulaSegment[] {
-  const segments: FormulaSegment[] = []
-  let text = ''
-  const flush = () => {
-    if (text) segments.push({ text })
-    text = ''
-  }
+export function parseFormula(source: string, home: SheetAxes, sheets: AxesLookup): Formula {
+  let t = ''
+  const r: string[] = []
   let index = 0
   while (index < source.length) {
     const char = source[index]!
@@ -119,35 +147,34 @@ export function parseFormula(source: string, home: SheetAxes, sheets: AxesLookup
         }
         end += 1
       }
-      text += source.slice(index, end + 1)
+      t += source.slice(index, end + 1)
       index = end + 1
       continue
     }
     const previous = index > 0 ? source[index - 1]! : ''
-    if (/[\w.$À-￿]/.test(previous) && !/['!]/.test(previous)) {
-      text += char
+    if (/[\w.$\u00C0-\uFFFF]/.test(previous) && !/['!]/.test(previous)) {
+      t += char
       index += 1
       continue
     }
     const match = REFERENCE.exec(source.slice(index))
     const after = match ? source[index + match[0].length] ?? '' : ''
     // A name like LOG10( or A1B is not a reference.
-    if (!match || /[\w(.À-￿]/.test(after)) {
-      text += char
+    if (!match || /[\w(.\u00C0-\uFFFF]/.test(after)) {
+      t += char
       index += 1
       continue
     }
     const ref = toRef(match, home, sheets)
     if (ref) {
-      flush()
-      segments.push({ ref })
+      t += REF_MARK
+      r.push(packRef(ref))
     } else {
-      text += match[0]
+      t += match[0]
     }
     index += match[0].length
   }
-  flush()
-  return segments
+  return { t, r }
 }
 
 function toRef(match: RegExpExecArray, home: SheetAxes, sheets: AxesLookup): FormulaRef | null {
@@ -191,9 +218,15 @@ function toRef(match: RegExpExecArray, home: SheetAxes, sheets: AxesLookup): For
   return { ...base, kind: 'rows', startRowId, endRowId, absolute: [match[15] === '$', false, match[17] === '$', false] }
 }
 
-/** Renders segments back to A1 text against the current row/column order. */
-export function renderFormula(segments: readonly FormulaSegment[], home: SheetAxes, sheets: AxesLookup): string {
-  return segments.map((segment) => ('text' in segment ? segment.text : renderRef(segment.ref, home, sheets))).join('')
+/** Renders a stored formula back to A1 text against the current row/column order. */
+export function renderFormula(formula: Formula, home: SheetAxes, sheets: AxesLookup): string {
+  const parts = formula.t.split(REF_MARK)
+  let text = parts[0] ?? ''
+  for (let index = 1; index < parts.length; index += 1) {
+    const ref = unpackRef(formula.r[index - 1] ?? '')
+    text += (ref ? renderRef(ref, home, sheets) : '#REF!') + parts[index]
+  }
+  return text
 }
 
 function quoteSheetName(name: string): string {

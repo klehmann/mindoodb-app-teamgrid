@@ -12,7 +12,8 @@ browser, as the basis for TeamGrid's next version. Concept and decisions:
 | `patches/` | Our changes to vendored files, applied by the sync script (`patch -p1` in `vendor/genoffice`). |
 | `src/desktop-api-shim.ts` | Browser replacement for GenOffice's Electron bridge (`window.desktopApi`). |
 | `src/xlsx/` | xlsx import (WASM sidecar) and export (vendored xlsx-gateway + JSZip); editor sessions. |
-| `src/model/` | Stored workbook (schema v4): ids, formula references by id, save diff → JSON patch. |
+| `src/model/` | Stored workbook (schema v5): ids, formula references by id, row blocks, save diff → JSON patches. |
+| `src/testing/` | Automerge-backed stand-in for MindooDB, for merge tests with two offline devices. |
 | `src/haven/` | Haven App SDK connection and the workbook picker. |
 | `native/xlsx-wasm/` | wasm-bindgen wrapper around GenOffice's Rust xlsx reader. |
 
@@ -23,6 +24,7 @@ pnpm install
 pnpm build:wasm        # needs rustup toolchain 1.90+ with wasm32-unknown-unknown, and wasm-pack
 pnpm dev               # http://localhost:4208, mock Haven at /__haven-test/
 pnpm typecheck
+pnpm test             # model tests, incl. concurrent offline edits
 pnpm sync-genoffice    # take a newer GenOffice checkout (../../../genoffice by default)
 ```
 
@@ -41,6 +43,15 @@ full, rows and columns are matched to their ids by replaying the save's
 inserts/deletes/moves (`model/replay.ts`), and the difference to the stored
 document becomes one JSON patch (`model/sync.ts`). The editor then reopens
 from the merged document, so concurrent changes show up right away.
+
+A workbook is one top document (sheets, columns, merges, styles, the order
+of row blocks) plus row-block documents of about 256 rows each, after the
+pattern of mindoodb-word-journal. A save writes only the blocks it changed;
+new rows join the block of the row before them, and appending past a full
+block opens a new one with a derived id. Rows that only exist because the
+sheet grew get ids derived from the row before them, so two people typing
+into the next empty row offline end up in the same row
+(`src/model/sync.test.ts` covers these cases in both merge directions).
 
 ## Spike status
 

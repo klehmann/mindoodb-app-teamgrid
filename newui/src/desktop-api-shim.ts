@@ -15,6 +15,7 @@ import type {
 } from '../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { connectHaven, listWorkbooks, type HavenConnection } from './haven/connection'
 import { pickWorkbook } from './haven/picker'
+import { changedSinceLoad } from './haven/store'
 import { loadXlsxEngine } from './xlsx/engine'
 import {
   closeSession,
@@ -132,11 +133,9 @@ function watchRemoteChanges(haven: HavenConnection): void {
     if (!stored) return
     checking = true
     try {
-      const current = await haven.database.documents.get(stored.id)
-      const heads = current?.heads ?? []
-      if (current && JSON.stringify(heads) !== JSON.stringify(stored.heads) && pendingEdits === 0) {
+      if ((await changedSinceLoad(haven, stored.loaded)) && pendingEdits === 0) {
         console.info('[newui] the workbook changed elsewhere; reloading it')
-        reopenDocumentId = stored.id
+        reopenDocumentId = stored.loaded.id
         devHooks.menu('open')
       }
     } catch (error) {

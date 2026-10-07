@@ -15,25 +15,17 @@ import {
   type WorkbookFile,
   type WorkbookSaveRequest,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
-import {
-  createWorkbookDocument,
-  updateWorkbookDocument,
-  workbookOf,
-  type HavenConnection,
-} from '../haven/connection'
+import type { HavenConnection } from '../haven/connection'
+import { createWorkbook, loadWorkbook, writeWorkbook, type LoadedWorkbook } from '../haven/store'
 import { workbookToXlsx } from '../model/export'
-import { createId, type Workbook } from '../model/schema'
 import { readWholeWorkbook } from '../model/sidecar-read'
-import { importWorkbook, syncWorkbook } from '../model/sync'
+import { emptyStoredWorkbook, newWorkbook, syncWorkbook } from '../model/sync'
 import { saveWorkbookInBrowser } from './browser-save'
 import { loadXlsxEngine } from './engine'
 
 export interface StoredDocument {
   haven: HavenConnection
-  id: string
-  subject: string
-  heads: string[]
-  workbook: Workbook
+  loaded: LoadedWorkbook
   /** File sheet ids of this session → stored sheet ids. */
   storedIdByFileId: Map<string, string>
 }
@@ -62,7 +54,7 @@ async function openBytes(
   }
   if (document) {
     const storedIdByName = new Map(
-      Object.values(document.workbook.worksheetsById)
+      Object.values(document.loaded.stored.workbook.worksheetsById)
         .filter((sheet) => !sheet.deletedAt)
         .map((sheet) => [sheet.name, sheet.id]),
     )
@@ -90,19 +82,9 @@ export async function openWorkbookBytes(bytes: Uint8Array, name: string, locale:
 
 /** Opens a stored workbook: renders it to xlsx and opens that in the editor. */
 export async function openStoredWorkbook(haven: HavenConnection, id: string, locale: string): Promise<WorkbookFile> {
-  const document = await haven.database.documents.get(id)
-  if (!document) throw new Error('The workbook no longer exists.')
-  const workbook = workbookOf(document)
-  const subject = typeof document.data.subject === 'string' && document.data.subject ? document.data.subject : id
-  const bytes = await workbookToXlsx(workbook, await loadXlsxEngine())
-  const { file } = await openBytes(bytes, subject, locale, {
-    haven,
-    id,
-    subject,
-    heads: document.heads ?? [],
-    workbook,
-  })
-  return file
+  const loaded = await loadWorkbook(haven, id)
+  const bytes = await workbookToXlsx(loaded.stored.workbook, await loadXlsxEngine())
+  return (await openBytes(bytes, loaded.subject, locale, { haven, loaded })).file
 }
 
 /** Imports an xlsx as a new stored workbook and returns the new document id. */
@@ -110,32 +92,25 @@ export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8A
   const engine = await loadXlsxEngine()
   const opened = (await engine.open(bytes, locale)) as WorkbookFile
   try {
-    const workbook = importWorkbook(await readWholeWorkbook(engine, opened))
-    return (await createWorkbookDocument(haven, subject, workbook)).id
+    const { next, writes } = syncWorkbook({
+      stored: emptyStoredWorkbook(),
+      storedIdByFileId: new Map(),
+      read: await readWholeWorkbook(engine, opened),
+    })
+    return await createWorkbook(haven, subject, next, writes)
   } finally {
     await engine.close(opened.sessionId)
   }
 }
 
 export async function createEmptyDocument(haven: HavenConnection, subject: string, sheetName: string) {
-  const id = createId('sheet')
-  const workbook: Workbook = {
-    worksheetOrder: [id],
-    worksheetsById: {
-      [id]: {
-        id,
-        name: sheetName,
-        rowOrder: [],
-        columnOrder: [],
-        rowsById: {},
-        columnsById: {},
-        cellsById: {},
-        mergesById: {},
-      },
-    },
-    stylesById: {},
-  }
-  return (await createWorkbookDocument(haven, subject, workbook)).id
+  const workbook = newWorkbook(sheetName)
+  return createWorkbook(haven, subject, workbook, {
+    top: { set: [], unset: [], listInsert: [], listDelete: [] },
+    createdChunks: new Map(),
+    chunks: new Map(),
+    changed: true,
+  })
 }
 
 export function sessionFor(sessionId: string): Session {
@@ -193,7 +168,7 @@ export async function saveSession(request: WorkbookSaveRequest, locale: string):
   let sync
   try {
     sync = syncWorkbook({
-      stored: document.workbook,
+      stored: document.loaded.stored,
       storedIdByFileId: document.storedIdByFileId,
       request,
       read: await readWholeWorkbook(engine, saved),
@@ -201,20 +176,15 @@ export async function saveSession(request: WorkbookSaveRequest, locale: string):
   } finally {
     await engine.close(saved.sessionId)
   }
-  const merged = sync.changed
-    ? await updateWorkbookDocument(document.haven, document.id, { baseHeads: document.heads, ...sync.patch })
-    : await document.haven.database.documents.get(document.id)
-  if (!merged) throw new Error('The workbook was deleted while saving.')
-  const workbook = workbookOf(merged)
-  const reopened = await openBytes(await workbookToXlsx(workbook, engine), document.subject, locale, {
+  if (sync.writes.changed) await writeWorkbook(document.haven, document.loaded, sync.writes)
+  // Continue on the merged state, which includes other people's changes.
+  const loaded = await loadWorkbook(document.haven, document.loaded.id)
+  const reopened = await openBytes(await workbookToXlsx(loaded.stored.workbook, engine), loaded.subject, locale, {
     haven: document.haven,
-    id: document.id,
-    subject: document.subject,
-    heads: merged.heads ?? [],
-    workbook,
+    loaded,
   })
   await closeSession(request.sessionId)
-  return { file: reopened.file, touchedEntries, stored: { changed: sync.changed } }
+  return { file: reopened.file, touchedEntries, stored: { changed: sync.writes.changed } }
 }
 
 async function sha256Hex(bytes: Uint8Array): Promise<string> {

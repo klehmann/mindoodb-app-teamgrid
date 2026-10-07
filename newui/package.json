@@ -11,7 +11,8 @@
     "build": "pnpm build:wasm && vite build",
     "preview": "vite preview --port 4208",
     "build:wasm": "cd native/xlsx-wasm && PATH=$HOME/.cargo/bin:$PATH RUSTUP_TOOLCHAIN=1.90.0 wasm-pack build --target web --release",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@fluentui/react-icons": "2.0.333",
@@ -51,6 +52,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
-    "vite-plugin-wasm": "3.6.0"
+    "vite-plugin-wasm": "3.6.0",
+    "vitest": "4.1.2"
   }
 }

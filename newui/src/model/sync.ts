@@ -4,17 +4,34 @@
 // columns are matched to their ids by replaying the save's structural
 // operations on the stored order lists, so an inserted row gets a new id and
 // every other row keeps its own. The re-read sheet is then built into the
-// stored shape (build.ts) and compared with the stored state, producing a
-// JSON patch that touches only what changed.
+// stored shape (build.ts), its rows are placed into row blocks (chunks), and
+// the result is compared with what is stored: one JSON patch for the top
+// document and one per chunk that changed.
 import { MindooDBAppValue, type MindooDBAppJsonPatch } from 'mindoodb-app-sdk'
 
 import type { WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { buildWorksheet } from './build'
 import { createAxesLookup, type SheetAxes } from './formula-refs'
-import { extendAxis, diffList, replayAxis, type AxisOp, type ReplayResult } from './replay'
-import { createId, liveIds, liveSheets, type Workbook, type Worksheet } from './schema'
+import { diffList, grow, replayAxis, type AxisOp, type ReplayResult } from './replay'
+import {
+  CHUNK_FIELDS,
+  createId,
+  liveIds,
+  liveSheets,
+  type Cell,
+  type CellKey,
+  type ChunkId,
+  type RowId,
+  type RowMeta,
+  type SheetId,
+  type Workbook,
+  type Worksheet,
+} from './schema'
 import type { SidecarWorkbook } from './sidecar-read'
 import { styleTable } from './styles'
+
+/** Rows a chunk takes before appending at its end opens a new one. */
+export const CHUNK_SOFT_LIMIT = 256
 
 const WORKBOOK_PATH = ['teamgrid', 'workbook']
 
@@ -28,8 +45,110 @@ export function toStored(value: unknown): unknown {
   return value
 }
 
+/** A chunk document's content as stored. */
+export interface ChunkContent {
+  sheetId: SheetId
+  rowOrder: RowId[]
+  rowsById: Record<RowId, RowMeta>
+  cellsById: Record<CellKey, Cell>
+}
+
+/** A stored workbook as loaded: the assembled view plus where each row lives. */
+export interface StoredWorkbook {
+  workbook: Workbook
+  chunks: Map<ChunkId, ChunkContent>
+  /** Per sheet: row id → the chunk that holds it (the first one, if a merge left copies). */
+  rowHome: Map<SheetId, Map<RowId, ChunkId>>
+}
+
+export type JsonPatchBody = Required<Pick<MindooDBAppJsonPatch, 'set' | 'unset' | 'listInsert' | 'listDelete'>>
+
+export interface WorkbookWrites {
+  top: JsonPatchBody
+  /** Chunks to create first (empty skeleton, derived id), then patch like the others. */
+  createdChunks: Map<ChunkId, SheetId>
+  chunks: Map<ChunkId, JsonPatchBody>
+  changed: boolean
+}
+
+/** The empty content a chunk document is created with: equal on every replica. */
+export function chunkSkeleton(sheetId: SheetId): ChunkContent {
+  return { sheetId, rowOrder: [], rowsById: {}, cellsById: {} }
+}
+
+/**
+ * Id of a chunk opened after `after` for `firstRow`. Derived, not random, so
+ * two replicas that append the same derived rows after the same full chunk
+ * open the same chunk document and their writes merge instead of forking.
+ * MindooDB document ids allow lowercase letters, digits and `_`.
+ */
+export function chunkIdFor(sheetId: SheetId, after: ChunkId | undefined, firstRow: RowId): ChunkId {
+  let hash = 0xcbf29ce4 >>> 0
+  let hash2 = 0x84222325 >>> 0
+  const text = `${sheetId}|${after ?? ''}|${firstRow}`
+  for (let index = 0; index < text.length; index += 1) {
+    hash = Math.imul(hash ^ text.charCodeAt(index), 16777619) >>> 0
+    hash2 = Math.imul(hash2 ^ text.charCodeAt(index), 2246822519) >>> 0
+  }
+  return `gc_${hash.toString(36)}${hash2.toString(36)}`
+}
+
+/** Assembles the in-memory workbook from the top document's workbook and its chunks. */
+export function assembleWorkbook(top: Workbook, chunks: Map<ChunkId, ChunkContent>): StoredWorkbook {
+  const rowHome = new Map<SheetId, Map<RowId, ChunkId>>()
+  const worksheetsById: Workbook['worksheetsById'] = {}
+  for (const [sheetId, sheet] of Object.entries(top.worksheetsById)) {
+    const home = new Map<RowId, ChunkId>()
+    const rowOrder: RowId[] = []
+    const rowsById: Record<RowId, RowMeta> = {}
+    const cellsById: Record<CellKey, Cell> = {}
+    const chunkOrder = [...new Set(sheet.chunkOrder ?? [])]
+    for (const chunkId of chunkOrder) {
+      const chunk = chunks.get(chunkId)
+      if (!chunk) continue
+      for (const rowId of chunk.rowOrder) {
+        if (home.has(rowId)) continue
+        home.set(rowId, chunkId)
+        rowOrder.push(rowId)
+        const row = chunk.rowsById[rowId]
+        if (row) rowsById[rowId] = row
+      }
+    }
+    // Cells of every copy count: a row two replicas appended under the same
+    // derived id may hold cells in two chunks. The home chunk wins a tie.
+    for (const chunkId of [...chunkOrder].reverse()) {
+      const chunk = chunks.get(chunkId)
+      if (chunk) Object.assign(cellsById, chunk.cellsById)
+    }
+    for (const chunkId of chunkOrder) {
+      const chunk = chunks.get(chunkId)
+      if (!chunk) continue
+      for (const [key, cell] of Object.entries(chunk.cellsById)) {
+        if (home.get(key.split(':')[0]!) === chunkId) cellsById[key as CellKey] = cell
+      }
+    }
+    worksheetsById[sheetId] = { ...sheet, chunkOrder, rowOrder, rowsById, cellsById }
+    rowHome.set(sheetId, home)
+  }
+  return {
+    workbook: { ...top, worksheetsById },
+    chunks,
+    rowHome,
+  }
+}
+
 function emptySheet(id: string, name: string): Worksheet {
-  return { id, name, rowOrder: [], columnOrder: [], rowsById: {}, columnsById: {}, cellsById: {}, mergesById: {} }
+  return {
+    id,
+    name,
+    rowOrder: [],
+    columnOrder: [],
+    rowsById: {},
+    columnsById: {},
+    cellsById: {},
+    mergesById: {},
+    chunkOrder: [],
+  }
 }
 
 interface SheetPlan {
@@ -39,10 +158,16 @@ interface SheetPlan {
 }
 
 function planAxes(stored: Worksheet, rowOps: AxisOp[], columnOps: AxisOp[], rowCount: number, columnCount: number) {
-  const rows = replayAxis(stored.rowOrder, liveIds(stored.rowOrder, stored.rowsById), rowOps, 'row')
-  const columns = replayAxis(stored.columnOrder, liveIds(stored.columnOrder, stored.columnsById), columnOps, 'col')
-  extendAxis(rows, rowCount, 'row')
-  extendAxis(columns, columnCount, 'col')
+  const rows = replayAxis(stored.rowOrder, liveIds(stored.rowOrder, stored.rowsById), rowOps, 'r', `${stored.id}:rows`)
+  const columns = replayAxis(
+    stored.columnOrder,
+    liveIds(stored.columnOrder, stored.columnsById),
+    columnOps,
+    'c',
+    `${stored.id}:columns`,
+  )
+  grow(rows, rowCount, 'r', `${stored.id}:rows`)
+  grow(columns, columnCount, 'c', `${stored.id}:columns`)
   return { rows, columns }
 }
 
@@ -86,64 +211,46 @@ function buildAll(
   return { sheets, stylesById }
 }
 
-/** A freshly imported workbook: every row, column and sheet gets a new id. */
-export function importWorkbook(read: SidecarWorkbook): Workbook {
-  const plans = new Map<string, SheetPlan>()
-  const storedIdByName = new Map<string, string>()
-  for (const sheet of read.sheets) {
-    const stored = emptySheet(createId('sheet'), sheet.meta.name)
-    storedIdByName.set(sheet.meta.name, stored.id)
-    plans.set(stored.id, { stored, ...planAxes(stored, [], [], sheet.meta.rowCount, sheet.meta.columnCount) })
-  }
-  const { sheets, stylesById } = buildAll(emptyWorkbook(), read, plans, storedIdByName)
-  return {
-    worksheetOrder: sheets.map((sheet) => sheet.id),
-    worksheetsById: Object.fromEntries(sheets.map((sheet) => [sheet.id, sheet])),
-    stylesById: pruneStyles(stylesById, sheets),
-  }
+export function emptyStoredWorkbook(): StoredWorkbook {
+  return { workbook: { worksheetOrder: [], worksheetsById: {}, stylesById: {} }, chunks: new Map(), rowHome: new Map() }
 }
 
-export function emptyWorkbook(): Workbook {
-  return { worksheetOrder: [], worksheetsById: {}, stylesById: {} }
-}
-
-/** Styles any cell, row or column still uses (an import carries the file's whole table). */
-function pruneStyles(stylesById: Workbook['stylesById'], sheets: readonly Worksheet[]) {
-  const used = new Set<string>()
-  for (const sheet of sheets) {
-    for (const cell of Object.values(sheet.cellsById)) if (cell.styleId) used.add(cell.styleId)
-    for (const row of Object.values(sheet.rowsById)) if (row.styleId) used.add(row.styleId)
-    for (const column of Object.values(sheet.columnsById)) if (column.styleId) used.add(column.styleId)
-  }
-  return Object.fromEntries(Object.entries(stylesById).filter(([id]) => used.has(id)))
+/** A new workbook with one empty sheet. */
+export function newWorkbook(sheetName: string): Workbook {
+  const sheet = emptySheet(createId('s'), sheetName)
+  return { worksheetOrder: [sheet.id], worksheetsById: { [sheet.id]: sheet }, stylesById: {} }
 }
 
 export interface SyncInput {
-  stored: Workbook
+  stored: StoredWorkbook
   /** The session's file sheet ids → stored sheet ids, as loaded. */
   storedIdByFileId: ReadonlyMap<string, string>
-  request: WorkbookSaveRequest
+  /** The editor's save; omit for an import (everything is new). */
+  request?: WorkbookSaveRequest
   /** The saved xlsx, re-read in full. */
   read: SidecarWorkbook
 }
 
 export interface SyncResult {
   next: Workbook
-  patch: Omit<MindooDBAppJsonPatch, 'baseHeads'>
-  changed: boolean
+  writes: WorkbookWrites
 }
 
 export function syncWorkbook({ stored, storedIdByFileId, request, read }: SyncInput): SyncResult {
+  const workbook = stored.workbook
   // Sheet identity: file ids of this session → stored ids; sheets the editor
   // added get new ids. The re-read file is matched by final sheet name.
   const storedIdByEditorId = new Map(storedIdByFileId)
   const removed = new Set<string>()
   const finalName = new Map<string, string>()
-  for (const sheet of liveSheets(stored)) finalName.set(sheet.id, sheet.name)
-  for (const op of request.sheetOps) {
+  for (const sheet of liveSheets(workbook)) finalName.set(sheet.id, sheet.name)
+  if (!request) {
+    for (const sheet of read.sheets) finalName.set(createId('s'), sheet.meta.name)
+  }
+  for (const op of request?.sheetOps ?? []) {
     if (op.kind === 'reorder-sheets') continue
     if (op.kind === 'add-sheet' || op.kind === 'duplicate-sheet') {
-      const id = createId('sheet')
+      const id = createId('s')
       storedIdByEditorId.set(op.sheetId, id)
       finalName.set(id, op.name)
       continue
@@ -158,7 +265,7 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read }: SyncIn
 
   const rowOps = new Map<string, AxisOp[]>()
   const columnOps = new Map<string, AxisOp[]>()
-  for (const op of request.structuralOps) {
+  for (const op of request?.structuralOps ?? []) {
     const id = storedIdByEditorId.get(op.sheetId)
     if (!id) continue
     const push = (target: Map<string, AxisOp[]>, axisOp: AxisOp) => target.set(id, [...(target.get(id) ?? []), axisOp])
@@ -173,16 +280,16 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read }: SyncIn
   for (const sheet of read.sheets) {
     const id = storedIdByName.get(sheet.meta.name)
     if (!id) throw new Error(`Saved sheet ${sheet.meta.name} has no stored counterpart.`)
-    const previous = stored.worksheetsById[id] ?? emptySheet(id, sheet.meta.name)
+    const previous = workbook.worksheetsById[id] ?? emptySheet(id, sheet.meta.name)
     plans.set(id, {
       stored: previous,
       ...planAxes(previous, rowOps.get(id) ?? [], columnOps.get(id) ?? [], sheet.meta.rowCount, sheet.meta.columnCount),
     })
   }
-  const { sheets, stylesById } = buildAll(stored, read, plans, storedIdByName)
+  const { sheets, stylesById } = buildAll(workbook, read, plans, storedIdByName)
 
   const deletedAt = new Date().toISOString()
-  const worksheetsById: Workbook['worksheetsById'] = { ...stored.worksheetsById }
+  const worksheetsById: Workbook['worksheetsById'] = { ...workbook.worksheetsById }
   for (const sheet of sheets) worksheetsById[sheet.id] = sheet
   for (const id of removed) {
     const sheet = worksheetsById[id]
@@ -190,11 +297,80 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read }: SyncIn
   }
   const liveOrder = read.sheets.map((sheet) => storedIdByName.get(sheet.meta.name)!)
   const next: Workbook = {
-    worksheetOrder: [...liveOrder, ...stored.worksheetOrder.filter((id) => !liveOrder.includes(id))],
+    worksheetOrder: [...liveOrder, ...workbook.worksheetOrder.filter((id) => !liveOrder.includes(id))],
     worksheetsById,
-    stylesById,
+    stylesById: request ? stylesById : pruneStyles(stylesById, sheets),
   }
-  return { next, ...diffWorkbook(stored, next) }
+  const createdChunks = new Map<ChunkId, SheetId>()
+  for (const sheet of sheets) placeRows(sheet, stored.rowHome.get(sheet.id) ?? new Map(), stored.chunks, createdChunks)
+  return { next, writes: diffWorkbook(stored, next, createdChunks) }
+}
+
+/** Styles any cell, row or column still uses (an import carries the file's whole table). */
+function pruneStyles(stylesById: Workbook['stylesById'], sheets: readonly Worksheet[]) {
+  const used = new Set<string>()
+  for (const sheet of sheets) {
+    for (const cell of Object.values(sheet.cellsById)) if (cell.styleId) used.add(cell.styleId)
+    for (const row of Object.values(sheet.rowsById)) if (row.styleId) used.add(row.styleId)
+    for (const column of Object.values(sheet.columnsById)) if (column.styleId) used.add(column.styleId)
+  }
+  return Object.fromEntries(Object.entries(stylesById).filter(([id]) => used.has(id)))
+}
+
+// ── placement ──────────────────────────────────────────────────────────
+
+/** Row id → chunk, for the sheet's next state. Kept on the sheet object during a save. */
+const placements = new WeakMap<Worksheet, Map<RowId, ChunkId>>()
+
+/**
+ * Decides which chunk each row of `sheet` lives in, and opens new chunks
+ * where needed (updating `sheet.chunkOrder`):
+ *
+ * - a row keeps its chunk unless the order forces it out (a move across
+ *   chunks); existing rows are never redistributed, so a concurrent edit to
+ *   a row always finds it where it was
+ * - a new row joins the chunk of the row before it; when that chunk is full
+ *   and the row comes after its last row (appending), a new chunk opens
+ *   right after it. Inserting in the middle of a full chunk lets it grow.
+ */
+function placeRows(
+  sheet: Worksheet,
+  previousHome: Map<RowId, ChunkId>,
+  chunks: Map<ChunkId, ChunkContent>,
+  createdChunks: Map<ChunkId, SheetId>,
+): void {
+  const chunkOrder = [...sheet.chunkOrder]
+  const position = (chunkId: ChunkId) => chunkOrder.indexOf(chunkId)
+  const lastStoredAt = new Map<ChunkId, number>()
+  sheet.rowOrder.forEach((rowId, index) => {
+    const chunkId = previousHome.get(rowId)
+    if (chunkId) lastStoredAt.set(chunkId, index)
+  })
+  const size = new Map<ChunkId, number>()
+  for (const chunkId of chunkOrder) size.set(chunkId, 0)
+  const home = new Map<RowId, ChunkId>()
+  let current: ChunkId | undefined
+  const open = (after: ChunkId | undefined, firstRow: RowId) => {
+    const chunkId = chunkIdFor(sheet.id, after, firstRow)
+    chunkOrder.splice(after === undefined ? 0 : position(after) + 1, 0, chunkId)
+    size.set(chunkId, 0)
+    if (!chunks.has(chunkId)) createdChunks.set(chunkId, sheet.id)
+    return chunkId
+  }
+  sheet.rowOrder.forEach((rowId, index) => {
+    const stored = previousHome.get(rowId)
+    if (stored !== undefined && (current === undefined || position(stored) >= position(current!))) {
+      current = stored
+    } else if (current === undefined) {
+      current = chunkOrder[0] ?? open(undefined, rowId)
+    } else if ((size.get(current) ?? 0) >= CHUNK_SOFT_LIMIT && index > (lastStoredAt.get(current) ?? -1)) {
+      current = open(current, rowId)
+    }
+    home.set(rowId, current)
+    size.set(current, (size.get(current) ?? 0) + 1)
+  })
+  sheet.chunkOrder = chunkOrder
+  placements.set(sheet, home)
 }
 
 // ── diff ────────────────────────────────────────────────────────────────
@@ -256,33 +432,86 @@ class PatchBuilder {
   get empty() {
     return !this.set.length && !this.unset.length && !this.listInsert.length && !this.listDelete.length
   }
+
+  body(): JsonPatchBody {
+    return { set: this.set, unset: this.unset, listInsert: this.listInsert, listDelete: this.listDelete }
+  }
 }
 
-const SHEET_COLLECTIONS = ['rowsById', 'columnsById', 'cellsById'] as const
+/** The top-document part of a sheet: everything but the chunk fields. */
+function topPart(sheet: Worksheet): Record<string, unknown> {
+  const skip = new Set<string>(CHUNK_FIELDS)
+  return Object.fromEntries(Object.entries(sheet).filter(([key]) => !skip.has(key)))
+}
 
-function diffWorkbook(before: Workbook, after: Workbook): Omit<SyncResult, 'next'> {
-  const patch = new PatchBuilder()
-  patch.list([...WORKBOOK_PATH, 'worksheetOrder'], before.worksheetOrder, after.worksheetOrder)
-  patch.map([...WORKBOOK_PATH, 'stylesById'], before.stylesById, after.stylesById, false)
-  for (const [id, sheet] of Object.entries(after.worksheetsById)) {
+function diffWorkbook(
+  stored: StoredWorkbook,
+  next: Workbook,
+  createdChunks: Map<ChunkId, SheetId>,
+): WorkbookWrites {
+  const before = stored.workbook
+  const top = new PatchBuilder()
+  top.list([...WORKBOOK_PATH, 'worksheetOrder'], before.worksheetOrder, next.worksheetOrder)
+  top.map([...WORKBOOK_PATH, 'stylesById'], before.stylesById, next.stylesById, false)
+
+  const chunkPatches = new Map<ChunkId, PatchBuilder>()
+  const chunkPatch = (chunkId: ChunkId) => {
+    let patch = chunkPatches.get(chunkId)
+    if (!patch) chunkPatches.set(chunkId, (patch = new PatchBuilder()))
+    return patch
+  }
+
+  for (const [id, sheet] of Object.entries(next.worksheetsById)) {
     const path = [...WORKBOOK_PATH, 'worksheetsById', id]
     const previous = before.worksheetsById[id]
+    const nextTop = topPart(sheet)
     if (!previous) {
-      patch.put(path, sheet)
-      continue
+      top.put(path, nextTop)
+    } else {
+      const previousTop = topPart(previous)
+      top.list([...path, 'columnOrder'], previous.columnOrder, sheet.columnOrder)
+      top.list([...path, 'chunkOrder'], previous.chunkOrder, sheet.chunkOrder)
+      top.map([...path, 'columnsById'], previous.columnsById, sheet.columnsById, true)
+      top.map([...path, 'mergesById'], previous.mergesById, sheet.mergesById, false)
+      const scalars = (value: Record<string, unknown>) => {
+        const { columnOrder: _c, chunkOrder: _k, columnsById: _b, mergesById: _m, ...rest } = value
+        return rest
+      }
+      top.fields(path, scalars(previousTop), scalars(nextTop))
     }
-    if (equal(previous, sheet)) continue
-    patch.list([...path, 'rowOrder'], previous.rowOrder, sheet.rowOrder)
-    patch.list([...path, 'columnOrder'], previous.columnOrder, sheet.columnOrder)
-    for (const collection of SHEET_COLLECTIONS) {
-      patch.map([...path, collection], previous[collection], sheet[collection], true)
+
+    // Chunks: each gets the rows placed in it, their formats and cells.
+    const home = placements.get(sheet)
+    if (!home) continue
+    const nextByChunk = new Map<ChunkId, ChunkContent>()
+    for (const chunkId of sheet.chunkOrder) nextByChunk.set(chunkId, chunkSkeleton(id))
+    for (const rowId of sheet.rowOrder) {
+      const content = nextByChunk.get(home.get(rowId)!)!
+      content.rowOrder.push(rowId)
+      const row = sheet.rowsById[rowId]
+      if (row) content.rowsById[rowId] = row
     }
-    patch.map([...path, 'mergesById'], previous.mergesById, sheet.mergesById, false)
-    const skip = new Set<string>(['rowOrder', 'columnOrder', 'mergesById', ...SHEET_COLLECTIONS])
-    const scalars = (value: Worksheet) =>
-      Object.fromEntries(Object.entries(value).filter(([key]) => !skip.has(key))) as Record<string, unknown>
-    patch.fields(path, scalars(previous), scalars(sheet))
+    for (const [key, cell] of Object.entries(sheet.cellsById)) {
+      const chunkId = home.get(key.split(':')[0]!)
+      if (chunkId) nextByChunk.get(chunkId)!.cellsById[key as CellKey] = cell
+    }
+    for (const [chunkId, content] of nextByChunk) {
+      const old = stored.chunks.get(chunkId) ?? chunkSkeleton(id)
+      const patch = chunkPatch(chunkId)
+      patch.list(['rowOrder'], old.rowOrder, content.rowOrder)
+      patch.map(['rowsById'], old.rowsById, content.rowsById, true)
+      patch.map(['cellsById'], old.cellsById, content.cellsById, true)
+    }
+    // Chunks of this sheet the order no longer lists keep their content
+    // (another replica may still write to them); they are just not loaded.
   }
-  const { set, unset, listInsert, listDelete } = patch
-  return { patch: { set, unset, listInsert, listDelete }, changed: !patch.empty }
+
+  const chunks = new Map<ChunkId, JsonPatchBody>()
+  for (const [chunkId, patch] of chunkPatches) if (!patch.empty) chunks.set(chunkId, patch.body())
+  return {
+    top: top.body(),
+    createdChunks,
+    chunks,
+    changed: !top.empty || chunks.size > 0 || createdChunks.size > 0,
+  }
 }

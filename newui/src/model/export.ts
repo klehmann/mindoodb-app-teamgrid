@@ -136,7 +136,7 @@ function appendSheet(
     const column = columnIndex.get(columnId)
     if (row === undefined || column === undefined) continue
     const style = styleEdit(cell.styleId)
-    const formula = cell.formula ? renderFormula(cell.formula.segments, home, lookup) : undefined
+    const formula = cell.formula ? renderFormula(cell.formula, home, lookup) : undefined
     const hasContent = formula !== undefined || (cell.value !== undefined && cell.value !== null)
     if (!hasContent && !style) continue
     edits.push({
