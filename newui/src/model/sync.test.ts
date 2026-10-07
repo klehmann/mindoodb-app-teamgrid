@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
-import { createWorkbook, loadWorkbook, writeWorkbook, type LoadedWorkbook } from '../haven/store'
+import { changedSinceLoad, createWorkbook, loadWorkbook, writeWorkbook, type LoadedWorkbook } from '../haven/store'
 import { AutomergeTestHost } from '../testing/automerge-host'
 import { createAxesLookup, renderFormula } from './formula-refs'
 import { liveIds } from './schema'
@@ -208,5 +208,17 @@ describe('stored workbook', () => {
     expect(writes.chunks.size).toBe(1)
     expect(writes.top.set).toHaveLength(0)
     expect(writes.createdChunks.size).toBe(0)
+  })
+
+  it('notices when someone else changed one of its row blocks', async () => {
+    const host = new AutomergeTestHost()
+    const id = await importGrid(host, [['a'], ['b']])
+    const watching = await loadWorkbook(host.connection, id)
+    expect(await changedSinceLoad(host.connection, watching)).toBe(false)
+    const other = await loadWorkbook(host.connection, id)
+    host.actor = 'c'.repeat(32)
+    await save(host, other, [['a'], ['b, edited elsewhere']])
+    expect(await changedSinceLoad(host.connection, watching)).toBe(true)
+    expect(await changedSinceLoad(host.connection, watching)).toBe(false)
   })
 })
