@@ -12,7 +12,8 @@
     "preview": "vite preview --port 4208",
     "build:wasm": "cd native/xlsx-wasm && PATH=$HOME/.cargo/bin:$PATH RUSTUP_TOOLCHAIN=1.90.0 wasm-pack build --target web --release",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:wasm:node": "cd native/xlsx-wasm && PATH=$HOME/.cargo/bin:$PATH RUSTUP_TOOLCHAIN=1.90.0 wasm-pack build --target nodejs --release --out-dir pkg-node"
   },
   "dependencies": {
     "@fluentui/react-icons": "2.0.333",

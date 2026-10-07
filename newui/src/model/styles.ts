@@ -4,7 +4,8 @@ import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-sche
 
 import type { BorderEdge, CellStyle, StoredStyle, StyleId } from './schema'
 
-function canonicalJson(value: unknown): string {
+/** JSON with object keys sorted, so equal content compares equal whatever the key order. */
+export function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
   const entries = Object.entries(value as Record<string, unknown>)

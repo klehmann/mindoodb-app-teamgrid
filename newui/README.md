@@ -26,6 +26,7 @@ pnpm dev               # http://127.0.0.1:4208, mock Haven at /__haven-test/ (re
                        # documents; __havenTestHost.applyRemoteUpdate plays a second device)
 pnpm typecheck
 pnpm test             # model tests, incl. concurrent offline edits
+pnpm build:wasm:node   # lets `pnpm test` also run the xlsx round trips (visuals)
 pnpm sync-genoffice    # take a newer GenOffice checkout (../../../genoffice by default)
 ```
 
@@ -58,9 +59,12 @@ into the next empty row offline end up in the same row
 
 - Stored and round-tripped: values, formulas (references by row/column id),
   cell styles, row heights, column widths, hidden rows/columns, merges,
-  frozen panes, gridlines, zoom, sheets (add, rename, hide, reorder, delete).
-- Not stored yet (lost on reload): charts, images, conditional formats, data
-  validation, filters, notes, hyperlinks, tables, pivots, page setup, defined
-  names, tab colors.
+  frozen panes, gridlines, zoom, sheets (add, rename, hide, reorder, delete),
+  charts (anchors and data ranges by id), pictures (bytes as attachments of
+  the top document), basic shapes.
+- Not stored yet (lost on reload): conditional formats, data validation,
+  filters, notes, hyperlinks, tables, pivots, sparklines, page setup, defined
+  names, tab colors; chart types GenOffice cannot create (bubble, stock,
+  surface) and chart styling beyond its chart-add options.
 - Not yet: WASM in a Web Worker, TeamGrid features (templates, revisions,
   view sheets, encryption), WebMCP, migration of v3 documents.

@@ -9,6 +9,8 @@ export interface XlsxEngine {
   }): Promise<unknown>
   readFormulaCells(input: { sessionId: string; sheetId: string }): Promise<unknown>
   readMedia(input: { sessionId: string; visualId: string }): Promise<unknown>
+  /** The image bytes behind a visual, without a base64 round trip. */
+  readMediaBytes(input: { sessionId: string; visualId: string }): Promise<Uint8Array>
   close(sessionId: string): Promise<void>
 }
 

@@ -17,7 +17,8 @@ import type {
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import type { XlsxEngine } from '../xlsx/engine'
 import { createAxesLookup, renderFormula, type SheetAxes } from './formula-refs'
-import { liveIds, liveSheets, type Workbook, type Worksheet } from './schema'
+import { liveIds, liveSheets, type VisualId, type Workbook, type Worksheet } from './schema'
+import { visualAddition } from './visuals'
 
 const BLANK_SHEET_NAME = 'Sheet1'
 
@@ -74,7 +75,18 @@ async function sheetIdsByName(engine: XlsxEngine, bytes: Uint8Array): Promise<Ma
   return new Map(opened.sheets.map((sheet) => [sheet.name, sheet.id]))
 }
 
-export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine): Promise<Uint8Array> {
+export interface ExportOptions {
+  /** Base64 bytes of a picture's attachment; pictures without bytes are left out. */
+  loadImage?: (attachment: string) => Promise<string | undefined>
+}
+
+export interface ExportResult {
+  bytes: Uint8Array
+  /** Per stored sheet, the visuals written, in drawing order (how the file lists them). */
+  visualOrder: Map<string, VisualId[]>
+}
+
+export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, options: ExportOptions = {}): Promise<ExportResult> {
   const sheets = liveSheets(workbook)
   let bytes = new Uint8Array(await blankXlsxBuffer(BLANK_SHEET_NAME))
 
@@ -108,13 +120,26 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine): Pr
   const axes = workbookAxes(workbook)
   const lookup = createAxesLookup(axes)
   const content = emptySaveRequest('export')
+  const visualOrder = new Map<string, VisualId[]>()
   for (const sheet of sheets) {
     const fileSheetId = fileIds.get(sheet.name)
     if (!fileSheetId) throw new Error(`Export lost sheet ${sheet.name}.`)
-    appendSheet(content, workbook, sheet, fileSheetId, lookup.bySheetId(sheet.id)!, lookup)
+    const home = lookup.bySheetId(sheet.id)!
+    appendSheet(content, workbook, sheet, fileSheetId, home, lookup)
+    const written: VisualId[] = []
+    for (const id of new Set(sheet.visualOrder ?? [])) {
+      const visual = sheet.visualsById?.[id]
+      if (!visual) continue
+      const image = visual.image ? await options.loadImage?.(visual.image.attachment) : undefined
+      const addition = visualAddition(visual, home, lookup, image)
+      if (!addition) continue
+      content.visualAdditions.push({ sheetId: fileSheetId, ...addition } as WorkbookSaveRequest['visualAdditions'][number])
+      written.push(id)
+    }
+    visualOrder.set(sheet.id, written)
   }
   const names = new Map([...fileIds].map(([name, id]) => [id, name]))
-  return (await saveWorkbookInBrowser(bytes, names, content)).bytes
+  return { bytes: (await saveWorkbookInBrowser(bytes, names, content)).bytes, visualOrder }
 }
 
 function appendSheet(

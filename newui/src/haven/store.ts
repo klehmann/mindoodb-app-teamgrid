@@ -118,9 +118,43 @@ async function createChunk(haven: HavenConnection, chunkId: ChunkId, parentId: s
   return created.heads ?? []
 }
 
+/** An attachment of a document as base64, or undefined when it is missing. */
+export async function readAttachmentBase64(haven: HavenConnection, docId: string, name: string) {
+  try {
+    const stream = await haven.database.attachments.openReadStream(docId, name)
+    const chunks: Uint8Array[] = []
+    for (let chunk = await stream.read(); chunk; chunk = await stream.read()) chunks.push(chunk)
+    await stream.close()
+    let binary = ''
+    for (const chunk of chunks) {
+      for (let index = 0; index < chunk.length; index += 0x8000) {
+        binary += String.fromCharCode(...chunk.subarray(index, index + 0x8000))
+      }
+    }
+    return btoa(binary)
+  } catch (error) {
+    console.warn(`[newui] picture ${name} could not be read`, error)
+    return undefined
+  }
+}
+
+async function writeAttachment(haven: HavenConnection, docId: string, name: string, bytes: Uint8Array, contentType: string) {
+  const stream = await haven.database.attachments.openWriteStream(docId, name, contentType)
+  try {
+    for (let offset = 0; offset < bytes.length; offset += 256 * 1024) {
+      await stream.write(bytes.subarray(offset, offset + 256 * 1024))
+    }
+    await stream.close()
+  } catch (error) {
+    await stream.abort().catch(() => {})
+    throw error
+  }
+}
+
 /**
- * Writes a save: new chunks first, then the chunks' patches, then the top
- * document, so the top document never lists a chunk that does not exist.
+ * Writes a save: new chunks first, then the chunks' patches, then new
+ * pictures, then the top document, so the top document never refers to a
+ * chunk or picture that does not exist.
  */
 export async function writeWorkbook(haven: HavenConnection, loaded: LoadedWorkbook, writes: WorkbookWrites): Promise<void> {
   const heads = new Map(loaded.heads)
@@ -132,6 +166,10 @@ export async function writeWorkbook(haven: HavenConnection, loaded: LoadedWorkbo
       haven.database.documents.update(chunkId, { json: patchOf(body, heads.get(chunkId)) }),
     ),
   )
+  for (const image of writes.newImages) {
+    if (!image.bytes) throw new Error(`The picture ${image.attachment} has no bytes to store.`)
+    await writeAttachment(haven, loaded.id, image.attachment, image.bytes, image.mediaType)
+  }
   const top = writes.top
   if (top.set.length || top.unset.length || top.listInsert.length || top.listDelete.length) {
     await haven.database.documents.update(loaded.id, { json: patchOf(top, heads.get(loaded.id)) })

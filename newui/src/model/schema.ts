@@ -34,7 +34,11 @@
 
 import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 
-import type { WorkbookFile } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
+import type { WorkbookFile, WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
+
+/** GenOffice's description of a visual added in the editor (save request). */
+export type VisualAdd = WorkbookSaveRequest['visualAdditions'][number]
+export type ChartAdd = NonNullable<VisualAdd['chart']>
 
 export const TEAMGRID_FORM = 'teamgrid-next'
 export const TEAMGRID_KIND = 'mindoodb.teamgrid.next'
@@ -113,6 +117,37 @@ export interface Merge {
   endColumnId: ColumnId
 }
 
+export type VisualId = string
+
+/** Where a visual sits: its corners as row/column ids plus EMU offsets into those cells. */
+export interface VisualAnchor {
+  fromRowId: RowId
+  fromColumnId: ColumnId
+  fromRowOffset: number
+  fromColumnOffset: number
+  toRowId: RowId
+  toColumnId: ColumnId
+  toRowOffset: number
+  toColumnOffset: number
+}
+
+/** A chart in GenOffice's chart-add form; series data ranges are id-bound like formulas. */
+export type StoredChart = Omit<ChartAdd, 'series'> & {
+  series: (Omit<ChartAdd['series'][number], 'valuesRef' | 'categoriesRef'> & {
+    valuesRef?: Formula
+    categoriesRef?: Formula
+  })[]
+}
+
+export interface StoredVisual {
+  kind: 'chart' | 'image' | 'shape'
+  anchor: VisualAnchor
+  chart?: StoredChart
+  shape?: NonNullable<VisualAdd['shape']>
+  /** The picture's bytes live in an attachment of the top document. */
+  image?: { attachment: string; mediaType: 'image/png' | 'image/jpeg' | 'image/gif' }
+}
+
 export interface Worksheet {
   id: SheetId
   name: string
@@ -130,6 +165,9 @@ export interface Worksheet {
   cellsById: Record<CellKey, Cell>
   /** Keyed by the merge's four corner ids, so the same merge never doubles. */
   mergesById: Record<string, Merge>
+  /** Charts, pictures and shapes, in drawing order (top document). */
+  visualOrder: VisualId[]
+  visualsById: Record<VisualId, StoredVisual>
   /** Row blocks in order (top document). */
   chunkOrder: ChunkId[]
   deletedAt?: string
@@ -180,7 +218,7 @@ export function liveIds(order: readonly string[], meta: Record<string, { deleted
 const ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
 /** A short random id: a one-letter prefix and 10 base-62 characters (~59 bits). */
-export function createId(prefix: 'r' | 'c' | 's'): string {
+export function createId(prefix: 'r' | 'c' | 's' | 'v'): string {
   const bytes = crypto.getRandomValues(new Uint8Array(10))
   let id = prefix
   for (const byte of bytes) id += ID_ALPHABET[byte % 62]

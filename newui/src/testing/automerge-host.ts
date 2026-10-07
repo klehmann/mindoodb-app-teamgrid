@@ -64,6 +64,7 @@ const HOST_ACTOR = 'aa'.repeat(16)
 
 export class AutomergeTestHost {
   private docs = new Map<string, Doc>()
+  private files = new Map<string, Uint8Array>()
   private feed: string[] = []
   private counter = 0
   /** Actor of the next writes; set per replica in tests. */
@@ -81,6 +82,7 @@ export class AutomergeTestHost {
   clone(actor?: string): AutomergeTestHost {
     const copy = new AutomergeTestHost()
     for (const [id, doc] of this.docs) copy.docs.set(id, A.clone(doc))
+    copy.files = new Map(this.files)
     copy.feed = [...this.feed]
     copy.counter = this.counter
     copy.actor = actor ?? this.actor
@@ -131,6 +133,30 @@ export class AutomergeTestHost {
           const from = Number(query.cursor ?? 0)
           const items = this.feed.slice(from).map((docId) => ({ id: docId }))
           return { items, nextCursor: items.length ? String(this.feed.length) : null }
+        },
+      },
+      attachments: {
+        openWriteStream: async (docId: string, name: string) => {
+          const chunks: Uint8Array[] = []
+          return {
+            write: async (chunk: Uint8Array) => void chunks.push(chunk.slice()),
+            close: async () => {
+              const bytes = new Uint8Array(chunks.reduce((size, chunk) => size + chunk.length, 0))
+              let offset = 0
+              for (const chunk of chunks) bytes.set(chunk, (offset += chunk.length) - chunk.length)
+              this.files.set(`${docId}/${name}`, bytes)
+            },
+            abort: async () => {},
+          }
+        },
+        openReadStream: async (docId: string, name: string) => {
+          const bytes = this.files.get(`${docId}/${name}`)
+          if (!bytes) throw new Error(`No attachment ${name}`)
+          let done = false
+          return {
+            read: async () => (done ? null : ((done = true), bytes)),
+            close: async () => {},
+          }
         },
       },
     } as unknown as HavenConnection['database'],

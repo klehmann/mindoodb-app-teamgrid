@@ -16,10 +16,17 @@ import {
   type WorkbookSaveRequest,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import type { HavenConnection } from '../haven/connection'
-import { createWorkbook, loadWorkbook, writeWorkbook, type LoadedWorkbook } from '../haven/store'
+import {
+  createWorkbook,
+  loadWorkbook,
+  readAttachmentBase64,
+  writeWorkbook,
+  type LoadedWorkbook,
+} from '../haven/store'
 import { workbookToXlsx } from '../model/export'
 import { readWholeWorkbook } from '../model/sidecar-read'
-import { emptyStoredWorkbook, newWorkbook, syncWorkbook } from '../model/sync'
+import { emptyStoredWorkbook, newWorkbook, syncWorkbook, visualFileKey, type WorkbookWrites } from '../model/sync'
+import type { XlsxEngine } from './engine'
 import { saveWorkbookInBrowser } from './browser-save'
 import { loadXlsxEngine } from './engine'
 
@@ -28,6 +35,8 @@ export interface StoredDocument {
   loaded: LoadedWorkbook
   /** File sheet ids of this session → stored sheet ids. */
   storedIdByFileId: Map<string, string>
+  /** This session's visuals: file visual → stored id, and per stored sheet the file order. */
+  visuals: { byFileKey: Map<string, string>; orderBySheet: Map<string, string[]> }
 }
 
 interface Session {
@@ -43,7 +52,7 @@ async function openBytes(
   bytes: Uint8Array,
   name: string,
   locale: string,
-  document?: Omit<StoredDocument, 'storedIdByFileId'>,
+  document?: Omit<StoredDocument, 'storedIdByFileId' | 'visuals'> & { visualOrder: Map<string, string[]> },
 ) {
   const engine = await loadXlsxEngine()
   const opened = (await engine.open(bytes, locale)) as Omit<WorkbookFile, 'sha256' | 'readOnly'>
@@ -58,9 +67,20 @@ async function openBytes(
         .filter((sheet) => !sheet.deletedAt)
         .map((sheet) => [sheet.name, sheet.id]),
     )
+    const storedIdByFileId = new Map(opened.sheets.map((sheet) => [sheet.id, storedIdByName.get(sheet.name)!]))
+    // The export wrote each sheet's visuals in this order; the file lists them the same way.
+    const byFileKey = new Map<string, string>()
+    for (const [fileSheetId, storedSheetId] of storedIdByFileId) {
+      const ids = document.visualOrder.get(storedSheetId) ?? []
+      const fileVisuals = opened.visuals.filter((visual) => visual.sheetId === fileSheetId)
+      if (fileVisuals.length !== ids.length) continue
+      fileVisuals.forEach((visual, index) => byFileKey.set(visualFileKey(visual), ids[index]!))
+    }
     session.document = {
-      ...document,
-      storedIdByFileId: new Map(opened.sheets.map((sheet) => [sheet.id, storedIdByName.get(sheet.name)!])),
+      haven: document.haven,
+      loaded: document.loaded,
+      storedIdByFileId,
+      visuals: { byFileKey, orderBySheet: document.visualOrder },
     }
   }
   sessions.set(opened.sessionId, session)
@@ -82,9 +102,21 @@ export async function openWorkbookBytes(bytes: Uint8Array, name: string, locale:
 
 /** Opens a stored workbook: renders it to xlsx and opens that in the editor. */
 export async function openStoredWorkbook(haven: HavenConnection, id: string, locale: string): Promise<WorkbookFile> {
-  const loaded = await loadWorkbook(haven, id)
-  const bytes = await workbookToXlsx(loaded.stored.workbook, await loadXlsxEngine())
-  return (await openBytes(bytes, loaded.subject, locale, { haven, loaded })).file
+  return (await openLoaded(haven, await loadWorkbook(haven, id), await loadXlsxEngine(), locale)).file
+}
+
+async function openLoaded(haven: HavenConnection, loaded: LoadedWorkbook, engine: XlsxEngine, locale: string) {
+  const { bytes, visualOrder } = await workbookToXlsx(loaded.stored.workbook, engine, {
+    loadImage: (attachment) => readAttachmentBase64(haven, loaded.id, attachment),
+  })
+  return openBytes(bytes, loaded.subject, locale, { haven, loaded, visualOrder })
+}
+
+/** Reads the bytes of pictures a save or import adds, while the file's session is open. */
+async function readNewImages(engine: XlsxEngine, sessionId: string, writes: WorkbookWrites) {
+  for (const image of writes.newImages) {
+    image.bytes = await engine.readMediaBytes({ sessionId, visualId: image.fileVisualId })
+  }
 }
 
 /** Imports an xlsx as a new stored workbook and returns the new document id. */
@@ -97,6 +129,7 @@ export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8A
       storedIdByFileId: new Map(),
       read: await readWholeWorkbook(engine, opened),
     })
+    await readNewImages(engine, opened.sessionId, writes)
     return await createWorkbook(haven, subject, next, writes)
   } finally {
     await engine.close(opened.sessionId)
@@ -106,6 +139,7 @@ export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8A
 export async function createEmptyDocument(haven: HavenConnection, subject: string, sheetName: string) {
   const workbook = newWorkbook(sheetName)
   return createWorkbook(haven, subject, workbook, {
+    newImages: [],
     top: { set: [], unset: [], listInsert: [], listDelete: [] },
     createdChunks: new Map(),
     chunks: new Map(),
@@ -172,17 +206,16 @@ export async function saveSession(request: WorkbookSaveRequest, locale: string):
       storedIdByFileId: document.storedIdByFileId,
       request,
       read: await readWholeWorkbook(engine, saved),
+      visuals: document.visuals,
     })
+    await readNewImages(engine, saved.sessionId, sync.writes)
   } finally {
     await engine.close(saved.sessionId)
   }
   if (sync.writes.changed) await writeWorkbook(document.haven, document.loaded, sync.writes)
   // Continue on the merged state, which includes other people's changes.
   const loaded = await loadWorkbook(document.haven, document.loaded.id)
-  const reopened = await openBytes(await workbookToXlsx(loaded.stored.workbook, engine), loaded.subject, locale, {
-    haven: document.haven,
-    loaded,
-  })
+  const reopened = await openLoaded(document.haven, loaded, engine, locale)
   await closeSession(request.sessionId)
   return { file: reopened.file, touchedEntries, stored: { changed: sync.writes.changed } }
 }

@@ -16,6 +16,7 @@ import {
   type Worksheet,
 } from './schema'
 import type { SidecarSheet } from './sidecar-read'
+import { canonicalJson } from './styles'
 
 export interface BuildSheetInput {
   sheet: SidecarSheet
@@ -106,7 +107,7 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
       // is not an edit: the stored value only changes with the formula, so
       // every open does not rewrite every result.
       const before = previous.cellsById[key]
-      const unchanged = before?.formula && JSON.stringify(before.formula) === JSON.stringify(formula)
+      const unchanged = before?.formula && canonicalJson(before.formula) === canonicalJson(formula)
       cell.formula = unchanged ? before.formula! : formula
       const value = unchanged ? before.value : record.value
       if (value !== null && value !== undefined) cell.value = value
@@ -141,6 +142,8 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     cellsById,
     mergesById,
     chunkOrder: previous.chunkOrder,
+    visualOrder: previous.visualOrder ?? [],
+    visualsById: previous.visualsById ?? {},
   }
   if (meta.hidden) next.hidden = true
   if (meta.tabColor) next.tabColor = meta.tabColor

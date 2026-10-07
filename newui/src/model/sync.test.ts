@@ -41,7 +41,7 @@ function read(rows: Grid): SidecarWorkbook {
     }),
   )
   return {
-    file: { sessionId: 'x', styles: [] } as unknown as SidecarWorkbook['file'],
+    file: { sessionId: 'x', styles: [], visuals: [] } as unknown as SidecarWorkbook['file'],
     sheets: [{ meta, cells, rows: [], merges: [] }],
   }
 }

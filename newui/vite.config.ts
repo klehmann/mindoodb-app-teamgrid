@@ -16,7 +16,8 @@ export default defineConfig({
       // "./x" to src/x(.ts), so the vendored sources resolve the same way.
       { find: /^@genoffice\/([a-z0-9-]+)$/, replacement: `${genofficePackages}/$1/src/index.ts` },
       { find: /^@genoffice\/([a-z0-9-]+)\/(.*)$/, replacement: `${genofficePackages}/$1/src/$2` },
-      { find: /^node:(crypto|fs|fs\/promises|os|path)$/, replacement: nodeStubs },
+      // Browser builds only; tests run in Node and get the real modules.
+      ...(process.env.VITEST ? [] : [{ find: /^node:(crypto|fs|fs\/promises|os|path)$/, replacement: nodeStubs }]),
     ],
   },
   // Same host as the classic TeamGrid dev server (4207), next to it on 4208.

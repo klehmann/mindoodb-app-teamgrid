@@ -24,11 +24,13 @@ import {
   type RowId,
   type RowMeta,
   type SheetId,
+  type VisualId,
   type Workbook,
   type Worksheet,
 } from './schema'
 import type { SidecarWorkbook } from './sidecar-read'
-import { styleTable } from './styles'
+import { canonicalJson, styleTable } from './styles'
+import { anchorExtent, normalizeAnchor, sheetSizes, storedVisual } from './visuals'
 
 /** Rows a chunk takes before appending at its end opens a new one. */
 export const CHUNK_SOFT_LIMIT = 256
@@ -63,7 +65,17 @@ export interface StoredWorkbook {
 
 export type JsonPatchBody = Required<Pick<MindooDBAppJsonPatch, 'set' | 'unset' | 'listInsert' | 'listDelete'>>
 
+/** A picture added in the editor: its bytes go into an attachment of the top document. */
+export interface NewImage {
+  attachment: string
+  mediaType: string
+  /** The visual's id in the saved file, to read its bytes. */
+  fileVisualId: string
+  bytes?: Uint8Array
+}
+
 export interface WorkbookWrites {
+  newImages: NewImage[]
   top: JsonPatchBody
   /** Chunks to create first (empty skeleton, derived id), then patch like the others. */
   createdChunks: Map<ChunkId, SheetId>
@@ -127,7 +139,15 @@ export function assembleWorkbook(top: Workbook, chunks: Map<ChunkId, ChunkConten
         if (home.get(key.split(':')[0]!) === chunkId) cellsById[key as CellKey] = cell
       }
     }
-    worksheetsById[sheetId] = { ...sheet, chunkOrder, rowOrder, rowsById, cellsById }
+    worksheetsById[sheetId] = {
+      ...sheet,
+      visualOrder: sheet.visualOrder ?? [],
+      visualsById: sheet.visualsById ?? {},
+      chunkOrder,
+      rowOrder,
+      rowsById,
+      cellsById,
+    }
     rowHome.set(sheetId, home)
   }
   return {
@@ -148,6 +168,8 @@ function emptySheet(id: string, name: string): Worksheet {
     cellsById: {},
     mergesById: {},
     chunkOrder: [],
+    visualOrder: [],
+    visualsById: {},
   }
 }
 
@@ -208,7 +230,7 @@ function buildAll(
       axes: lookup,
     })
   })
-  return { sheets, stylesById }
+  return { sheets, stylesById, lookup }
 }
 
 export function emptyStoredWorkbook(): StoredWorkbook {
@@ -229,6 +251,8 @@ export interface SyncInput {
   request?: WorkbookSaveRequest
   /** The saved xlsx, re-read in full. */
   read: SidecarWorkbook
+  /** The session's visuals: file visual (`drawingPath#drawingIndex`) → stored id, and per sheet the file order. */
+  visuals?: { byFileKey: ReadonlyMap<string, VisualId>; orderBySheet: ReadonlyMap<SheetId, VisualId[]> }
 }
 
 export interface SyncResult {
@@ -236,8 +260,24 @@ export interface SyncResult {
   writes: WorkbookWrites
 }
 
-export function syncWorkbook({ stored, storedIdByFileId, request, read }: SyncInput): SyncResult {
+export function visualFileKey(visual: { drawingPath?: string | undefined; drawingIndex?: number | undefined; id: string }) {
+  return visual.drawingPath === undefined ? visual.id : `${visual.drawingPath}#${visual.drawingIndex ?? 0}`
+}
+
+export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals }: SyncInput): SyncResult {
   const workbook = stored.workbook
+  // Visual anchors with their far corner in the cell it falls into.
+  const sizesBySheet = new Map(fileRead.sheets.map((sheet) => [sheet.meta.id, sheetSizes(sheet)]))
+  const read: SidecarWorkbook = {
+    ...fileRead,
+    file: {
+      ...fileRead.file,
+      visuals: fileRead.file.visuals.map((visual) => {
+        const sizes = sizesBySheet.get(visual.sheetId)
+        return sizes ? normalizeAnchor(visual, sizes) : visual
+      }),
+    },
+  }
   // Sheet identity: file ids of this session → stored ids; sheets the editor
   // added get new ids. The re-read file is matched by final sheet name.
   const storedIdByEditorId = new Map(storedIdByFileId)
@@ -281,12 +321,58 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read }: SyncIn
     const id = storedIdByName.get(sheet.meta.name)
     if (!id) throw new Error(`Saved sheet ${sheet.meta.name} has no stored counterpart.`)
     const previous = workbook.worksheetsById[id] ?? emptySheet(id, sheet.meta.name)
+    // Ids must also cover the cells visuals are anchored to.
+    let rowCount = sheet.meta.rowCount
+    let columnCount = sheet.meta.columnCount
+    for (const visual of read.file.visuals) {
+      if (visual.sheetId !== sheet.meta.id) continue
+      const extent = anchorExtent(visual)
+      rowCount = Math.max(rowCount, extent.rows)
+      columnCount = Math.max(columnCount, extent.columns)
+    }
     plans.set(id, {
       stored: previous,
-      ...planAxes(previous, rowOps.get(id) ?? [], columnOps.get(id) ?? [], sheet.meta.rowCount, sheet.meta.columnCount),
+      ...planAxes(previous, rowOps.get(id) ?? [], columnOps.get(id) ?? [], rowCount, columnCount),
     })
   }
-  const { sheets, stylesById } = buildAll(workbook, read, plans, storedIdByName)
+  const { sheets, stylesById, lookup } = buildAll(workbook, read, plans, storedIdByName)
+
+  // Visuals keep their ids: the file lists a sheet's visuals in drawing
+  // order, which is the session's order minus the removed ones plus the
+  // added ones at the end. If that does not add up, ids start over.
+  const removedVisuals = new Set<VisualId>()
+  for (const edit of request?.visualEdits ?? []) {
+    const id = edit.remove ? visuals?.byFileKey.get(visualFileKey({ ...edit, id: '' })) : undefined
+    if (id) removedVisuals.add(id)
+  }
+  const newImages: NewImage[] = []
+  for (const [index, sheet] of sheets.entries()) {
+    const fileSheet = read.sheets[index]!
+    const fileVisuals = read.file.visuals.filter((visual) => visual.sheetId === fileSheet.meta.id)
+    const added = (request?.visualAdditions ?? []).filter((visual) => storedIdByEditorId.get(visual.sheetId) === sheet.id)
+    let ids = [
+      ...(visuals?.orderBySheet.get(sheet.id) ?? []).filter((id) => !removedVisuals.has(id)),
+      ...added.map(() => createId('v')),
+    ]
+    if (ids.length !== fileVisuals.length) ids = fileVisuals.map(() => createId('v'))
+    const home = lookup.bySheetId(sheet.id)!
+    const previous = plans.get(sheet.id)!.stored
+    sheet.visualOrder = []
+    sheet.visualsById = {}
+    fileVisuals.forEach((fileVisual, position) => {
+      const id = ids[position]!
+      const before = previous.visualsById?.[id]
+      const extension = fileVisual.mediaType?.split('/')[1] ?? 'bin'
+      const visual = storedVisual(fileVisual, home, lookup, `${id}.${extension}`)
+      if (!visual) return
+      if (visual.image) {
+        if (before?.image) visual.image = before.image
+        else newImages.push({ attachment: visual.image.attachment, mediaType: visual.image.mediaType, fileVisualId: fileVisual.id })
+      }
+      sheet.visualOrder.push(id)
+      sheet.visualsById[id] = visual
+    })
+  }
 
   const deletedAt = new Date().toISOString()
   const worksheetsById: Workbook['worksheetsById'] = { ...workbook.worksheetsById }
@@ -303,7 +389,7 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read }: SyncIn
   }
   const createdChunks = new Map<ChunkId, SheetId>()
   for (const sheet of sheets) placeRows(sheet, stored.rowHome.get(sheet.id) ?? new Map(), stored.chunks, createdChunks)
-  return { next, writes: diffWorkbook(stored, next, createdChunks) }
+  return { next, writes: { ...diffWorkbook(stored, next, createdChunks), newImages } }
 }
 
 /** Styles any cell, row or column still uses (an import carries the file's whole table). */
@@ -377,8 +463,9 @@ function placeRows(
 
 type Path = (string | number)[]
 
+/** Stored documents come back with sorted keys, so content is compared key-order-free. */
 function equal(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
+  return canonicalJson(left) === canonicalJson(right)
 }
 
 class PatchBuilder {
@@ -448,7 +535,7 @@ function diffWorkbook(
   stored: StoredWorkbook,
   next: Workbook,
   createdChunks: Map<ChunkId, SheetId>,
-): WorkbookWrites {
+): Omit<WorkbookWrites, 'newImages'> {
   const before = stored.workbook
   const top = new PatchBuilder()
   top.list([...WORKBOOK_PATH, 'worksheetOrder'], before.worksheetOrder, next.worksheetOrder)
@@ -473,8 +560,18 @@ function diffWorkbook(
       top.list([...path, 'chunkOrder'], previous.chunkOrder, sheet.chunkOrder)
       top.map([...path, 'columnsById'], previous.columnsById, sheet.columnsById, true)
       top.map([...path, 'mergesById'], previous.mergesById, sheet.mergesById, false)
+      top.list([...path, 'visualOrder'], previous.visualOrder ?? [], sheet.visualOrder)
+      top.map([...path, 'visualsById'], previous.visualsById ?? {}, sheet.visualsById, false)
       const scalars = (value: Record<string, unknown>) => {
-        const { columnOrder: _c, chunkOrder: _k, columnsById: _b, mergesById: _m, ...rest } = value
+        const {
+          columnOrder: _c,
+          chunkOrder: _k,
+          columnsById: _b,
+          mergesById: _m,
+          visualOrder: _vo,
+          visualsById: _v,
+          ...rest
+        } = value
         return rest
       }
       top.fields(path, scalars(previousTop), scalars(nextTop))

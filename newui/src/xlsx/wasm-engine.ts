@@ -25,6 +25,9 @@ export async function createWasmEngine(): Promise<XlsxEngine> {
     async readMedia({ sessionId, visualId }) {
       return JSON.parse(engine.readMedia(sessionId, visualId))
     },
+    async readMediaBytes({ sessionId, visualId }) {
+      return engine.readMediaBytes(sessionId, visualId)
+    },
     async close(sessionId) {
       engine.close(sessionId)
     },
