@@ -388,5 +388,9 @@ async function xlsxBufferFromRows(
   zip.file('xl/theme/theme1.xml', DEFAULT_THEME_XML)
   zip.file('xl/styles.xml', MINIMAL_STYLESHEET_XML)
   zip.file('xl/worksheets/sheet1.xml', buildWorksheetXml(rows))
-  return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
+  return zip.generateAsync({
+    // Buffer outside Node (browser builds): a Uint8Array is what JSZip produces there.
+    type: typeof Buffer === 'undefined' ? ('uint8array' as 'nodebuffer') : 'nodebuffer',
+    compression: 'DEFLATE',
+  })
 }

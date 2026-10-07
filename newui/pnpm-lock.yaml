@@ -65,6 +65,9 @@ importers:
       jszip:
         specifier: 3.10.1
         version: 3.10.1
+      mindoodb-app-sdk:
+        specifier: 0.0.63
+        version: 0.0.63(@automerge/automerge@3.5.0)(mindoodb@0.0.71)
       numfmt:
         specifier: 3.2.6
         version: 3.2.6
@@ -111,8 +114,14 @@ importers:
       vite:
         specifier: 7.3.6
         version: 7.3.6(@types/node@24.10.1)
+      vite-plugin-wasm:
+        specifier: 3.6.0
+        version: 3.6.0(vite@7.3.6(@types/node@24.10.1))
 
 packages:
+
+  '@automerge/automerge@3.5.0':
+    resolution: {integrity: sha512-ejbqJWfXWM2QbTcUK/5ugYiQiyOP7LYVAp/RuSvthCc07oek0FClMxEuouuhjrLjVPDSI34RP1ftGc45PF7WRA==}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -1434,6 +1443,50 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
+  mindoodb-app-sdk@0.0.63:
+    resolution: {integrity: sha512-E/0InVbAyQ8RmjW3cbSJ574vkPShQSsrN8sDbvp9Vbbfp9NroMH+WGrF31UXo/seVPYbZBQDcXMLc/BZtHmbpQ==}
+    engines: {node: '>=22.13.0'}
+    peerDependencies:
+      '@automerge/automerge': ^3.3.2
+      mindoodb: '>=0.0.71'
+    peerDependenciesMeta:
+      '@automerge/automerge':
+        optional: true
+      mindoodb:
+        optional: true
+
+  mindoodb-view-language@0.0.18:
+    resolution: {integrity: sha512-9estxqoKL0Lu1QuYfEcoHYgQWEwF0RX71QxCu48j1IHyQ2nwXDSIg4OLtp+Oy5UJ398xcsWGTySttruDe9xShA==}
+    engines: {node: '>=22.13.0'}
+
+  mindoodb@0.0.71:
+    resolution: {integrity: sha512-LLUtl6tOVkQrAmWHSEV1M9j+gHmEsTDO608+b130426M/BfkvDhbKz7+vu4Jipw5TP3gxqfUWDt8jDAX+WkbJw==}
+    engines: {node: '>=22.13.0'}
+    hasBin: true
+    peerDependencies:
+      '@number0/iroh': ^1.0.0
+      expo-standard-web-crypto: ^3.0.0
+      node-forge: ^1.3.1
+      react-native-automerge-generated: ^0.1.0
+      react-native-quick-crypto: ^1.0.0
+      tweetnacl: ^1.0.3
+    peerDependenciesMeta:
+      '@number0/iroh':
+        optional: true
+      expo-standard-web-crypto:
+        optional: true
+      node-forge:
+        optional: true
+      react-native-automerge-generated:
+        optional: true
+      react-native-quick-crypto:
+        optional: true
+      tweetnacl:
+        optional: true
+
+  minisearch@7.2.0:
+    resolution: {integrity: sha512-dqT2XBYUOZOiC5t2HRnwADjhNS2cecp9u+TJRiJ1Qp/f5qjkeT5APcGPjHw+bz89Ms8Jp+cG4AlE+QZ/QnDglg==}
+
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
@@ -1699,6 +1752,11 @@ packages:
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
+  vite-plugin-wasm@3.6.0:
+    resolution: {integrity: sha512-mL/QPziiIA4RAA6DkaZZzOstdwbW5jO4Vz7Zenj0wieKWBlNvIvX5L5ljum9lcUX0ShNfBgCNLKTjNkRVVqcsw==}
+    peerDependencies:
+      vite: ^2 || ^3 || ^4 || ^5 || ^6 || ^7 || ^8
+
   vite@7.3.6:
     resolution: {integrity: sha512-4XP60spRGjSZFf1qYH+dJIkK2znL3zQfl9KkOV9MkkRR/3Dls0dxaBsQPTloEc5BLXWPL9vsOxopxyKoMmDueg==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1766,6 +1824,8 @@ packages:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
+
+  '@automerge/automerge@3.5.0': {}
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -3315,6 +3375,38 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
+  mindoodb-app-sdk@0.0.63(@automerge/automerge@3.5.0)(mindoodb@0.0.71):
+    dependencies:
+      mindoodb-view-language: 0.0.18
+    optionalDependencies:
+      '@automerge/automerge': 3.5.0
+      mindoodb: 0.0.71
+    transitivePeerDependencies:
+      - '@number0/iroh'
+      - expo-standard-web-crypto
+      - node-forge
+      - react-native-automerge-generated
+      - react-native-quick-crypto
+      - tweetnacl
+
+  mindoodb-view-language@0.0.18:
+    dependencies:
+      mindoodb: 0.0.71
+    transitivePeerDependencies:
+      - '@number0/iroh'
+      - expo-standard-web-crypto
+      - node-forge
+      - react-native-automerge-generated
+      - react-native-quick-crypto
+      - tweetnacl
+
+  mindoodb@0.0.71:
+    dependencies:
+      '@automerge/automerge': 3.5.0
+      minisearch: 7.2.0
+
+  minisearch@7.2.0: {}
+
   ms@2.1.3: {}
 
   n-gram@2.0.2: {}
@@ -3586,6 +3678,10 @@ snapshots:
       pako: 1.0.11
 
   util-deprecate@1.0.2: {}
+
+  vite-plugin-wasm@3.6.0(vite@7.3.6(@types/node@24.10.1)):
+    dependencies:
+      vite: 7.3.6(@types/node@24.10.1)
 
   vite@7.3.6(@types/node@24.10.1):
     dependencies:

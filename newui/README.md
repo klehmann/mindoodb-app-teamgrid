@@ -11,7 +11,9 @@ browser, as the basis for TeamGrid's next version. Concept and decisions:
 | `vendor/genoffice/` | GenOffice sources, copied by `scripts/sync-genoffice.mjs` (commit in `VENDORED_FROM`). Never edit by hand. |
 | `patches/` | Our changes to vendored files, applied by the sync script (`patch -p1` in `vendor/genoffice`). |
 | `src/desktop-api-shim.ts` | Browser replacement for GenOffice's Electron bridge (`window.desktopApi`). |
-| `src/xlsx/` | xlsx import (WASM sidecar) and export (vendored xlsx-gateway + JSZip). |
+| `src/xlsx/` | xlsx import (WASM sidecar) and export (vendored xlsx-gateway + JSZip); editor sessions. |
+| `src/model/` | Stored workbook (schema v4): ids, formula references by id, save diff → JSON patch. |
+| `src/haven/` | Haven App SDK connection and the workbook picker. |
 | `native/xlsx-wasm/` | wasm-bindgen wrapper around GenOffice's Rust xlsx reader. |
 
 ## Commands
@@ -19,16 +21,34 @@ browser, as the basis for TeamGrid's next version. Concept and decisions:
 ```bash
 pnpm install
 pnpm build:wasm        # needs rustup toolchain 1.90+ with wasm32-unknown-unknown, and wasm-pack
-pnpm dev               # http://localhost:4208
+pnpm dev               # http://localhost:4208, mock Haven at /__haven-test/
 pnpm typecheck
 pnpm sync-genoffice    # take a newer GenOffice checkout (../../../genoffice by default)
 ```
 
-Open an xlsx with Cmd/Ctrl+O; Cmd/Ctrl+S downloads the edited workbook.
+Inside Haven (or the mock at `/__haven-test/`) the editor opens stored
+workbooks (form `teamgrid-next`), creates new ones and imports xlsx files as
+documents; AutoSave writes JSON patches with `baseHeads`, and an idle editor
+reloads when someone else changed the workbook. Standalone, Cmd/Ctrl+O opens
+an xlsx and Cmd/Ctrl+S downloads it.
+
+## How storage works
+
+The editor only knows xlsx files, so a stored workbook is rendered to an xlsx
+in memory (`model/export.ts`, GenOffice's gateway on a blank workbook) and
+opened from there. On save, GenOffice patches that xlsx; it is read back in
+full, rows and columns are matched to their ids by replaying the save's
+inserts/deletes/moves (`model/replay.ts`), and the difference to the stored
+document becomes one JSON patch (`model/sync.ts`). The editor then reopens
+from the merged document, so concurrent changes show up right away.
 
 ## Spike status
 
-- Works: editor boot, formulas, xlsx open (styles, merges, charts, images) via
-  WASM, edit, save as xlsx download, reopen.
-- Not yet: MindooDB storage (schema v4), Haven SDK bridge, AutoSave, WASM in a
-  Web Worker, TeamGrid features (templates, revisions, view sheets), WebMCP.
+- Stored and round-tripped: values, formulas (references by row/column id),
+  cell styles, row heights, column widths, hidden rows/columns, merges,
+  frozen panes, gridlines, zoom, sheets (add, rename, hide, reorder, delete).
+- Not stored yet (lost on reload): charts, images, conditional formats, data
+  validation, filters, notes, hyperlinks, tables, pivots, page setup, defined
+  names, tab colors.
+- Not yet: WASM in a Web Worker, TeamGrid features (templates, revisions,
+  view sheets, encryption), WebMCP, migration of v3 documents.

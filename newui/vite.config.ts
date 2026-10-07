@@ -1,13 +1,15 @@
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
+import wasm from 'vite-plugin-wasm'
 
 const genofficePackages = fileURLToPath(new URL('./vendor/genoffice/packages', import.meta.url))
 const nodeStubs = fileURLToPath(new URL('./src/node-stubs/index.ts', import.meta.url))
 
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  // wasm(): Automerge in the SDK's mock Haven (/__haven-test/) imports its .wasm as an ES module.
+  plugins: [wasm(), react()],
   resolve: {
     alias: [
       // GenOffice workspace packages: `exports` maps "." to src/index.ts and

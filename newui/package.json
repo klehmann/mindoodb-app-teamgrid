@@ -33,6 +33,7 @@
     "bidi-js": "1.0.3",
     "fast-xml-parser": "5.10.1",
     "jszip": "3.10.1",
+    "mindoodb-app-sdk": "0.0.63",
     "numfmt": "3.2.6",
     "opentype.js": "2.0.0",
     "parse5": "8.0.1",
@@ -49,6 +50,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
     "typescript": "5.9.3",
-    "vite": "7.3.6"
+    "vite": "7.3.6",
+    "vite-plugin-wasm": "3.6.0"
   }
 }
