@@ -138,7 +138,8 @@ export async function applyVisualAdditions(
       const image = addition.image
       const extension = IMAGE_EXTENSIONS[image.mediaType]
       const mediaPath = await allocatePartPath(pkg, 'xl/media/image', `.${extension}`)
-      pkg.addBinary(mediaPath, Uint8Array.from(Buffer.from(image.base64, 'base64')))
+      // atob, not Buffer: the gateway also runs in browsers.
+      pkg.addBinary(mediaPath, Uint8Array.from(atob(image.base64), (char) => char.charCodeAt(0)))
       touchedEntries.add(mediaPath)
       await registerContentTypeDefault(pkg, extension, image.mediaType, touchedEntries)
       const imageRelId = await appendRelationship(

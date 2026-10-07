@@ -156,6 +156,9 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
     consumeNewBlankWorkbook: async () => false,
     getAutoSaveDefault: async () => ({ on: haven !== null, updatedAt: 0 }),
     onAutoSaveDefaultChanged: () => () => {},
+    // AutoSave already writes every change to MindooDB; a separate crash
+    // recovery copy has no place to go in the browser.
+    writeWorkbookRecovery: async () => ({ ok: false }),
     notifyPendingEdits(count) {
       pendingEdits = count
     },

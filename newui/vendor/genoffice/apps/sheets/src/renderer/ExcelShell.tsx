@@ -77,6 +77,7 @@ import { useModalDialog } from './modal-dialog'
 import { STATUS_BAR_FUNCS, type StatusBarFunc } from './status-bar-stats'
 import { SHEET_ZOOM_MAX, SHEET_ZOOM_MIN, clampZoomPercent } from './zoom-range'
 import { ZoomDialog } from './ZoomDialog'
+import { AI_ENABLED } from './ai/ai-enabled'
 
 // No File tab: file commands live in the macOS
 // application menu (File → Open/Save/Save As) and the toolbar icons.
@@ -708,7 +709,7 @@ export function ExcelShell({
 
       {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
       <div className="sheet-body">
-        <AiChatPanel
+        {AI_ENABLED && <AiChatPanel
           isOpen={isCopilotOpen}
           hasContent={sheetHasContent}
           chat={chat}
@@ -734,7 +735,7 @@ export function ExcelShell({
           onCitation={onAiCitation}
           onExpand={() => setIsCopilotOpen(true)}
           onCollapse={() => setIsCopilotOpen(false)}
-        />
+        />}
         <div className="sheet-main">
           <section className="workbook-area">
             <div id="univer-container" className="spreadsheet" />
@@ -755,7 +756,7 @@ export function ExcelShell({
               </div>
             )}
           </section>
-          {aiSelectionAskAnchor && aiScopeRange && !aiBusy && (
+          {AI_ENABLED && aiSelectionAskAnchor && aiScopeRange && !aiBusy && (
             <AiSelectionAsk
               anchor={aiSelectionAskAnchor}
               range={aiScopeRange}
@@ -2606,7 +2607,7 @@ function Ribbon({
     : [...fontSizes, echoSize].sort((a, b) => a - b)
   return (
     <div className="ribbon" data-ribbon-body="">
-      <RibbonGroup label={t('appGroupAiAssistant')}>
+      {AI_ENABLED && <RibbonGroup label={t('appGroupAiAssistant')}>
         <button
           className={`ribbon-tool as-button large ai-entry ${aiOpen ? 'active' : ''}`}
           data-tip={t('aiOpenAssistant')}
@@ -2676,7 +2677,7 @@ function Ribbon({
             <strong>{t('aiAnalyzeBtn')}</strong>
           </span>
         </button>
-      </RibbonGroup>
+      </RibbonGroup>}
       <RibbonGroup label={t('appGroupClipboard')}>
         <button
           className="ribbon-tool as-button large"
