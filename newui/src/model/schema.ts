@@ -19,8 +19,9 @@
 // - a cell is keyed `<rowId>:<columnId>` and patched field by field, so a
 //   value change and a format change of the same cell both survive a merge
 // - formula references point at row/column ids (see formula-refs.ts)
-// - styles live in a registry keyed by a hash of their content, so two people
-//   creating the same format end up with one entry
+// - a cell's format is stored property by property next to its value
+//   (`s.bold`, `s.fillColor`, …), so one person making a cell bold and
+//   another filling it yellow both survive a merge
 // - rows and columns that only exist because the sheet grew (typing below the
 //   last row) get ids derived from the id before them, so two people who
 //   both type into "the next row" offline end up in the same row
@@ -63,7 +64,7 @@ export type BorderEdge = NonNullable<CellStyle['borderTop']>
 /**
  * A stored style: GenOffice's style delta on the default format, the shape
  * its save path writes. Stored in this form (not as read) because it is
- * what survives a write/read round trip unchanged, so styles keep their ids.
+ * what survives a write/read round trip unchanged.
  */
 export type StoredStyle = WorkbookStyleEdit
 
@@ -89,24 +90,29 @@ export interface Formula {
   r: string[]
 }
 
-export interface Cell {
-  value?: CellScalar
-  formula?: Formula
+/** A format, one field per style property (`s.<property>`), so each merges on its own. */
+export type StyleFields = { [K in keyof StoredStyle as `s.${K & string}`]?: StoredStyle[K] }
+
+/** Before formats were stored per property: an id into the workbook's `stylesById`. */
+interface LegacyStyleRef {
   styleId?: StyleId
 }
 
-export interface RowMeta {
+export interface Cell extends StyleFields, LegacyStyleRef {
+  value?: CellScalar
+  formula?: Formula
+}
+
+export interface RowMeta extends StyleFields, LegacyStyleRef {
   height?: number
   customHeight?: boolean
   hidden?: boolean
-  styleId?: StyleId
   deletedAt?: string
 }
 
-export interface ColumnMeta {
+export interface ColumnMeta extends StyleFields, LegacyStyleRef {
   width?: number
   hidden?: boolean
-  styleId?: StyleId
   deletedAt?: string
 }
 
@@ -179,7 +185,8 @@ export const CHUNK_FIELDS = ['rowOrder', 'rowsById', 'cellsById'] as const
 export interface Workbook {
   worksheetOrder: SheetId[]
   worksheetsById: Record<SheetId, Worksheet>
-  stylesById: Record<StyleId, StoredStyle>
+  /** Legacy style registry, read once and dropped by the next save. */
+  stylesById?: Record<StyleId, StoredStyle>
 }
 
 export function cellKey(rowId: RowId, columnId: ColumnId): CellKey {

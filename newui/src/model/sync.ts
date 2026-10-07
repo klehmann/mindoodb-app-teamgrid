@@ -21,6 +21,7 @@ import {
   type Cell,
   type CellKey,
   type ChunkId,
+  type Merge,
   type RowId,
   type RowMeta,
   type SheetId,
@@ -29,7 +30,7 @@ import {
   type Worksheet,
 } from './schema'
 import type { SidecarWorkbook } from './sidecar-read'
-import { canonicalJson, styleTable } from './styles'
+import { canonicalJson, toStyleEdit, withoutLegacyStyle } from './styles'
 import { anchorExtent, normalizeAnchor, sheetSizes, storedVisual } from './visuals'
 
 /** Rows a chunk takes before appending at its end opens a new one. */
@@ -57,7 +58,10 @@ export interface ChunkContent {
 
 /** A stored workbook as loaded: the assembled view plus where each row lives. */
 export interface StoredWorkbook {
+  /** What the editor works on: merged, repaired (see assembleWorkbook). */
   workbook: Workbook
+  /** The top document's workbook exactly as stored; saves diff against it, so repairs get written. */
+  top: Workbook
   chunks: Map<ChunkId, ChunkContent>
   /** Per sheet: row id → the chunk that holds it (the first one, if a merge left copies). */
   rowHome: Map<SheetId, Map<RowId, ChunkId>>
@@ -107,6 +111,7 @@ export function chunkIdFor(sheetId: SheetId, after: ChunkId | undefined, firstRo
 
 /** Assembles the in-memory workbook from the top document's workbook and its chunks. */
 export function assembleWorkbook(top: Workbook, chunks: Map<ChunkId, ChunkContent>): StoredWorkbook {
+  const legacy = top.stylesById
   const rowHome = new Map<SheetId, Map<RowId, ChunkId>>()
   const worksheetsById: Workbook['worksheetsById'] = {}
   for (const [sheetId, sheet] of Object.entries(top.worksheetsById)) {
@@ -123,7 +128,7 @@ export function assembleWorkbook(top: Workbook, chunks: Map<ChunkId, ChunkConten
         home.set(rowId, chunkId)
         rowOrder.push(rowId)
         const row = chunk.rowsById[rowId]
-        if (row) rowsById[rowId] = row
+        if (row) rowsById[rowId] = withoutLegacyStyle(row, legacy)
       }
     }
     // Cells of every copy count: a row two replicas appended under the same
@@ -139,8 +144,14 @@ export function assembleWorkbook(top: Workbook, chunks: Map<ChunkId, ChunkConten
         if (home.get(key.split(':')[0]!) === chunkId) cellsById[key as CellKey] = cell
       }
     }
+    if (legacy) for (const [key, cell] of Object.entries(cellsById)) cellsById[key as CellKey] = withoutLegacyStyle(cell, legacy)
+    const columnsById = Object.fromEntries(
+      Object.entries(sheet.columnsById).map(([id, column]) => [id, withoutLegacyStyle(column, legacy)]),
+    )
     worksheetsById[sheetId] = {
       ...sheet,
+      columnsById,
+      mergesById: withoutOverlaps(sheet.mergesById, rowOrder, rowsById, sheet.columnOrder, sheet.columnsById),
       visualOrder: sheet.visualOrder ?? [],
       visualsById: sheet.visualsById ?? {},
       chunkOrder,
@@ -150,11 +161,63 @@ export function assembleWorkbook(top: Workbook, chunks: Map<ChunkId, ChunkConten
     }
     rowHome.set(sheetId, home)
   }
-  return {
-    workbook: { ...top, worksheetsById },
-    chunks,
-    rowHome,
+  const { stylesById: _legacy, ...rest } = top
+  const workbook: Workbook = { ...rest, worksheetsById }
+  distinctSheetNames(workbook)
+  return { workbook, top, chunks, rowHome }
+}
+
+/**
+ * Two people who each added a sheet with the same name offline end up with
+ * two sheets of that name, which a workbook cannot hold. Later sheets in tab
+ * order get a number appended, the same way on every replica; the next save
+ * writes the new name.
+ */
+function distinctSheetNames(workbook: Workbook): void {
+  const taken = new Set<string>()
+  for (const sheet of liveSheets(workbook)) {
+    let name = sheet.name
+    for (let n = 2; taken.has(name.toLowerCase()); n += 1) name = `${sheet.name} (${n})`
+    taken.add(name.toLowerCase())
+    if (name !== sheet.name) workbook.worksheetsById[sheet.id] = { ...sheet, name }
   }
+}
+
+/**
+ * Merged areas two people created offline may overlap, which a sheet cannot
+ * show. The first by key wins, the same way on every replica; the next save
+ * removes the others.
+ */
+function withoutOverlaps(
+  mergesById: Record<string, Merge>,
+  rowOrder: readonly RowId[],
+  rowsById: Record<RowId, RowMeta>,
+  columnOrder: readonly string[],
+  columnsById: Worksheet['columnsById'],
+): Record<string, Merge> {
+  const rowIndex = new Map(liveIds(rowOrder, rowsById).map((id, index) => [id, index]))
+  const columnIndex = new Map(liveIds(columnOrder, columnsById).map((id, index) => [id, index]))
+  const kept: Record<string, Merge> = {}
+  const areas: [number, number, number, number][] = []
+  for (const key of Object.keys(mergesById).sort()) {
+    const merge = mergesById[key]!
+    const area = [
+      rowIndex.get(merge.startRowId),
+      columnIndex.get(merge.startColumnId),
+      rowIndex.get(merge.endRowId),
+      columnIndex.get(merge.endColumnId),
+    ]
+    if (area.some((value) => value === undefined)) {
+      // A corner was deleted: the export skips it; keep it for an undo elsewhere.
+      kept[key] = merge
+      continue
+    }
+    const [top, left, bottom, right] = area as [number, number, number, number]
+    if (areas.some(([t, l, b, r]) => top <= b && t <= bottom && left <= r && l <= right)) continue
+    areas.push([top, left, bottom, right])
+    kept[key] = merge
+  }
+  return kept
 }
 
 function emptySheet(id: string, name: string): Worksheet {
@@ -199,8 +262,7 @@ function buildAll(
   plans: Map<string, SheetPlan>,
   storedIdByName: Map<string, string>,
 ) {
-  const { ids: styleIds, byId } = styleTable(read.file.styles)
-  const stylesById = { ...workbook.stylesById, ...byId }
+  const styles = read.file.styles.map(toStyleEdit)
   const axes: SheetAxes[] = read.sheets.map((sheet) => {
     const plan = plans.get(storedIdByName.get(sheet.meta.name)!)!
     return {
@@ -226,21 +288,22 @@ function buildAll(
       deletedRowIds: plan.rows.deleted,
       deletedColumnIds: plan.columns.deleted,
       deletedAt,
-      styleIds,
+      styles,
       axes: lookup,
     })
   })
-  return { sheets, stylesById, lookup }
+  return { sheets, lookup }
 }
 
 export function emptyStoredWorkbook(): StoredWorkbook {
-  return { workbook: { worksheetOrder: [], worksheetsById: {}, stylesById: {} }, chunks: new Map(), rowHome: new Map() }
+  const workbook: Workbook = { worksheetOrder: [], worksheetsById: {} }
+  return { workbook, top: workbook, chunks: new Map(), rowHome: new Map() }
 }
 
 /** A new workbook with one empty sheet. */
 export function newWorkbook(sheetName: string): Workbook {
   const sheet = emptySheet(createId('s'), sheetName)
-  return { worksheetOrder: [sheet.id], worksheetsById: { [sheet.id]: sheet }, stylesById: {} }
+  return { worksheetOrder: [sheet.id], worksheetsById: { [sheet.id]: sheet } }
 }
 
 export interface SyncInput {
@@ -335,7 +398,7 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
       ...planAxes(previous, rowOps.get(id) ?? [], columnOps.get(id) ?? [], rowCount, columnCount),
     })
   }
-  const { sheets, stylesById, lookup } = buildAll(workbook, read, plans, storedIdByName)
+  const { sheets, lookup } = buildAll(workbook, read, plans, storedIdByName)
 
   // Visuals keep their ids: the file lists a sheet's visuals in drawing
   // order, which is the session's order minus the removed ones plus the
@@ -385,22 +448,10 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
   const next: Workbook = {
     worksheetOrder: [...liveOrder, ...workbook.worksheetOrder.filter((id) => !liveOrder.includes(id))],
     worksheetsById,
-    stylesById: request ? stylesById : pruneStyles(stylesById, sheets),
   }
   const createdChunks = new Map<ChunkId, SheetId>()
   for (const sheet of sheets) placeRows(sheet, stored.rowHome.get(sheet.id) ?? new Map(), stored.chunks, createdChunks)
   return { next, writes: { ...diffWorkbook(stored, next, createdChunks), newImages } }
-}
-
-/** Styles any cell, row or column still uses (an import carries the file's whole table). */
-function pruneStyles(stylesById: Workbook['stylesById'], sheets: readonly Worksheet[]) {
-  const used = new Set<string>()
-  for (const sheet of sheets) {
-    for (const cell of Object.values(sheet.cellsById)) if (cell.styleId) used.add(cell.styleId)
-    for (const row of Object.values(sheet.rowsById)) if (row.styleId) used.add(row.styleId)
-    for (const column of Object.values(sheet.columnsById)) if (column.styleId) used.add(column.styleId)
-  }
-  return Object.fromEntries(Object.entries(stylesById).filter(([id]) => used.has(id)))
 }
 
 // ── placement ──────────────────────────────────────────────────────────
@@ -536,10 +587,11 @@ function diffWorkbook(
   next: Workbook,
   createdChunks: Map<ChunkId, SheetId>,
 ): Omit<WorkbookWrites, 'newImages'> {
-  const before = stored.workbook
+  const before = stored.top
   const top = new PatchBuilder()
   top.list([...WORKBOOK_PATH, 'worksheetOrder'], before.worksheetOrder, next.worksheetOrder)
-  top.map([...WORKBOOK_PATH, 'stylesById'], before.stylesById, next.stylesById, false)
+  // Formats moved onto the cells (assembleWorkbook): the registry goes.
+  if (before.stylesById) top.unset.push({ path: [...WORKBOOK_PATH, 'stylesById'] })
 
   const chunkPatches = new Map<ChunkId, PatchBuilder>()
   const chunkPatch = (chunkId: ChunkId) => {
@@ -557,7 +609,7 @@ function diffWorkbook(
     } else {
       const previousTop = topPart(previous)
       top.list([...path, 'columnOrder'], previous.columnOrder, sheet.columnOrder)
-      top.list([...path, 'chunkOrder'], previous.chunkOrder, sheet.chunkOrder)
+      top.list([...path, 'chunkOrder'], previous.chunkOrder ?? [], sheet.chunkOrder)
       top.map([...path, 'columnsById'], previous.columnsById, sheet.columnsById, true)
       top.map([...path, 'mergesById'], previous.mergesById, sheet.mergesById, false)
       top.list([...path, 'visualOrder'], previous.visualOrder ?? [], sheet.visualOrder)

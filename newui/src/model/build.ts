@@ -12,11 +12,11 @@ import {
   type Merge,
   type RowId,
   type RowMeta,
-  type StyleId,
+  type StoredStyle,
   type Worksheet,
 } from './schema'
 import type { SidecarSheet } from './sidecar-read'
-import { canonicalJson } from './styles'
+import { canonicalJson, styleFields } from './styles'
 
 export interface BuildSheetInput {
   sheet: SidecarSheet
@@ -32,8 +32,8 @@ export interface BuildSheetInput {
   deletedRowIds: ReadonlySet<RowId>
   deletedColumnIds: ReadonlySet<ColumnId>
   deletedAt: string
-  /** Style table of the file the sheet was read from, by OOXML xf index. */
-  styleIds: readonly (StyleId | undefined)[]
+  /** Style table of the file the sheet was read from, by OOXML xf index (undefined = default). */
+  styles: readonly (StoredStyle | undefined)[]
   axes: AxesLookup
 }
 
@@ -61,8 +61,7 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     if (record.height !== undefined) row.height = record.height
     if (record.customHeight) row.customHeight = true
     if (record.hidden) row.hidden = true
-    const styleId = record.styleIndex === undefined ? undefined : input.styleIds[record.styleIndex]
-    if (styleId) row.styleId = styleId
+    Object.assign(row, styleFields(record.styleIndex === undefined ? undefined : input.styles[record.styleIndex]))
     if (Object.keys(row).length > 0) rowsById[id] = row
   }
 
@@ -80,8 +79,7 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
       const column: ColumnMeta = {}
       if (span.width !== undefined) column.width = span.width
       if (span.hidden) column.hidden = true
-      const styleId = span.styleIndex === undefined ? undefined : input.styleIds[span.styleIndex]
-      if (styleId) column.styleId = styleId
+      Object.assign(column, styleFields(span.styleIndex === undefined ? undefined : input.styles[span.styleIndex]))
       if (Object.keys(column).length > 0) columnsById[id] = column
     }
   }
@@ -114,8 +112,7 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     } else if (record.value !== null) {
       cell.value = record.value
     }
-    const styleId = record.styleIndex === undefined ? undefined : input.styleIds[record.styleIndex]
-    if (styleId) cell.styleId = styleId
+    Object.assign(cell, styleFields(record.styleIndex === undefined ? undefined : input.styles[record.styleIndex]))
     if (Object.keys(cell).length > 0) cellsById[key] = cell
   }
 

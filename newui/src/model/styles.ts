@@ -1,8 +1,8 @@
-// Content-addressed style registry: a style's id is a hash of its canonical
-// JSON, so equal styles written by different people share one entry.
+// Cell formats: what the editor reads → the stored delta on the default
+// format, kept per property on the cell, row or column it belongs to.
 import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 
-import type { BorderEdge, CellStyle, StoredStyle, StyleId } from './schema'
+import type { BorderEdge, CellStyle, StoredStyle, StyleFields } from './schema'
 
 /** JSON with object keys sorted, so equal content compares equal whatever the key order. */
 export function canonicalJson(value: unknown): string {
@@ -14,39 +14,36 @@ export function canonicalJson(value: unknown): string {
   return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(',')}}`
 }
 
-/** cyrb53: a fast 53-bit string hash; collisions are irrelevant at style-table sizes. */
-function hash53(text: string): string {
-  let h1 = 0xdeadbeef
-  let h2 = 0x41c6ce57
-  for (let index = 0; index < text.length; index += 1) {
-    const code = text.charCodeAt(index)
-    h1 = Math.imul(h1 ^ code, 2654435761)
-    h2 = Math.imul(h2 ^ code, 1597334677)
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0')
-}
-
-export function styleIdOf(style: StoredStyle): StyleId {
-  return `st_${hash53(canonicalJson(style))}`
-}
-
 /** Font of the exported workbook's default format (the gateway's minimal stylesheet). */
 const DEFAULT_FONT_FAMILY = 'Calibri'
 const DEFAULT_FONT_SIZE = 11
 
-/** Stored ids for a file's style table by xf index; undefined = default format. */
-export function styleTable(styles: readonly CellStyle[]): { ids: (StyleId | undefined)[]; byId: Record<StyleId, StoredStyle> } {
-  const byId: Record<StyleId, StoredStyle> = {}
-  const ids = styles.map((style) => {
-    const stored = toStyleEdit(style)
-    if (!stored) return undefined
-    const id = styleIdOf(stored)
-    byId[id] = stored
-    return id
-  })
-  return { ids, byId }
+const STYLE_PREFIX = 's.'
+
+/** A style as the fields stored on a cell, row or column. */
+export function styleFields(style: StoredStyle | undefined): StyleFields {
+  const fields: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(style ?? {})) fields[`${STYLE_PREFIX}${key}`] = value
+  return fields as StyleFields
+}
+
+/** The style a cell, row or column stores; undefined = default format. */
+export function styleOf(fields: object | undefined, legacy?: Record<string, StoredStyle>): StoredStyle | undefined {
+  if (!fields) return undefined
+  const style: Record<string, unknown> = {}
+  const legacyId = (fields as { styleId?: string }).styleId
+  if (legacyId && legacy?.[legacyId]) Object.assign(style, legacy[legacyId])
+  for (const [key, value] of Object.entries(fields)) {
+    if (key.startsWith(STYLE_PREFIX) && value !== undefined) style[key.slice(STYLE_PREFIX.length)] = value
+  }
+  return Object.keys(style).length > 0 ? (style as StoredStyle) : undefined
+}
+
+/** Replaces a legacy `styleId` with the style's fields (documents saved before per-property formats). */
+export function withoutLegacyStyle<T extends object>(fields: T, legacy: Record<string, StoredStyle> | undefined): T {
+  if (!('styleId' in fields)) return fields
+  const { styleId: _id, ...rest } = fields as T & { styleId?: string }
+  return { ...rest, ...styleFields(styleOf(fields, legacy)) } as T
 }
 
 function hexColor(color: string | undefined): string | undefined {

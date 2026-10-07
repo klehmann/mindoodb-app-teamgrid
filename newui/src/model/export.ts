@@ -18,6 +18,7 @@ import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import type { XlsxEngine } from '../xlsx/engine'
 import { createAxesLookup, renderFormula, type SheetAxes } from './formula-refs'
 import { liveIds, liveSheets, type VisualId, type Workbook, type Worksheet } from './schema'
+import { styleOf } from './styles'
 import { visualAddition } from './visuals'
 
 const BLANK_SHEET_NAME = 'Sheet1'
@@ -152,7 +153,6 @@ function appendSheet(
 ): void {
   const rowIndex = new Map(home.rowIds.map((id, index) => [id, index]))
   const columnIndex = new Map(home.columnIds.map((id, index) => [id, index]))
-  const styleEdit = (styleId: string | undefined) => (styleId ? workbook.stylesById[styleId] : undefined)
 
   const edits: WorkbookCellEdit[] = request.edits
   for (const [key, cell] of Object.entries(sheet.cellsById)) {
@@ -160,7 +160,7 @@ function appendSheet(
     const row = rowIndex.get(rowId)
     const column = columnIndex.get(columnId)
     if (row === undefined || column === undefined) continue
-    const style = styleEdit(cell.styleId)
+    const style = styleOf(cell)
     const formula = cell.formula ? renderFormula(cell.formula, home, lookup) : undefined
     const hasContent = formula !== undefined || (cell.value !== undefined && cell.value !== null)
     if (!hasContent && !style) continue
