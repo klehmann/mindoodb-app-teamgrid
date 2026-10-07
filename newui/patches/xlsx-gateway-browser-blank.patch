@@ -1,6 +1,6 @@
 --- a/packages/xlsx-gateway/src/gateway/csv-import.ts
 +++ b/packages/xlsx-gateway/src/gateway/csv-import.ts
-@@ -388,5 +388,9 @@
+@@ -395,5 +395,9 @@
    zip.file('xl/theme/theme1.xml', DEFAULT_THEME_XML)
    zip.file('xl/styles.xml', MINIMAL_STYLESHEET_XML)
    zip.file('xl/worksheets/sheet1.xml', buildWorksheetXml(rows))

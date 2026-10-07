@@ -27,6 +27,8 @@ export interface HavenConnection {
 let connection: Promise<HavenConnection | null> | undefined
 
 function insideHost(): boolean {
+  // `?standalone` runs without Haven even inside a frame (tests, demos).
+  if (new URLSearchParams(window.location.search).has('standalone')) return false
   return window.parent !== window || window.opener != null
 }
 

@@ -18,6 +18,7 @@ fn to_js_error(error: SidecarError) -> JsValue {
         SidecarError::InvalidRequest(_) => "invalid_request",
         SidecarError::Io(_) => "io_error",
         SidecarError::Workbook(_) => "workbook_error",
+        SidecarError::Cancelled => "cancelled",
     };
     let js_error = js_sys::Error::new(&error.to_string());
     let _ = js_sys::Reflect::set(&js_error, &"code".into(), &code.into());

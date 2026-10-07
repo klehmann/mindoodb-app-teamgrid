@@ -49,7 +49,7 @@ for (const path of PATHS) {
 // updates rebase cleanly.
 const patches = join(here, '../patches')
 for (const name of existsSync(patches) ? readdirSync(patches).filter((n) => n.endsWith('.patch')).sort() : []) {
-  execFileSync('patch', ['-p1', '--forward', '-d', target, '-i', join(patches, name)], { stdio: 'inherit' })
+  execFileSync('patch', ['-p1', '--forward', '--no-backup-if-mismatch', '-d', target, '-i', join(patches, name)], { stdio: 'inherit' })
 }
 const commit = execFileSync('git', ['-C', source, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 writeFileSync(join(target, 'VENDORED_FROM'), `https://github.com/genspark-ai/genoffice @ ${commit}\n`)
