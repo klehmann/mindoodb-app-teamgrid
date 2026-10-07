@@ -66,8 +66,8 @@ importers:
         specifier: 3.10.1
         version: 3.10.1
       mindoodb-app-sdk:
-        specifier: 0.0.63
-        version: 0.0.63(@automerge/automerge@3.5.0)(mindoodb@0.0.71)
+        specifier: 0.0.65
+        version: 0.0.65(@automerge/automerge@3.5.0)(mindoodb@0.0.71)
       numfmt:
         specifier: 3.2.6
         version: 3.2.6
@@ -1505,8 +1505,8 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
-  mindoodb-app-sdk@0.0.63:
-    resolution: {integrity: sha512-E/0InVbAyQ8RmjW3cbSJ574vkPShQSsrN8sDbvp9Vbbfp9NroMH+WGrF31UXo/seVPYbZBQDcXMLc/BZtHmbpQ==}
+  mindoodb-app-sdk@0.0.65:
+    resolution: {integrity: sha512-VMHTjOjy+5xxs0QqRe8oBf+tBqxhsvkfnMFHdsFwQ/M41C5N8lVAllJTx0qrPHdluBqRr+Vy0TpKSAsKFB63vA==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
       '@automerge/automerge': ^3.3.2
@@ -3570,7 +3570,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  mindoodb-app-sdk@0.0.63(@automerge/automerge@3.5.0)(mindoodb@0.0.71):
+  mindoodb-app-sdk@0.0.65(@automerge/automerge@3.5.0)(mindoodb@0.0.71):
     dependencies:
       mindoodb-view-language: 0.0.18
     optionalDependencies:

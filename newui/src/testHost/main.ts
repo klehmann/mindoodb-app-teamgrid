@@ -19,7 +19,9 @@ async function start() {
       ...(definition.version ? { appVersion: definition.version } : {}),
       ...(definition.defaultLaunchDatabaseId ? { preferredDatabaseId: definition.defaultLaunchDatabaseId } : {}),
     },
-    databases: mockDatabasesFromDefinition(definition, { teamgrid: [] }),
+    // Real Automerge documents: saves merge at their baseHeads as in Haven, and
+    // __havenTestHost.applyRemoteUpdate plays a second device.
+    databases: mockDatabasesFromDefinition(definition, { teamgrid: [] }, { automerge: true }),
   })
 }
 
