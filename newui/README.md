@@ -22,7 +22,7 @@ browser, as the basis for TeamGrid's next version. Concept and decisions:
 ```bash
 pnpm install
 pnpm build:wasm        # needs rustup toolchain 1.90+ with wasm32-unknown-unknown, and wasm-pack
-pnpm dev               # http://localhost:4208, mock Haven at /__haven-test/ (real Automerge
+pnpm dev               # http://127.0.0.1:4208, mock Haven at /__haven-test/ (real Automerge
                        # documents; __havenTestHost.applyRemoteUpdate plays a second device)
 pnpm typecheck
 pnpm test             # model tests, incl. concurrent offline edits

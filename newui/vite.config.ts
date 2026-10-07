@@ -19,6 +19,11 @@ export default defineConfig({
       { find: /^node:(crypto|fs|fs\/promises|os|path)$/, replacement: nodeStubs },
     ],
   },
+  // Same host as the classic TeamGrid dev server (4207), next to it on 4208.
+  server: {
+    host: '127.0.0.1',
+    port: 4208,
+  },
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 20_000,

@@ -7,7 +7,7 @@
   "packageManager": "pnpm@11.1.1",
   "scripts": {
     "sync-genoffice": "node scripts/sync-genoffice.mjs",
-    "dev": "vite --port 4208",
+    "dev": "vite",
     "build": "pnpm build:wasm && vite build",
     "preview": "vite preview --port 4208",
     "build:wasm": "cd native/xlsx-wasm && PATH=$HOME/.cargo/bin:$PATH RUSTUP_TOOLCHAIN=1.90.0 wasm-pack build --target web --release",
