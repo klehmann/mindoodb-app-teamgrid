@@ -45,6 +45,7 @@
         "edit",
         "view"
       ],
+      "category": "editor",
       "match": {
         "form": "teamgrid",
         "kind": "mindoodb.teamgrid"
