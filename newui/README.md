@@ -74,6 +74,16 @@ position (`src/model/view-sheet.ts`, `src/haven/view-sheets.ts`,
 "Kontakte nach Firma". Its mock hands out one navigator per view, so the top
 level category is not applied there.
 
+## Fill series
+
+Univer's auto-fill only continues English and Chinese month and weekday names,
+and its English lists overlap ("May" turns January…May into "Jun"). A rule of
+our own (`src/fill-series.ts`, registered through
+`patches/sheets-univer-hook.patch`) runs first: long and short names in the
+eight TeamGrid languages (from `Intl`, plus Excel's German "Mrz"/"Mo" style),
+the list that holds every source cell, the UI language first, and the source's
+writing (JANUAR → FEBRUAR).
+
 ## Small screens
 
 Below 1100px the tab row uses short labels and tabs that do not fit go
