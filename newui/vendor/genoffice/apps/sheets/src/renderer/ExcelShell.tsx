@@ -249,7 +249,7 @@ const GROUP_ICONS: Partial<Record<StringKey, string | React.JSX.Element>> = {
   appGroupDefinedNames: '🏷',
   appGroupFormulaAuditing: '🔍',
   appGroupCalculation: '⟳',
-  appGroupGetData: '🛢',
+  appGroupGetData: '🗎',
   appGroupSortFilter: '⇅',
   appGroupDataTools: '⚡',
   appGroupForecast: '📈',
@@ -2641,6 +2641,7 @@ function Ribbon({
             </button>
           </div>
         </RibbonGroup>
+        <ViewSheetsGroup />
         <RibbonGroup label={t('appGroupSortFilter')}>
           {largeMenu(t('appSort'), '⇅', t('appSortSelectionTitle'), [
             { value: 'sort:asc', label: t('appSortAToZ') },
@@ -3968,10 +3969,53 @@ function NumberFormatSelect({
   )
 }
 
+/**
+ * [TeamGrid] Sheets filled from a MindooDB view: the Data tab's "MindooDB
+ * view" group, present when the host installs the commands
+ * (newui/src/haven/view-sheets.ts).
+ */
+interface TeamGridViewSheets {
+  labels(): {
+    group: string
+    add: string
+    addTip: string
+    refresh: string
+    refreshTip: string
+    settings: string
+    settingsTip: string
+  }
+  add(): void
+  refresh(): void
+  settings(): void
+}
+const teamGridViewSheets = (): TeamGridViewSheets | undefined =>
+  (window as unknown as { teamGridViewSheets?: TeamGridViewSheets }).teamGridViewSheets
+
+function ViewSheetsGroup(): React.JSX.Element | null {
+  const commands = teamGridViewSheets()
+  if (!commands) return null
+  const labels = commands.labels()
+  return (
+    <RibbonGroup label={labels.group}>
+      <RibbonButton large label={labels.add} detail={labels.addTip} symbol="🛢" onClick={() => commands.add()} />
+      <div className="row-stack">
+        <button className="styles-row as-button" data-tip={labels.refreshTip} onClick={() => commands.refresh()}>
+          <ToolSymbol symbol="⟳" />
+          {labels.refresh}
+        </button>
+        <button className="styles-row as-button" data-tip={labels.settingsTip} onClick={() => commands.settings()}>
+          <ToolSymbol symbol="☰" />
+          {labels.settings}
+        </button>
+      </div>
+    </RibbonGroup>
+  )
+}
+
 /** [TeamGrid] The folded group's icon, found by its (translated) label. */
 function GroupIcon({ label, t }: { readonly label: string; readonly t: (key: StringKey) => string }): React.JSX.Element {
   const key = (Object.keys(GROUP_ICONS) as StringKey[]).find((candidate) => t(candidate) === label)
-  const icon = key ? GROUP_ICONS[key] : undefined
+  const icon = key ? GROUP_ICONS[key] : label === teamGridViewSheets()?.labels().group ? '🛢' : undefined
   if (typeof icon === 'string') return <ToolSymbol symbol={icon} />
   return <span className="tool-symbol" aria-hidden="true">{icon ?? <GroupFoldIcon />}</span>
 }

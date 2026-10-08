@@ -142,6 +142,7 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     visualOrder: previous.visualOrder ?? [],
     visualsById: previous.visualsById ?? {},
   }
+  if (previous.viewBinding) next.viewBinding = previous.viewBinding
   if (meta.hidden) next.hidden = true
   if (meta.tabColor) next.tabColor = meta.tabColor
   if (!meta.showGridLines) next.showGridLines = false

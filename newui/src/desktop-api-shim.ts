@@ -32,6 +32,7 @@ import {
 } from './haven/welcome'
 import { changedSinceLoad } from './haven/store'
 import { loadXlsxEngine } from './xlsx/engine'
+import { viewSheetCommands, type ViewSheetCommands } from './haven/view-sheets'
 import {
   closeSession,
   createEmptyDocument,
@@ -263,6 +264,21 @@ function watchRemoteChanges(haven: HavenConnection): void {
   }, REMOTE_POLL_MS)
 }
 
+/** Opens `id` again and, once the editor shows it, the sheet named `sheetName`. */
+function reopenAt(id: string, sheetName: string): void {
+  const before = activeSessionId
+  openInEditor(id)
+  const started = Date.now()
+  const timer = setInterval(() => {
+    const workbook = (window as unknown as {
+      __univerAPI?: { getActiveWorkbook(): { getSheetByName(name: string): { activate(): unknown } | null } | null }
+    }).__univerAPI?.getActiveWorkbook()
+    const sheet = activeSessionId !== before ? workbook?.getSheetByName(sheetName) : null
+    if (sheet) sheet.activate()
+    if (sheet || Date.now() - started > 20_000) clearInterval(timer)
+  }, 250)
+}
+
 /** Relabels the File menu after a language switch (set once it is installed). */
 let setFileMenuStrings: ((strings: ReturnType<typeof welcomeStrings>) => void) | undefined
 
@@ -355,6 +371,15 @@ export async function installDesktopApiShim(): Promise<void> {
   ;(window as unknown as { __newui: unknown }).__newui = devHooks
   if (haven) {
     watchRemoteChanges(haven)
+    const connected = haven
+    ;(window as unknown as { teamGridViewSheets: ViewSheetCommands }).teamGridViewSheets = viewSheetCommands({
+      haven: connected,
+      language: () => welcomeLanguage,
+      welcomeStrings: () => welcomeStrings(welcomeLanguage),
+      activeWorkbookId: () => (activeSessionId ? storedDocumentOf(activeSessionId)?.loaded.id : undefined),
+      waitForSave,
+      reopen: reopenAt,
+    })
     setFileMenuStrings = installFileMenu(welcomeStrings(welcomeLanguage), haven.canWrite, (action) => {
       onFileAction(haven!, action).catch((error) => console.error(`[newui] ${action} failed`, error))
     })

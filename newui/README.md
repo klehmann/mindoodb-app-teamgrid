@@ -62,6 +62,18 @@ overlap after a merge, are repaired the same way on every replica when the
 workbook loads and written by the next save
 (`src/model/merge-scenarios.test.ts`).
 
+## View sheets
+
+The Data tab's "MindooDB view" group adds a sheet filled from a virtual view
+configured for the app in Haven (classic TeamGrid's virtual view sheet), and
+refreshes or reconfigures the active one: a bold header row, category rows
+on a light fill, documents below, dates as date cells. The sheet stores its
+`viewBinding`; a refresh rewrites its cells, keeping row and column ids by
+position (`src/model/view-sheet.ts`, `src/haven/view-sheets.ts`,
+`patches/sheets-view-sheets.patch`). The test host configures a sample view,
+"Kontakte nach Firma". Its mock hands out one navigator per view, so the top
+level category is not applied there.
+
 ## Small screens
 
 Below 1100px the tab row uses short labels and tabs that do not fit go

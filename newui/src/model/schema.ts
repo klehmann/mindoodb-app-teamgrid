@@ -154,9 +154,26 @@ export interface StoredVisual {
   image?: { attachment: string; mediaType: 'image/png' | 'image/jpeg' | 'image/gif' }
 }
 
+/**
+ * A sheet filled from a MindooDB virtual view configured for the app in
+ * Haven (classic TeamGrid's "virtual view sheet"): a header row and one row
+ * per view entry, rewritten on every refresh (view-sheet.ts).
+ */
+export interface ViewBinding {
+  viewId: string
+  /** The view's name when the sheet was last filled, for when it is gone. */
+  viewTitle: string
+  showDocuments: boolean
+  showCategories: boolean
+  /** Only the entries below this category path; empty for the whole view. */
+  rootCategoryPath: string[]
+  lastRefreshedAt: string
+}
+
 export interface Worksheet {
   id: SheetId
   name: string
+  viewBinding?: ViewBinding
   hidden?: boolean
   tabColor?: string
   showGridLines?: boolean

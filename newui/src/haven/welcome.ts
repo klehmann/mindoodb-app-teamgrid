@@ -41,6 +41,9 @@ const STYLE = `
 .tg-dialog .tg-date{color:var(--text-secondary);font-size:12px;white-space:nowrap}
 .tg-dialog .tg-empty{padding:16px 12px;color:var(--text-secondary)}
 .tg-dialog label{display:block;padding:8px 20px 4px;color:var(--text-secondary)}
+.tg-dialog select{box-sizing:border-box;width:calc(100% - 40px);margin:0 20px 16px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--tg-radius);background:var(--surface);color:var(--text);font:inherit}
+.tg-dialog .tg-error{margin:0 20px 12px;color:var(--danger)}
+.tg-dialog p.tg-message{margin:0;padding:4px 20px 16px}
 .tg-dialog input{box-sizing:border-box;width:calc(100% - 40px);margin:0 20px 16px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--tg-radius);background:var(--surface);color:var(--text);font:inherit}
 .tg-dialog input:focus-visible,.tg-dialog textarea:focus-visible{outline:2px solid var(--tg-focus-ring);outline-offset:1px}
 .tg-dialog textarea{box-sizing:border-box;width:calc(100% - 40px);margin:0 20px 4px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--tg-radius);background:var(--surface);color:var(--text);font:inherit;min-height:84px;resize:vertical}
@@ -68,14 +71,14 @@ function installStyle() {
   styleInstalled = true
 }
 
-function element<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) {
+export function element<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) {
   const node = document.createElement(tag)
   if (className) node.className = className
   if (text !== undefined) node.textContent = text
   return node
 }
 
-function button(label: string, className: string, icon?: string) {
+export function button(label: string, className: string, icon?: string) {
   const node = element('button', `tg-btn ${className}`)
   node.type = 'button'
   if (icon) node.innerHTML = icon
@@ -84,7 +87,7 @@ function button(label: string, className: string, icon?: string) {
 }
 
 /** A modal dialog; resolves with what `build` reports, or null on cancel/Escape. */
-function dialog<T>(title: string, strings: WelcomeStrings, build: (done: (value: T | null) => void) => {
+export function dialog<T>(title: string, strings: WelcomeStrings, build: (done: (value: T | null) => void) => {
   body: HTMLElement
   actions?: HTMLButtonElement[]
 }): Promise<T | null> {

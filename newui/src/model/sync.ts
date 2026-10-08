@@ -327,6 +327,20 @@ export function visualFileKey(visual: { drawingPath?: string | undefined; drawin
   return visual.drawingPath === undefined ? visual.id : `${visual.drawingPath}#${visual.drawingIndex ?? 0}`
 }
 
+/**
+ * Writes for a workbook changed outside the editor (say a view sheet filled
+ * from MindooDB): `next` is the stored workbook with some sheets replaced or
+ * added; only those sheets' rows are placed into chunks and diffed.
+ */
+export function writesFor(stored: StoredWorkbook, next: Workbook, changedSheetIds: readonly SheetId[]): WorkbookWrites {
+  const createdChunks = new Map<ChunkId, SheetId>()
+  for (const id of changedSheetIds) {
+    const sheet = next.worksheetsById[id]
+    if (sheet) placeRows(sheet, stored.rowHome.get(id) ?? new Map(), stored.chunks, createdChunks)
+  }
+  return { ...diffWorkbook(stored, next, createdChunks), newImages: [] }
+}
+
 export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals }: SyncInput): SyncResult {
   const workbook = stored.workbook
   // Visual anchors with their far corner in the cell it falls into.
