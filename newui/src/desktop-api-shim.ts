@@ -7,6 +7,7 @@
 // visible in the console.
 import { LANGS, type Lang } from '@genoffice/i18n'
 import { resolveAutoSave } from '@genoffice/ui'
+import { MindooDBAppAgentToolError } from 'mindoodb-app-sdk'
 
 import type {
   DesktopApi,
@@ -21,10 +22,12 @@ import {
   writeProperties,
   type HavenConnection,
 } from './haven/connection'
+import { createTeamGridAgentTools } from './haven/agent-tools'
 import { installFileMenu, type FileAction } from './haven/file-menu'
 import {
   askTitle,
   askUnsaved,
+  chooseOnWelcome,
   chooseWorkbook,
   closeWelcome,
   editProperties,
@@ -107,6 +110,8 @@ let welcomeLanguage = 'en'
 let pendingDocumentId: string | null = null
 let activeSessionId: string | null = null
 let pendingEdits = 0
+/** Saves and opens in progress: the editor is between two sessions meanwhile. */
+let swapping = 0
 
 function pickFile(accept: string): Promise<File | null> {
   if (devHooks.nextFile) {
@@ -146,8 +151,18 @@ function toUiTheme(mode: string | undefined): UiTheme {
 
 function opened(file: WorkbookFile): WorkbookFile {
   activeSessionId = file.sessionId
+  publishAgentContext()
   return file
 }
+
+/** The stored workbook the editor shows, for agents. */
+function openWorkbookInfo(): { id: string; title: string } | null {
+  const stored = activeSessionId ? storedDocumentOf(activeSessionId) : undefined
+  return stored ? { id: stored.loaded.id, title: stored.loaded.subject } : null
+}
+
+/** Tells Haven's agents what is open (set once agent tools are installed). */
+let publishAgentContext: () => void = () => {}
 
 /** Creates or picks the workbook a welcome-screen or file-menu choice stands for. */
 async function workbookForChoice(haven: HavenConnection, choice: WelcomeChoice): Promise<string | null> {
@@ -237,25 +252,7 @@ async function onFileAction(haven: HavenConnection, action: FileAction): Promise
     // The title may have changed in the properties since the session opened.
     download(session.bytes, storedDocumentOf(activeSessionId!)?.loaded.subject ?? session.name)
   } else if (action === 'close') {
-    if (!activeSessionId) return
-    // With AutoSave on, pending changes are saved, as they would be a moment
-    // later anyway; otherwise the user decides.
-    if (pendingEdits > 0 && !autoSaveOn(haven)) {
-      const choice = await askUnsaved(stored?.loaded.subject ?? sessionFor(activeSessionId).name, strings)
-      if (choice === null) return
-      if (choice === 'save') await waitForSave()
-    } else {
-      await waitForSave()
-    }
-    if (haven.context.embed) {
-      // Embedded in another app (an editor tab): its host closes the tab.
-      await haven.session.embedding.complete({ docId: haven.context.embed.docId })
-      return
-    }
-    // The welcome screen replaces the workbook (the editor's own open flow,
-    // which does not save; with nothing active the shim shows the welcome screen).
-    activeSessionId = null
-    devHooks.menu('open')
+    await closeWorkbook(haven, { ask: true })
   } else if (action === 'properties' && stored) {
     const properties = await editProperties(await readProperties(haven, stored.loaded.id), strings)
     if (!properties) return
@@ -277,6 +274,102 @@ function autoSaveOn(haven: HavenConnection | null): boolean {
 
 /** Where GenOffice keeps the AutoSave switch (useAutoSavePref in App.tsx). */
 const AUTO_SAVE_KEY = 'ai-sheets-auto-save'
+
+/**
+ * Closes the workbook. With AutoSave on, pending changes are saved, as they
+ * would be a moment later anyway; otherwise the user decides (`ask`), or, for an
+ * agent, nothing happens and `unsaved` comes back. Embedded in another app (an
+ * editor tab), the host then closes the tab; standalone the welcome screen
+ * replaces the workbook (the editor's own open flow, which does not save; with
+ * nothing active the shim shows the welcome screen).
+ */
+async function closeWorkbook(
+  haven: HavenConnection,
+  options: { ask: boolean },
+): Promise<'closed' | 'canceled' | 'unsaved' | 'none'> {
+  if (!activeSessionId) return 'none'
+  if (pendingEdits > 0 && !autoSaveOn(haven)) {
+    if (!options.ask) return 'unsaved'
+    const stored = storedDocumentOf(activeSessionId)
+    const strings = welcomeStrings(welcomeLanguage)
+    const choice = await askUnsaved(stored?.loaded.subject ?? sessionFor(activeSessionId).name, strings)
+    if (choice === null) return 'canceled'
+    if (choice === 'save') await waitForSave()
+  } else {
+    await waitForSave()
+  }
+  if (haven.context.embed) {
+    await haven.session.embedding.complete({ docId: haven.context.embed.docId })
+    return 'closed'
+  }
+  activeSessionId = null
+  publishAgentContext()
+  devHooks.menu('open')
+  return 'closed'
+}
+
+/** Opens a stored workbook for an agent: from the welcome screen, or through the editor's open flow. */
+function openForAgent(id: string): void {
+  if (!chooseOnWelcome({ kind: 'open', id })) openInEditor(id)
+}
+
+/** Offers TeamGrid's agent tools to Haven and keeps the agent context current. */
+function installAgentTools(haven: HavenConnection): void {
+  const agent = haven.session.agent
+  if (!agent) return
+  const tools = createTeamGridAgentTools({
+    canWrite: haven.canWrite,
+    listWorkbooks: () => listWorkbooks(haven),
+    openWorkbook: openWorkbookInfo,
+    open: openForAgent,
+    createEmpty: (title) => createEmptyDocument(haven, title, 'Tabelle1'),
+    createFromTemplate: (templateId, title) => createFromTemplate(haven, templateId, title, language),
+    // Also waits for a save already running (AutoSave): it reopens the workbook.
+    save: async () => {
+      await waitForSave()
+      for (const started = Date.now(); swapping > 0 && Date.now() - started < 15_000; ) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+    },
+    close: async () => {
+      if ((await closeWorkbook(haven, { ask: false })) === 'unsaved') {
+        throw new MindooDBAppAgentToolError(
+          'INVALID_STATE',
+          'The workbook has unsaved changes and AutoSave is off.',
+          'call teamgrid_save first, or ask the user whether to keep the changes',
+        )
+      }
+    },
+    menu: (action) => devHooks.menu(action),
+    reopening: () => swapping > 0 || pendingDocumentId !== null,
+  })
+  agent
+    .registerTools(tools)
+    .then((registration) =>
+      console.info(
+        registration.enabled
+          ? `[newui] offered ${registration.exposedNames.length} agent tools to Haven`
+          : `[newui] declared ${registration.exposedNames.length} agent tools; Haven does not offer them yet`,
+      ),
+    )
+    .catch((error) => console.warn('[newui] could not offer agent tools to Haven', error))
+  let timer: ReturnType<typeof setTimeout> | null = null
+  publishAgentContext = () => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = null
+      const open = openWorkbookInfo()
+      void agent
+        .setContext({
+          openWorkbook: open ? { workbookId: open.id, title: open.title } : null,
+          ...(pendingEdits > 0 ? { unsavedEdits: pendingEdits } : {}),
+          canWrite: haven.canWrite,
+        })
+        .catch(() => undefined)
+    }, 300)
+  }
+  publishAgentContext()
+}
 
 /** Reopens the active stored workbook when someone else changed it and nothing is pending here. */
 function watchRemoteChanges(haven: HavenConnection): void {
@@ -339,6 +432,7 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
     // recovery copy has no place to go in the browser.
     writeWorkbookRecovery: async () => ({ ok: false }),
     notifyPendingEdits(count) {
+      if (count !== pendingEdits) publishAgentContext()
       pendingEdits = count
     },
     onMenuAction(handler) {
@@ -347,7 +441,14 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
     },
 
     async selectWorkbook(): Promise<WorkbookFile | null> {
-      if (haven) return selectStoredWorkbook(haven)
+      if (haven) {
+        swapping += 1
+        try {
+          return await selectStoredWorkbook(haven)
+        } finally {
+          swapping -= 1
+        }
+      }
       const file = await pickFile('.xlsx,.xlsm')
       if (!file) return null
       return opened(await openWorkbookBytes(new Uint8Array(await file.arrayBuffer()), file.name, language))
@@ -360,30 +461,41 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
     closeWorkbook: closeSession,
 
     async saveWorkbookEdits(request) {
-      const stored = storedDocumentOf(request.sessionId)
-      // Save As of a stored workbook: a new one under another title, with the
-      // edits; the original stays as it was.
-      if (stored && haven && request.mode === 'save-as' && !request.targetPath) {
-        const strings = welcomeStrings(welcomeLanguage)
-        const subject = await askTitle(strings.saveAsTitle, strings.copyOf.replace('{title}', stored.loaded.subject), strings)
-        if (subject === null) return { canceled: true }
-        const outcome = await saveSessionAs(request, haven, subject, language)
-        opened(outcome.file)
-        console.info('[newui] saved as a new workbook in MindooDB')
-        return { canceled: false, file: outcome.file, touchedEntries: [...outcome.touchedEntries] }
+      swapping += 1
+      try {
+        return await saveWorkbookEditsNow(request)
+      } finally {
+        swapping -= 1
       }
-      // A plain xlsx has nowhere to go in the background; only an explicit
-      // save downloads it.
-      if (!stored && request.quiet) return { canceled: true }
-      const outcome = await saveSession(request, language)
-      if (outcome.stored) console.info(`[newui] saved to MindooDB (${outcome.stored.changed ? 'changed' : 'no changes'})`)
-      opened(outcome.file)
-      if (outcome.download) {
-        devHooks.lastSaved = outcome.download
-        download(outcome.download, outcome.file.name)
-      }
-      return { canceled: false, file: outcome.file, touchedEntries: [...outcome.touchedEntries] }
     },
+  }
+
+  async function saveWorkbookEditsNow(
+    request: Parameters<DesktopApi['saveWorkbookEdits']>[0],
+  ): ReturnType<DesktopApi['saveWorkbookEdits']> {
+    const stored = storedDocumentOf(request.sessionId)
+    // Save As of a stored workbook: a new one under another title, with the
+    // edits; the original stays as it was.
+    if (stored && haven && request.mode === 'save-as' && !request.targetPath) {
+      const strings = welcomeStrings(welcomeLanguage)
+      const subject = await askTitle(strings.saveAsTitle, strings.copyOf.replace('{title}', stored.loaded.subject), strings)
+      if (subject === null) return { canceled: true as const }
+      const outcome = await saveSessionAs(request, haven, subject, language)
+      opened(outcome.file)
+      console.info('[newui] saved as a new workbook in MindooDB')
+      return { canceled: false as const, file: outcome.file, touchedEntries: [...outcome.touchedEntries] }
+    }
+    // A plain xlsx has nowhere to go in the background; only an explicit
+    // save downloads it.
+    if (!stored && request.quiet) return { canceled: true as const }
+    const outcome = await saveSession(request, language)
+    if (outcome.stored) console.info(`[newui] saved to MindooDB (${outcome.stored.changed ? 'changed' : 'no changes'})`)
+    opened(outcome.file)
+    if (outcome.download) {
+      devHooks.lastSaved = outcome.download
+      download(outcome.download, outcome.file.name)
+    }
+    return { canceled: false as const, file: outcome.file, touchedEntries: [...outcome.touchedEntries] }
   }
 }
 
@@ -417,6 +529,7 @@ export async function installDesktopApiShim(): Promise<void> {
   ;(window as unknown as { __newui: unknown }).__newui = devHooks
   if (haven) {
     watchRemoteChanges(haven)
+    installAgentTools(haven)
     const connected = haven
     ;(window as unknown as { teamGridViewSheets: ViewSheetCommands }).teamGridViewSheets = viewSheetCommands({
       haven: connected,
