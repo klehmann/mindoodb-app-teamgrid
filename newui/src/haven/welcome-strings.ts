@@ -29,7 +29,12 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tags",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Enter one tag per line. Use a backslash to create hierarchy, for example Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "saveAsTitle": "Save as",
+    "close": "Close",
+    "unsavedTitle": "Unsaved changes",
+    "unsavedBody": "Save the changes to “{title}” before closing?",
+    "dontSave": "Don't save"
   },
   "de": {
     "title": "Gemeinsame Tabellen",
@@ -57,7 +62,12 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tags",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Gib pro Zeile einen Tag ein. Verwende einen Backslash für Hierarchien, zum Beispiel Work\\Planning.",
-    "useAsTemplate": "Diese Tabelle als Vorlage verwenden"
+    "useAsTemplate": "Diese Tabelle als Vorlage verwenden",
+    "saveAsTitle": "Speichern unter",
+    "close": "Schließen",
+    "unsavedTitle": "Ungespeicherte Änderungen",
+    "unsavedBody": "Änderungen an „{title}“ vor dem Schließen speichern?",
+    "dontSave": "Nicht speichern"
   },
   "fr": {
     "title": "Collaborative spreadsheets",
@@ -85,7 +95,12 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Étiquettes",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Saisissez une étiquette par ligne. Utilisez une barre oblique inverse pour créer une hiérarchie, par exemple Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "saveAsTitle": "Enregistrer sous",
+    "close": "Fermer",
+    "unsavedTitle": "Modifications non enregistrées",
+    "unsavedBody": "Enregistrer les modifications de « {title} » avant de fermer ?",
+    "dontSave": "Ne pas enregistrer"
   },
   "it": {
     "title": "Collaborative spreadsheets",
@@ -113,7 +128,12 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tag",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Inserisci un tag per riga. Usa una barra rovesciata per creare una gerarchia, ad esempio Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "saveAsTitle": "Salva con nome",
+    "close": "Chiudi",
+    "unsavedTitle": "Modifiche non salvate",
+    "unsavedBody": "Salvare le modifiche a «{title}» prima di chiudere?",
+    "dontSave": "Non salvare"
   },
   "es": {
     "title": "Collaborative spreadsheets",
@@ -141,7 +161,12 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Etiquetas",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Introduce una etiqueta por línea. Usa una barra invertida para crear una jerarquía, por ejemplo Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "saveAsTitle": "Guardar como",
+    "close": "Cerrar",
+    "unsavedTitle": "Cambios sin guardar",
+    "unsavedBody": "¿Guardar los cambios de «{title}» antes de cerrar?",
+    "dontSave": "No guardar"
   },
   "nl": {
     "title": "Collaborative spreadsheets",
@@ -169,7 +194,12 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tags",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Voer één tag per regel in. Gebruik een backslash om een hiërarchie te maken, bijvoorbeeld Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "saveAsTitle": "Opslaan als",
+    "close": "Sluiten",
+    "unsavedTitle": "Niet-opgeslagen wijzigingen",
+    "unsavedBody": "Wijzigingen in ‘{title}’ opslaan voordat je sluit?",
+    "dontSave": "Niet opslaan"
   },
   "nb": {
     "title": "Collaborative spreadsheets",
@@ -197,7 +227,12 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tagger",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Skriv inn én tagg per linje. Bruk bakoverstrek for å lage hierarki, for eksempel Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "saveAsTitle": "Lagre som",
+    "close": "Lukk",
+    "unsavedTitle": "Ulagrede endringer",
+    "unsavedBody": "Lagre endringene i «{title}» før du lukker?",
+    "dontSave": "Ikke lagre"
   },
   "pl": {
     "title": "Collaborative spreadsheets",
@@ -225,7 +260,12 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tagi",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Wpisz jeden tag w wierszu. Użyj ukośnika wstecznego, aby utworzyć hierarchię, na przykład Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "saveAsTitle": "Zapisz jako",
+    "close": "Zamknij",
+    "unsavedTitle": "Niezapisane zmiany",
+    "unsavedBody": "Zapisać zmiany w „{title}” przed zamknięciem?",
+    "dontSave": "Nie zapisuj"
   }
 } as const
 

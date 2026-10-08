@@ -6,6 +6,7 @@
 // no-op subscription) and is logged once, so the remaining surface stays
 // visible in the console.
 import { LANGS, type Lang } from '@genoffice/i18n'
+import { resolveAutoSave } from '@genoffice/ui'
 
 import type {
   DesktopApi,
@@ -23,6 +24,7 @@ import {
 import { installFileMenu, type FileAction } from './haven/file-menu'
 import {
   askTitle,
+  askUnsaved,
   chooseWorkbook,
   closeWelcome,
   editProperties,
@@ -42,6 +44,7 @@ import {
   openWorkbookBytes,
   readPivotDefinition,
   saveSession,
+  saveSessionAs,
   sessionFor,
   storedDocumentOf,
 } from './xlsx/sessions'
@@ -233,6 +236,26 @@ async function onFileAction(haven: HavenConnection, action: FileAction): Promise
     const session = sessionFor(activeSessionId!)
     // The title may have changed in the properties since the session opened.
     download(session.bytes, storedDocumentOf(activeSessionId!)?.loaded.subject ?? session.name)
+  } else if (action === 'close') {
+    if (!activeSessionId) return
+    // With AutoSave on, pending changes are saved, as they would be a moment
+    // later anyway; otherwise the user decides.
+    if (pendingEdits > 0 && !autoSaveOn(haven)) {
+      const choice = await askUnsaved(stored?.loaded.subject ?? sessionFor(activeSessionId).name, strings)
+      if (choice === null) return
+      if (choice === 'save') await waitForSave()
+    } else {
+      await waitForSave()
+    }
+    if (haven.context.embed) {
+      // Embedded in another app (an editor tab): its host closes the tab.
+      await haven.session.embedding.complete({ docId: haven.context.embed.docId })
+      return
+    }
+    // The welcome screen replaces the workbook (the editor's own open flow,
+    // which does not save; with nothing active the shim shows the welcome screen).
+    activeSessionId = null
+    devHooks.menu('open')
   } else if (action === 'properties' && stored) {
     const properties = await editProperties(await readProperties(haven, stored.loaded.id), strings)
     if (!properties) return
@@ -242,6 +265,18 @@ async function onFileAction(haven: HavenConnection, action: FileAction): Promise
     await changedSinceLoad(haven, stored.loaded)
   }
 }
+
+/** The editor's AutoSave switch: Haven's default (on), unless the user switched it here. */
+function autoSaveOn(haven: HavenConnection | null): boolean {
+  try {
+    return resolveAutoSave({ on: haven !== null, updatedAt: 0 }, localStorage.getItem(AUTO_SAVE_KEY))
+  } catch {
+    return haven !== null
+  }
+}
+
+/** Where GenOffice keeps the AutoSave switch (useAutoSavePref in App.tsx). */
+const AUTO_SAVE_KEY = 'ai-sheets-auto-save'
 
 /** Reopens the active stored workbook when someone else changed it and nothing is pending here. */
 function watchRemoteChanges(haven: HavenConnection): void {
@@ -326,6 +361,17 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
 
     async saveWorkbookEdits(request) {
       const stored = storedDocumentOf(request.sessionId)
+      // Save As of a stored workbook: a new one under another title, with the
+      // edits; the original stays as it was.
+      if (stored && haven && request.mode === 'save-as' && !request.targetPath) {
+        const strings = welcomeStrings(welcomeLanguage)
+        const subject = await askTitle(strings.saveAsTitle, strings.copyOf.replace('{title}', stored.loaded.subject), strings)
+        if (subject === null) return { canceled: true }
+        const outcome = await saveSessionAs(request, haven, subject, language)
+        opened(outcome.file)
+        console.info('[newui] saved as a new workbook in MindooDB')
+        return { canceled: false, file: outcome.file, touchedEntries: [...outcome.touchedEntries] }
+      }
       // A plain xlsx has nowhere to go in the background; only an explicit
       // save downloads it.
       if (!stored && request.quiet) return { canceled: true }

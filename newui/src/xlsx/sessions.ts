@@ -15,7 +15,7 @@ import {
   type WorkbookFile,
   type WorkbookSaveRequest,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
-import type { HavenConnection } from '../haven/connection'
+import { readProperties, writeProperties, type HavenConnection } from '../haven/connection'
 import {
   createWorkbook,
   loadWorkbook,
@@ -227,6 +227,30 @@ export async function saveSession(request: WorkbookSaveRequest, locale: string):
   const reopened = await openLoaded(document.haven, loaded, engine, locale)
   await closeSession(request.sessionId)
   return { file: reopened.file, touchedEntries, stored: { changed: sync.writes.changed } }
+}
+
+/**
+ * Save As in Haven: the session's workbook with the save's edits becomes a new
+ * stored workbook titled `subject` (tags taken over, never a template), which
+ * is opened in place of the session. The original document is not written.
+ */
+export async function saveSessionAs(
+  request: WorkbookSaveRequest,
+  haven: HavenConnection,
+  subject: string,
+  locale: string,
+): Promise<SaveOutcome> {
+  const session = sessionFor(request.sessionId)
+  const original = session.document
+  const { bytes, touchedEntries } = await saveWorkbookInBrowser(session.bytes, session.sheetNames, request)
+  const id = await importXlsxAsDocument(haven, bytes, subject, locale)
+  if (original) {
+    const properties = await readProperties(haven, original.loaded.id)
+    await writeProperties(haven, id, { subject, tags: properties.tags, istemplate: false })
+  }
+  const file = await openStoredWorkbook(haven, id, locale)
+  await closeSession(request.sessionId)
+  return { file, touchedEntries }
 }
 
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
