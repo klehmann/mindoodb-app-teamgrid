@@ -148,6 +148,18 @@ export function chooseWorkbook(
 }
 
 /** Asks for a title; resolves with it (the default when left empty) or null. */
+/** Save / Don't save / Cancel before closing a workbook with unsaved changes. */
+export function askUnsaved(title: string, strings: WelcomeStrings): Promise<'save' | 'discard' | null> {
+  return dialog<'save' | 'discard'>(strings.unsavedTitle, strings, (done) => {
+    const body = element('p', undefined, strings.unsavedBody.replace('{title}', title))
+    const discard = button(strings.dontSave, '')
+    discard.addEventListener('click', () => done('discard'))
+    const save = button(strings.save, 'tg-btn--primary')
+    save.addEventListener('click', () => done('save'))
+    return { body, actions: [discard, save] }
+  })
+}
+
 export function askTitle(title: string, initial: string, strings: WelcomeStrings): Promise<string | null> {
   return dialog<string>(title, strings, (done) => {
     const body = element('div')
