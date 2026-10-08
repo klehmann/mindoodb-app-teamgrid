@@ -197,6 +197,75 @@ function GroupFoldIcon(): React.JSX.Element {
   )
 }
 
+/** [TeamGrid] Drawn like ribbon-icons.tsx: 24×24, 1.5 strokes, round caps. */
+function GroupGlyph({ children }: { readonly children: React.ReactNode }): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
+    </svg>
+  )
+}
+
+/**
+ * [TeamGrid] What a folded group shows instead of its commands: a ribbon
+ * glyph (RIBBON_GLYPH_ICONS key) or a drawing of its own that names the
+ * group at a glance. Groups without an entry show the generic fold icon.
+ */
+const GROUP_ICONS: Partial<Record<StringKey, string | React.JSX.Element>> = {
+  appGroupClipboard: '📋',
+  appGroupFont: (
+    <GroupGlyph>
+      <path d="M6.5 16.5 12 4.75l5.5 11.75M8.65 12h6.7M4.75 19.75h14.5" />
+    </GroupGlyph>
+  ),
+  appGroupAlignment: '≡',
+  appGroupNumber: (
+    <GroupGlyph>
+      <circle cx="7.5" cy="7.5" r="2.25" />
+      <circle cx="16.5" cy="16.5" r="2.25" />
+      <path d="M18.25 5.75 5.75 18.25" />
+    </GroupGlyph>
+  ),
+  appGroupStyles: '🎨',
+  appGroupCells: '▦',
+  appGroupEditing: '∑',
+  appGroupTables: '⊞',
+  appPivotTable: '🧮',
+  appGroupIllustrations: '🖼',
+  appGroupCheckbox: '☑',
+  appGroupCharts: '📊',
+  appGroupSparklines: '〜',
+  appGroupFilters: '▽',
+  appGroupLinks: '🔗',
+  appGroupComments: '🗨',
+  appGroupNotes: '🗒',
+  appGroupText: 'A',
+  appGroupSymbols: 'π',
+  appGroupThemes: '◍',
+  appGroupPageSetup: '🗎',
+  appGroupScaleToFit: '⤢',
+  appGroupSheetOptions: '▥',
+  appGroupFunctionLibrary: 'ƒx',
+  appGroupDefinedNames: '🏷',
+  appGroupFormulaAuditing: '🔍',
+  appGroupCalculation: '⟳',
+  appGroupGetData: '🛢',
+  appGroupSortFilter: '⇅',
+  appGroupDataTools: '⚡',
+  appGroupForecast: '📈',
+  appGroupOutline: '⊟',
+  appGroupProofing: '✓',
+  appGroupLanguage: '🌐',
+  appGroupProtection: '🔒',
+  appGroupWorkbookViews: '🗔',
+  appGroupShow: '👓',
+  appZoomLabel: '⊙',
+  appGroupWindow: '◫',
+  appGroupChartLayouts: '◧',
+  appGroupChartActions: '🗑',
+  appChangeChartType: '📊',
+}
+
 /**
  * [TeamGrid] Folds the band's groups that do not fit into dropdown buttons,
  * from the right; the first group stays. Expanded widths are cached per tab
@@ -3899,6 +3968,14 @@ function NumberFormatSelect({
   )
 }
 
+/** [TeamGrid] The folded group's icon, found by its (translated) label. */
+function GroupIcon({ label, t }: { readonly label: string; readonly t: (key: StringKey) => string }): React.JSX.Element {
+  const key = (Object.keys(GROUP_ICONS) as StringKey[]).find((candidate) => t(candidate) === label)
+  const icon = key ? GROUP_ICONS[key] : undefined
+  if (typeof icon === 'string') return <ToolSymbol symbol={icon} />
+  return <span className="tool-symbol" aria-hidden="true">{icon ?? <GroupFoldIcon />}</span>
+}
+
 function RibbonGroup({
   label,
   children,
@@ -3910,6 +3987,7 @@ function RibbonGroup({
   // [TeamGrid] Except in the phone sheet (responsive.css), and when the group
   // folds for lack of room: then it is a button opening its commands below.
   const fold = useContext(RibbonFoldContext)
+  const { t } = useI18n()
   const wrapRef = useRef<HTMLDivElement>(null)
   const [at, setAt] = useState<{ left: number; top: number } | null>(null)
   const isOpen = fold?.open === label
@@ -3932,7 +4010,7 @@ function RibbonGroup({
             onClick={() => fold.toggle(label)}
           >
             <span className="tool-icon-row">
-              <GroupFoldIcon />
+              <GroupIcon label={label} t={t} />
               <CaretIcon />
             </span>
             <span>

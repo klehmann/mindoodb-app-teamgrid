@@ -42,11 +42,10 @@
  import { platformShortcuts } from '@genoffice/i18n'
  import {
    Dropdown,
-@@ -140,6 +140,140 @@
- /// lights / caption buttons — the ribbon must not reserve space for them.
+@@ -141,6 +141,209 @@
  const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab'
  const IS_MAC = navigator.platform.toLowerCase().includes('mac')
-+
+ 
 +/**
 + * [TeamGrid] Narrow windows (a tablet, a component inside another app, a
 + * phone). Below COMPACT_TABS_QUERY the tab row uses short labels, and tabs
@@ -101,6 +100,75 @@
 +      <rect x="11" y="11" width="6" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
 +    </svg>
 +  )
++}
++
++/** [TeamGrid] Drawn like ribbon-icons.tsx: 24×24, 1.5 strokes, round caps. */
++function GroupGlyph({ children }: { readonly children: React.ReactNode }): React.JSX.Element {
++  return (
++    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
++      {children}
++    </svg>
++  )
++}
++
++/**
++ * [TeamGrid] What a folded group shows instead of its commands: a ribbon
++ * glyph (RIBBON_GLYPH_ICONS key) or a drawing of its own that names the
++ * group at a glance. Groups without an entry show the generic fold icon.
++ */
++const GROUP_ICONS: Partial<Record<StringKey, string | React.JSX.Element>> = {
++  appGroupClipboard: '📋',
++  appGroupFont: (
++    <GroupGlyph>
++      <path d="M6.5 16.5 12 4.75l5.5 11.75M8.65 12h6.7M4.75 19.75h14.5" />
++    </GroupGlyph>
++  ),
++  appGroupAlignment: '≡',
++  appGroupNumber: (
++    <GroupGlyph>
++      <circle cx="7.5" cy="7.5" r="2.25" />
++      <circle cx="16.5" cy="16.5" r="2.25" />
++      <path d="M18.25 5.75 5.75 18.25" />
++    </GroupGlyph>
++  ),
++  appGroupStyles: '🎨',
++  appGroupCells: '▦',
++  appGroupEditing: '∑',
++  appGroupTables: '⊞',
++  appPivotTable: '🧮',
++  appGroupIllustrations: '🖼',
++  appGroupCheckbox: '☑',
++  appGroupCharts: '📊',
++  appGroupSparklines: '〜',
++  appGroupFilters: '▽',
++  appGroupLinks: '🔗',
++  appGroupComments: '🗨',
++  appGroupNotes: '🗒',
++  appGroupText: 'A',
++  appGroupSymbols: 'π',
++  appGroupThemes: '◍',
++  appGroupPageSetup: '🗎',
++  appGroupScaleToFit: '⤢',
++  appGroupSheetOptions: '▥',
++  appGroupFunctionLibrary: 'ƒx',
++  appGroupDefinedNames: '🏷',
++  appGroupFormulaAuditing: '🔍',
++  appGroupCalculation: '⟳',
++  appGroupGetData: '🛢',
++  appGroupSortFilter: '⇅',
++  appGroupDataTools: '⚡',
++  appGroupForecast: '📈',
++  appGroupOutline: '⊟',
++  appGroupProofing: '✓',
++  appGroupLanguage: '🌐',
++  appGroupProtection: '🔒',
++  appGroupWorkbookViews: '🗔',
++  appGroupShow: '👓',
++  appZoomLabel: '⊙',
++  appGroupWindow: '◫',
++  appGroupChartLayouts: '◧',
++  appGroupChartActions: '🗑',
++  appChangeChartType: '📊',
 +}
 +
 +/**
@@ -180,10 +248,11 @@
 +    </div>
 +  )
 +}
- 
++
  /// Univer's formula bar keeps its expanded state in React component state
  /// with no command behind it; the fold arrow is the only way in.
-@@ -414,10 +548,25 @@
+ function toggleFormulaBarExpand(): void {
+@@ -414,10 +617,25 @@
  }: ExcelShellProps): React.JSX.Element {
    const { t } = useI18n()
    const [activeTab, setActiveTab] = useState<RibbonTab>('Home')
@@ -213,7 +282,7 @@
    // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
    const [isCopilotOpen, setIsCopilotOpen] = useState(() =>
      aiPanelInitiallyOpen('ai-sheets-show-ai'),
-@@ -589,6 +738,101 @@
+@@ -589,6 +807,101 @@
    const visibleTabs: readonly RibbonTab[] = selectedChart
      ? [...ribbonTabs, 'Chart Design']
      : ribbonTabs
@@ -315,7 +384,7 @@
    const saveAsTitle = `${t('appSaveAs')} (${platformShortcuts('⇧⌘S')})`
  
    return (
-@@ -597,11 +841,15 @@
+@@ -597,11 +910,15 @@
        inert={openingWorkbook}
        aria-busy={openingWorkbook}
      >
@@ -333,7 +402,7 @@
          >
            <button
              type="button"
-@@ -656,25 +904,70 @@
+@@ -656,25 +973,70 @@
              />
            </label>
            <span className="qa-sep" aria-hidden="true" />
@@ -417,7 +486,7 @@
          <Ribbon
            activeTab={activeTab}
            selectionFormat={selectionFormat}
-@@ -707,6 +1000,8 @@
+@@ -707,6 +1069,8 @@
            aiOpen={isCopilotOpen}
            onAiToggle={() => setIsCopilotOpen((open) => !open)}
          />
@@ -426,13 +495,29 @@
        </header>
  
        {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
-@@ -3612,8 +3907,50 @@
+@@ -3602,6 +3966,14 @@
+       }}
+     />
+   )
++}
++
++/** [TeamGrid] The folded group's icon, found by its (translated) label. */
++function GroupIcon({ label, t }: { readonly label: string; readonly t: (key: StringKey) => string }): React.JSX.Element {
++  const key = (Object.keys(GROUP_ICONS) as StringKey[]).find((candidate) => t(candidate) === label)
++  const icon = key ? GROUP_ICONS[key] : undefined
++  if (typeof icon === 'string') return <ToolSymbol symbol={icon} />
++  return <span className="tool-symbol" aria-hidden="true">{icon ?? <GroupFoldIcon />}</span>
+ }
+ 
+ function RibbonGroup({
+@@ -3612,8 +3984,51 @@
    readonly children: React.ReactNode
  }): React.JSX.Element {
    // No visible group captions — the label stays for assistive tech.
 +  // [TeamGrid] Except in the phone sheet (responsive.css), and when the group
 +  // folds for lack of room: then it is a button opening its commands below.
 +  const fold = useContext(RibbonFoldContext)
++  const { t } = useI18n()
 +  const wrapRef = useRef<HTMLDivElement>(null)
 +  const [at, setAt] = useState<{ left: number; top: number } | null>(null)
 +  const isOpen = fold?.open === label
@@ -455,7 +540,7 @@
 +            onClick={() => fold.toggle(label)}
 +          >
 +            <span className="tool-icon-row">
-+              <GroupFoldIcon />
++              <GroupIcon label={label} t={t} />
 +              <CaretIcon />
 +            </span>
 +            <span>
