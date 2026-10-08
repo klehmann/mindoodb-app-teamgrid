@@ -9,7 +9,7 @@ import { createAxesLookup, renderFormula } from './formula-refs'
 import { convertLegacyWorkbook, legacyWorkbookOf, type LegacyWorkbook } from './legacy'
 import { readWholeWorkbook } from './sidecar-read'
 import { styleOf } from './styles'
-import { emptyStoredWorkbook, writesFor } from './sync'
+import { emptyStoredWorkbook, syncWorkbook, writesFor } from './sync'
 import { LEGACY, rows } from '../testing/legacy-sample'
 
 describe('TeamGrid 1.x workbooks', () => {
@@ -52,6 +52,14 @@ describe('TeamGrid 1.x workbooks', () => {
     expect(renderFormula(view.cellsById['vrow_1:vcol_1']!.formula!, sheetAxes(view), lookup)).toBe('Umsatz!B4')
   })
 
+  it('keeps defined names, bound to the same ids', () => {
+    expect(Object.values(workbook.namesById ?? {})).toHaveLength(1)
+    const name = workbook.namesById![':betraege']!
+    expect(name.name).toBe('Betraege')
+    expect(renderFormula(name.formula, sheetAxes(main), lookup)).toBe('Umsatz!$B$2:$B$3')
+    expect(renderFormula(main.cellsById['row_4:col_a']!.formula!, sheetAxes(main), lookup)).toBe('MAX(Betraege)')
+  })
+
   it('turns charts into chart visuals and keeps view sheets bound', () => {
     expect(main.visualOrder).toEqual(['chart_1'])
     const chart = main.visualsById.chart_1!.chart!
@@ -81,6 +89,20 @@ describe('TeamGrid 1.x workbooks', () => {
     expect(read.sheets.map((sheet) => sheet.meta.name)).toEqual(['Umsatz', 'Kontakte'])
     const total = read.sheets[0]!.cells.find((cell) => cell.row === 3 && cell.column === 1)
     expect(total?.formula?.replace(/^=/, '')).toBe('SUM(B2:B3)')
+    expect(total?.value).toBe(2000)
+    const largest = read.sheets[0]!.cells.find((cell) => cell.row === 3 && cell.column === 0)
+    expect(largest).toMatchObject({ formula: '=MAX(Betraege)', value: 1200 })
     expect(read.file.visuals.filter((visual) => visual.kind === 'chart')).toHaveLength(1)
+    expect(read.file.definedNames).toEqual([{ name: 'Betraege', formula: 'Umsatz!$B$2:$B$3' }])
+
+    // A save of the unchanged file writes nothing for the names.
+    const { writes } = syncWorkbook({
+      stored: loaded.stored,
+      storedIdByFileId: new Map(read.sheets.map((sheet) => [sheet.meta.id, sheet.meta.name === 'Umsatz' ? 'sheet_main' : 'sheet_view'])),
+      request: { sessionId: 'x', sheetOps: [], structuralOps: [] } as never,
+      read,
+    })
+    expect(JSON.stringify(writes.top)).not.toContain('namesById')
+    await engine.close(file.sessionId)
   })
 })

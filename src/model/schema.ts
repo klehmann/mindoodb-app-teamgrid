@@ -199,9 +199,27 @@ export interface Worksheet {
 /** Fields of a sheet that live in its chunk documents, not in the top document. */
 export const CHUNK_FIELDS = ['rowOrder', 'rowsById', 'cellsById'] as const
 
+/**
+ * A defined name ("Umsatz" → Umsatz!$B$2:$B$13). Its formula is bound to
+ * row/column ids like a cell formula, always sheet-qualified, so it follows
+ * inserted rows. Keyed by `nameKey`: two people defining the same name end
+ * up with one entry.
+ */
+export interface DefinedName {
+  name: string
+  formula: Formula
+  /** Only valid on this sheet (Excel's localSheetId); absent for the whole workbook. */
+  scopeSheetId?: SheetId
+}
+
+export function nameKey(name: string, scopeSheetId?: SheetId): string {
+  return `${scopeSheetId ?? ''}:${name.toLowerCase()}`
+}
+
 export interface Workbook {
   worksheetOrder: SheetId[]
   worksheetsById: Record<SheetId, Worksheet>
+  namesById?: Record<string, DefinedName>
   /** Legacy style registry, read once and dropped by the next save. */
   stylesById?: Record<StyleId, StoredStyle>
 }

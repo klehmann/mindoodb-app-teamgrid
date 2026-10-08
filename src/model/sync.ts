@@ -11,11 +11,13 @@ import { MindooDBAppValue, type MindooDBAppJsonPatch } from 'mindoodb-app-sdk'
 
 import type { WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { buildWorksheet } from './build'
-import { createAxesLookup, type SheetAxes } from './formula-refs'
+import { createAxesLookup, NO_HOME, parseFormula, type AxesLookup, type SheetAxes } from './formula-refs'
 import { diffList, grow, replayAxis, type AxisOp, type ReplayResult } from './replay'
 import {
   CHUNK_FIELDS,
   createId,
+  nameKey,
+  type DefinedName,
   liveIds,
   liveSheets,
   type Cell,
@@ -303,7 +305,7 @@ export function emptyStoredWorkbook(): StoredWorkbook {
 /** A new workbook with one empty sheet. */
 export function newWorkbook(sheetName: string): Workbook {
   const sheet = emptySheet(createId('s'), sheetName)
-  return { worksheetOrder: [sheet.id], worksheetsById: { [sheet.id]: sheet } }
+  return { worksheetOrder: [sheet.id], worksheetsById: { [sheet.id]: sheet }, namesById: {} }
 }
 
 export interface SyncInput {
@@ -325,6 +327,36 @@ export interface SyncResult {
 
 export function visualFileKey(visual: { drawingPath?: string | undefined; drawingIndex?: number | undefined; id: string }) {
   return visual.drawingPath === undefined ? visual.id : `${visual.drawingPath}#${visual.drawingIndex ?? 0}`
+}
+
+/**
+ * The file's defined names, bound to ids. A name whose references did not
+ * change keeps its stored formula (as cell formulas do), so a save does not
+ * rewrite every name. Hidden and built-in names (_xlnm.*) are the file's own
+ * business and are not stored.
+ */
+function definedNames(
+  read: SidecarWorkbook,
+  previous: Record<string, DefinedName>,
+  scopeOf: (sheetIndex: number) => SheetId | undefined,
+  lookup: AxesLookup,
+): Record<string, DefinedName> {
+  const names: Record<string, DefinedName> = {}
+  for (const entry of read.file.definedNames ?? []) {
+    if (entry.name.startsWith('_xlnm.')) continue
+    const scopeSheetId = entry.sheetIndex === undefined ? undefined : scopeOf(entry.sheetIndex)
+    if (entry.sheetIndex !== undefined && !scopeSheetId) continue
+    const key = nameKey(entry.name, scopeSheetId)
+    const formula = parseFormula(entry.formula.replace(/^=/, ''), NO_HOME, lookup)
+    const before = previous[key]
+    const name: DefinedName = {
+      name: entry.name,
+      formula: before && canonicalJson(before.formula) === canonicalJson(formula) ? before.formula : formula,
+    }
+    if (scopeSheetId) name.scopeSheetId = scopeSheetId
+    names[key] = name
+  }
+  return names
 }
 
 /**
@@ -451,6 +483,11 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
     })
   }
 
+  const namesById = definedNames(read, workbook.namesById ?? {}, (index) => {
+    const sheet = read.sheets[index]
+    return sheet ? storedIdByName.get(sheet.meta.name) : undefined
+  }, lookup)
+
   const deletedAt = new Date().toISOString()
   const worksheetsById: Workbook['worksheetsById'] = { ...workbook.worksheetsById }
   for (const sheet of sheets) worksheetsById[sheet.id] = sheet
@@ -462,6 +499,7 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
   const next: Workbook = {
     worksheetOrder: [...liveOrder, ...workbook.worksheetOrder.filter((id) => !liveOrder.includes(id))],
     worksheetsById,
+    namesById,
   }
   const createdChunks = new Map<ChunkId, SheetId>()
   for (const sheet of sheets) placeRows(sheet, stored.rowHome.get(sheet.id) ?? new Map(), stored.chunks, createdChunks)
@@ -606,6 +644,8 @@ function diffWorkbook(
   top.list([...WORKBOOK_PATH, 'worksheetOrder'], before.worksheetOrder, next.worksheetOrder)
   // Formats moved onto the cells (assembleWorkbook): the registry goes.
   if (before.stylesById) top.unset.push({ path: [...WORKBOOK_PATH, 'stylesById'] })
+  if (before.namesById) top.map([...WORKBOOK_PATH, 'namesById'], before.namesById, next.namesById ?? {}, false)
+  else if (next.namesById && Object.keys(next.namesById).length > 0) top.put([...WORKBOOK_PATH, 'namesById'], next.namesById)
 
   const chunkPatches = new Map<ChunkId, PatchBuilder>()
   const chunkPatch = (chunkId: ChunkId) => {

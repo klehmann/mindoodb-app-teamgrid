@@ -118,9 +118,12 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
   frozen panes, gridlines, zoom, sheets (add, rename, hide, reorder, delete),
   charts (anchors and data ranges by id), pictures (bytes as attachments of
   the top document), basic shapes.
+- Defined names are stored by key (scope + lower-case name) with id-bound
+  formulas, and written back on every open; formula cells are exported with
+  their last result as cached value.
 - Not stored yet (lost on reload): conditional formats, data validation,
-  filters, notes, hyperlinks, tables, pivots, sparklines, page setup, defined
-  names, tab colors; chart types GenOffice cannot create (bubble, stock,
+  filters, notes, hyperlinks, tables, pivots, sparklines, page setup, tab
+  colors; chart types GenOffice cannot create (bubble, stock,
   surface) and chart styling beyond its chart-add options.
 - Not yet: WASM in a Web Worker, revisions (Haven time travel), encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

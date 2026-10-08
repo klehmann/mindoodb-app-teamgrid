@@ -37,6 +37,13 @@ export const LEGACY = {
             'row_2:col_b': { id: 'row_2:col_b', rowId: 'row_2', columnId: 'col_b', value: { kind: 'number', value: 1200, format: 'currency', currencyCode: 'EUR' } },
             'row_3:col_a': { id: 'row_3:col_a', rowId: 'row_3', columnId: 'col_a', value: { kind: 'string', text: 'Feb' } },
             'row_3:col_b': { id: 'row_3:col_b', rowId: 'row_3', columnId: 'col_b', value: { kind: 'number', value: 800 }, style: { horizontalAlign: 'center', verticalAlign: 'middle', borders: { bottom: { style: 'thin', color: '#000000' } } } },
+            'row_4:col_a': {
+              id: 'row_4:col_a',
+              rowId: 'row_4',
+              columnId: 'col_a',
+              value: { kind: 'empty' },
+              formula: { kind: 'formula', source: '=MAX(Betraege)', segments: [{ kind: 'text', text: '=MAX(Betraege)' }], references: [], cached: { kind: 'number', value: 1200 } },
+            },
             'row_4:col_b': {
               id: 'row_4:col_b',
               rowId: 'row_4',
@@ -102,7 +109,9 @@ export const LEGACY = {
         },
       },
     },
-    namedExpressionsById: {},
+    namedExpressionsById: {
+      ne_1: { id: 'ne_1', name: 'Betraege', reference: { kind: 'range', ...range('row_2', 'row_3', 'col_b') } },
+    },
     settings: { locale: 'de-DE' },
   },
 }

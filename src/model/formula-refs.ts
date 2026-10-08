@@ -26,6 +26,9 @@ export interface AxesLookup {
   bySheetName(name: string): SheetAxes | undefined
 }
 
+/** No home sheet: references must name their sheet (defined names, chart ranges). */
+export const NO_HOME: SheetAxes = { id: '', name: '', rowIds: [], columnIds: [] }
+
 export function createAxesLookup(sheets: readonly SheetAxes[]): AxesLookup {
   const byId = new Map(sheets.map((sheet) => [sheet.id, sheet]))
   const byName = new Map(sheets.map((sheet) => [sheet.name.toLowerCase(), sheet]))

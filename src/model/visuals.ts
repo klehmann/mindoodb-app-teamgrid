@@ -10,7 +10,7 @@
 import { ADDABLE_SHAPE_TYPES } from '@genoffice/xlsx-gateway/shared/shape-types'
 
 import type { WorkbookFile } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
-import { parseFormula, renderFormula, type AxesLookup, type SheetAxes } from './formula-refs'
+import { NO_HOME, parseFormula, renderFormula, type AxesLookup, type SheetAxes } from './formula-refs'
 import type { ChartAdd, StoredChart, StoredVisual, VisualAdd, VisualAnchor } from './schema'
 import type { SidecarSheet } from './sidecar-read'
 
@@ -145,7 +145,6 @@ const HEX = /^#[0-9A-Fa-f]{6}$/
  * Chart ranges are always sheet-qualified ('Sales'!$B$2:$B$9). Parsing and
  * rendering them against no home sheet keeps the sheet in both directions.
  */
-const NO_HOME: SheetAxes = { id: '', name: '', rowIds: [], columnIds: [] }
 const clampInt = (value: number, min: number, max: number) => Math.round(Math.min(max, Math.max(min, value)))
 
 function storedChart(chart: ReadChart, lookup: AxesLookup): StoredChart | null {

@@ -16,7 +16,7 @@ import type {
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import type { XlsxEngine } from '../xlsx/engine'
-import { createAxesLookup, renderFormula, type SheetAxes } from './formula-refs'
+import { createAxesLookup, NO_HOME, renderFormula, type SheetAxes } from './formula-refs'
 import { liveIds, liveSheets, type VisualId, type Workbook, type Worksheet } from './schema'
 import { styleOf } from './styles'
 import { visualAddition } from './visuals'
@@ -139,8 +139,23 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     }
     visualOrder.set(sheet.id, written)
   }
+  const definedNames = Object.values(workbook.namesById ?? {}).flatMap((name) => {
+    const formula = renderFormula(name.formula, NO_HOME, lookup)
+    const sheetIndex = name.scopeSheetId === undefined ? undefined : sheets.findIndex((sheet) => sheet.id === name.scopeSheetId)
+    // A name whose range or scope sheet was deleted is left out rather than written broken.
+    if (formula.includes('#REF!') || sheetIndex === -1) return []
+    return [{ name: name.name, formula, ...(sheetIndex === undefined ? {} : { sheetIndex }) }]
+  })
   const names = new Map([...fileIds].map(([name, id]) => [id, name]))
-  return { bytes: (await saveWorkbookInBrowser(bytes, names, content)).bytes, visualOrder }
+  bytes = new Uint8Array((await saveWorkbookInBrowser(bytes, names, content)).bytes)
+
+  // Pass 3: defined names (the gateway takes them only in a save without structural changes).
+  if (definedNames.length > 0) {
+    const request = emptySaveRequest('export')
+    request.definedNamesState = { names: definedNames, preserveNames: [] } as WorkbookSaveRequest['definedNamesState']
+    bytes = new Uint8Array((await saveWorkbookInBrowser(bytes, names, request)).bytes)
+  }
+  return { bytes, visualOrder }
 }
 
 function appendSheet(
@@ -173,6 +188,12 @@ function appendSheet(
       ...(formula === undefined ? {} : { formula: formula.startsWith('=') ? formula : `=${formula}` }),
       ...(style ? { style } : {}),
     } as WorkbookCellEdit)
+    // The last result as the cell's cached value, as Excel saves it: the editor
+    // shows it before it recalculates (it installs defined names only after
+    // the first calculation), and readers without a formula engine see it.
+    if (formula !== undefined && cell.value !== undefined && cell.value !== null) {
+      request.formulaValues.push({ sheetId, row, column, value: cell.value })
+    }
   }
 
   const ops: WorkbookStructuralOp[] = request.structuralOps

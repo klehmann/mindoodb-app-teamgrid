@@ -13,8 +13,10 @@ import {
   cellKey,
   liveIds,
   type Cell,
+  nameKey,
   type CellScalar,
   type ColumnMeta,
+  type DefinedName,
   type Formula,
   type FormulaRef,
   type RowMeta,
@@ -98,7 +100,7 @@ interface LegacyChart {
     to: { rowId: string; columnId: string; rowOffsetEmu: number; colOffsetEmu: number }
   }
   legend?: { position: 'right' | 'bottom' | 'top' | 'left' | 'none' }
-  style?: { showGridlines?: boolean }
+  style?: { colors?: string[]; showGridlines?: boolean }
   deletedAt?: string
 }
 
@@ -119,13 +121,30 @@ interface LegacyWorksheet {
 export interface LegacyWorkbook {
   worksheetOrder: string[]
   worksheetsById: Record<string, LegacyWorksheet>
+  /** Defined names; in 1.x they sit next to the workbook (`teamgrid.namedExpressionsById`). */
+  namedExpressionsById?: Record<string, { name: string; reference: LegacyReference }>
 }
 
 /** The 1.x workbook of a document's data, or undefined when it is something else. */
 export function legacyWorkbookOf(data: Record<string, unknown>): LegacyWorkbook | undefined {
   if (data.form !== LEGACY_FORM) return undefined
-  const teamgrid = data.teamgrid as { workbook?: LegacyWorkbook } | undefined
-  return teamgrid?.workbook?.worksheetsById ? teamgrid.workbook : undefined
+  const teamgrid = data.teamgrid as
+    | { workbook?: LegacyWorkbook; namedExpressionsById?: LegacyWorkbook['namedExpressionsById'] }
+    | undefined
+  if (!teamgrid?.workbook?.worksheetsById) return undefined
+  return { ...teamgrid.workbook, namedExpressionsById: teamgrid.namedExpressionsById ?? {} }
+}
+
+/**
+ * 1.x's tab order as it read it (resolveWorksheetOrder): every id once, unknown
+ * ids dropped, sheets the list misses appended in id order.
+ */
+function worksheetOrder(legacy: LegacyWorkbook): string[] {
+  const order = [...new Set(legacy.worksheetOrder)].filter((id) => legacy.worksheetsById[id])
+  const missing = Object.keys(legacy.worksheetsById)
+    .filter((id) => !order.includes(id))
+    .sort()
+  return [...order, ...missing]
 }
 
 // ── conversion ─────────────────────────────────────────────────────────
@@ -246,9 +265,7 @@ function rangeRef(range: LegacySeriesRange): Formula {
 
 /** Converts a 1.x workbook; `now` stamps view sheets that never recorded a refresh. */
 export function convertLegacyWorkbook(legacy: LegacyWorkbook, now = new Date().toISOString()): Workbook {
-  const sheets = legacy.worksheetOrder
-    .map((id) => legacy.worksheetsById[id])
-    .filter((sheet): sheet is LegacyWorksheet => !!sheet)
+  const sheets = worksheetOrder(legacy).map((id) => legacy.worksheetsById[id]!)
   const axes: SheetAxes[] = sheets.map((sheet) => ({
     id: sheet.id,
     name: sheet.title,
@@ -355,7 +372,7 @@ export function convertLegacyWorkbook(legacy: LegacyWorkbook, now = new Date().t
               : series.name
                 ? String(rangeValues(series.name)[0] ?? '')
                 : `Series ${position + 1}`
-          const color = hexColor(series.color)
+          const color = hexColor(series.color ?? chart.style?.colors?.[position])
           return {
             name,
             categories: categories.length ? categories.slice(0, values.length) : values.map((_, index) => String(index + 1)),
@@ -412,5 +429,13 @@ export function convertLegacyWorkbook(legacy: LegacyWorkbook, now = new Date().t
     if (legacySheet.deletedAt) sheet.deletedAt = legacySheet.deletedAt
     worksheetsById[sheet.id] = sheet
   })
-  return { worksheetOrder: sheets.map((sheet) => sheet.id), worksheetsById }
+  // Defined names: always sheet-qualified and absolute, as Excel writes them.
+  const namesById: Record<string, DefinedName> = {}
+  for (const named of Object.values(legacy.namedExpressionsById ?? {})) {
+    if (!named?.name || !named.reference || !legacy.worksheetsById[named.reference.worksheetId]) continue
+    const ref = refOf(named.reference, '')
+    ref.absolute = [true, true, true, true]
+    namesById[nameKey(named.name)] = { name: named.name, formula: { t: '\u0001', r: [packRef(ref)] } }
+  }
+  return { worksheetOrder: sheets.map((sheet) => sheet.id), worksheetsById, namesById }
 }
