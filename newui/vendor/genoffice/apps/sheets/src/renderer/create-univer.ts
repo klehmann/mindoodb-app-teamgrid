@@ -53,5 +53,7 @@ export function createUniver(options: CreateUniverOptions): { univer: Univer; un
     univer.registerPlugin(plugin, pluginOptions)
   }
 
+  // [TeamGrid] Lets the host add to the running Univer (newui/src/fill-series.ts).
+  ;(window as unknown as { teamGridOnUniver?: (univer: Univer) => void }).teamGridOnUniver?.(univer)
   return { univer, univerAPI: FUniver.newAPI(univer) }
 }

@@ -20,6 +20,7 @@ import {
   writeProperties,
   type HavenConnection,
 } from './haven/connection'
+import { installFillSeries } from './fill-series'
 import { installFileMenu, type FileAction } from './haven/file-menu'
 import {
   askTitle,
@@ -350,6 +351,7 @@ export async function installDesktopApiShim(): Promise<void> {
   }
   language = toLang(haven?.context.locale ?? navigator.language)
   welcomeLanguage = (haven?.context.locale ?? navigator.language).slice(0, 2).toLowerCase()
+  installFillSeries(() => welcomeLanguage)
   const api = new Proxy(createApi(haven), {
     get(target, property) {
       if (typeof property !== 'string') return undefined
