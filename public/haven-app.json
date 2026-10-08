@@ -3,8 +3,8 @@
   "formatVersion": 1,
   "appId": "mindoodb-app-teamgrid",
   "label": "Mindoo TeamGrid",
-  "description": "Collaborative spreadsheets with formulas, formatting, and revision time travel.",
-  "version": "1.0.0",
+  "description": "Collaborative spreadsheets with Excel features, charts, xlsx import and export, and sheets from MindooDB views.",
+  "version": "2.0.0",
   "runtime": "iframe",
   "hosting": "external",
   "defaultLaunchDatabaseId": "teamgrid",
@@ -20,40 +20,6 @@
         "attachments",
         "views"
       ]
-    }
-  ],
-  "components": [
-    {
-      "id": "spreadsheet",
-      "label": {
-        "en": "Spreadsheet",
-        "de": "Tabelle",
-        "es": "Hoja de cálculo",
-        "fr": "Feuille de calcul",
-        "it": "Foglio di calcolo",
-        "nb": "Regneark",
-        "nl": "Spreadsheet",
-        "pl": "Arkusz kalkulacyjny"
-      },
-      "description": {
-        "en": "A TeamGrid workbook with formulas and charts.",
-        "de": "Eine TeamGrid-Arbeitsmappe mit Formeln und Diagrammen."
-      },
-      "icon": "listing/icon.webp",
-      "intents": [
-        "create",
-        "edit",
-        "view"
-      ],
-      "match": {
-        "form": "teamgrid",
-        "kind": "mindoodb.teamgrid"
-      },
-      "create": {
-        "subject": "",
-        "tags": [],
-        "istemplate": false
-      }
     }
   ],
   "publicUrl": "https://app-teamgrid.mindoodb.com/",

@@ -1,0 +1,17 @@
+{
+  "name": "xlsx-wasm",
+  "type": "module",
+  "description": "Browser (WASM) build of GenOffice's xlsx sidecar read path",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "files": [
+    "xlsx_wasm_bg.wasm",
+    "xlsx_wasm.js",
+    "xlsx_wasm.d.ts"
+  ],
+  "main": "xlsx_wasm.js",
+  "types": "xlsx_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

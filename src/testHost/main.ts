@@ -1,33 +1,36 @@
 /**
- * The app's test URL, `/__haven-test/`: the real app in an iframe, launched by a mock
- * Haven with the databases, permissions and launch parameters from `haven-app.json`,
- * plus a control panel (theme, host focus, notifications, bridge requests). Use it for
- * Playwright, for AI agents driving the UI, and for clicking through the app without
- * installing it in a real Haven. `window.__havenTestHost` scripts the host.
- *
- * It is served by `pnpm dev` and only built with `HAVEN_TEST_HOST=1` (preview
- * deployments), never for the production deploy: the public URL shows the landing page.
+ * `/__haven-test/`: the app in an iframe, launched by the SDK's mock Haven
+ * with the databases and permissions from `haven-app.json`. Mock data only;
+ * it is gone on reload. Served by `pnpm dev`, never part of a production
+ * build. `window.__havenTestHost` scripts the host.
  */
-import type { MindooDBAppDefinition } from "mindoodb-app-sdk";
-import { mockDatabasesFromDefinition, mountHavenTestHost } from "mindoodb-app-sdk/testing";
+import type { MindooDBAppDefinition } from 'mindoodb-app-sdk'
+import { mockDatabasesFromDefinition, mountHavenTestHost } from 'mindoodb-app-sdk/testing'
 
-import { seedDocuments } from "@/testHost/seed";
+import { CONTACTS, CONTACTS_VIEW, openContactsView } from './contacts-view'
 
 async function start() {
-  const response = await fetch(new URL("../haven-app.json", window.location.href));
-  const definition = (await response.json()) as MindooDBAppDefinition;
-
+  const response = await fetch(new URL('../haven-app.json', window.location.href))
+  const definition = (await response.json()) as MindooDBAppDefinition
   mountHavenTestHost({
-    appUrl: "../",
+    appUrl: '../',
     title: definition.label,
     launchContext: {
       appId: definition.appId,
-      appVersion: definition.version,
       launchParameters: { ...definition.launchParameters },
-      preferredDatabaseId: definition.defaultLaunchDatabaseId,
+      ...(definition.version ? { appVersion: definition.version } : {}),
+      ...(definition.defaultLaunchDatabaseId ? { preferredDatabaseId: definition.defaultLaunchDatabaseId } : {}),
+      // A view configured as a data source, for view sheets.
+      views: [CONTACTS_VIEW],
     },
-    databases: mockDatabasesFromDefinition(definition, seedDocuments),
-  });
+    // Real Automerge documents: saves merge at their baseHeads as in Haven, and
+    // __havenTestHost.applyRemoteUpdate plays a second device.
+    databases: mockDatabasesFromDefinition(definition, { teamgrid: CONTACTS }, { automerge: true }).map((database) =>
+      database.info.id === 'teamgrid'
+        ? { ...database, methods: { ...database.methods, views: { open: (_id, options) => openContactsView(options) } } }
+        : database,
+    ),
+  })
 }
 
-void start();
+void start()

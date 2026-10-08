@@ -23,7 +23,7 @@
 
         Flow: on a same-origin /assets/ <script> or <link> error, run repair()
         once per cooldown window, then location.reload(). If it fails again
-        while #app is still empty, show a plain-text message instead of looping.
+        while #root is still empty, show a plain-text message instead of looping.
       */
       (function () {
         var ATTEMPT_KEY = "mindoodb-shell-recovery";
@@ -104,11 +104,11 @@
           console.error("[boot] Program file could not be loaded.", url);
           // Cooldown: one automatic repair+reload per minute. A second failure
           // in that window means repair did not help -- show plain text in
-          // #app instead of looping forever.
+          // #root instead of looping forever.
           if (Date.now() - lastAttempt() < COOLDOWN_MS) {
-            var root = document.getElementById("app");
+            var root = document.getElementById("root");
             if (root && !root.firstChild) {
-              root.textContent = "MindooDB Teamgrid could not load its program files. Please close the app and open it again.";
+              root.textContent = "MindooDB TeamGrid could not load its program files. Please close the app and open it again.";
             }
             return;
           }
@@ -121,10 +121,10 @@
       })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MindooDB Teamgrid</title>
+    <title>MindooDB TeamGrid</title>
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/app/boot.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/boot.ts"></script>
   </body>
 </html>

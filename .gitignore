@@ -5,3 +5,5 @@ dist/
 coverage/
 *.local
 settings.json
+public/test-fixture.xlsx
+public/frame-test.html

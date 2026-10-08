@@ -13,6 +13,7 @@ allowBuilds:
   tesseract.js: true
   vue-demi: true
   workerd: true
+  protobufjs: false
 
 # First-party packages are published by us during release workflows, so they
 # do not need pnpm's minimum release age delay in Cloudflare Pages builds.
@@ -20,3 +21,7 @@ minimumReleaseAgeExclude:
   - mindoodb
   - mindoodb-app-sdk
   - mindoodb-view-language
+
+# Vendored GenOffice code imports Univer sub-packages it only gets
+# transitively (it was written for npm's flat node_modules).
+nodeLinker: hoisted
