@@ -3,7 +3,7 @@
 // menu bar plus Haven's own document actions.
 import type { WelcomeStrings } from './welcome-strings'
 
-export type FileAction = 'new' | 'open' | 'template' | 'import' | 'export' | 'properties'
+export type FileAction = 'new' | 'open' | 'template' | 'import' | 'export' | 'properties' | 'close'
 
 const STYLE = `
 .tg-file{position:fixed;top:4px;left:8px;z-index:8000;display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 10px;border:1px solid transparent;border-radius:6px;background:none;color:var(--text);font:600 13px/1 system-ui,sans-serif;cursor:pointer}
@@ -41,6 +41,8 @@ export function installFileMenu(
     ['export', strings.exportXlsx],
     null,
     ['properties', `${strings.propertiesTitle}…`],
+    null,
+    ['close', strings.close],
   ]
 
   let menu: HTMLElement | null = null

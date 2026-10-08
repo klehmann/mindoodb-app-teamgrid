@@ -42,6 +42,7 @@ import {
   openWorkbookBytes,
   readPivotDefinition,
   saveSession,
+  saveSessionAs,
   sessionFor,
   storedDocumentOf,
 } from './xlsx/sessions'
@@ -233,6 +234,13 @@ async function onFileAction(haven: HavenConnection, action: FileAction): Promise
     const session = sessionFor(activeSessionId!)
     // The title may have changed in the properties since the session opened.
     download(session.bytes, storedDocumentOf(activeSessionId!)?.loaded.subject ?? session.name)
+  } else if (action === 'close') {
+    // Saves what is pending, then the welcome screen replaces the workbook
+    // (the editor's own open flow; with nothing active the shim shows it).
+    if (!activeSessionId) return
+    await waitForSave()
+    activeSessionId = null
+    devHooks.menu('open')
   } else if (action === 'properties' && stored) {
     const properties = await editProperties(await readProperties(haven, stored.loaded.id), strings)
     if (!properties) return
@@ -326,6 +334,17 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
 
     async saveWorkbookEdits(request) {
       const stored = storedDocumentOf(request.sessionId)
+      // Save As of a stored workbook: a new one under another title, with the
+      // edits; the original stays as it was.
+      if (stored && haven && request.mode === 'save-as' && !request.targetPath) {
+        const strings = welcomeStrings(welcomeLanguage)
+        const subject = await askTitle(strings.saveAsTitle, strings.copyOf.replace('{title}', stored.loaded.subject), strings)
+        if (subject === null) return { canceled: true }
+        const outcome = await saveSessionAs(request, haven, subject, language)
+        opened(outcome.file)
+        console.info('[newui] saved as a new workbook in MindooDB')
+        return { canceled: false, file: outcome.file, touchedEntries: [...outcome.touchedEntries] }
+      }
       // A plain xlsx has nowhere to go in the background; only an explicit
       // save downloads it.
       if (!stored && request.quiet) return { canceled: true }
