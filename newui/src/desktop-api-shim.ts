@@ -48,10 +48,33 @@ import {
 /** How often an idle stored workbook checks for other people's changes. */
 const REMOTE_POLL_MS = 5_000
 
+/**
+ * Desktop-only parts of the API with no meaning in Haven (native menus and
+ * windows, crash recovery, the AI panel, the sidecar process). The editor
+ * asks for them on every start; answering with nothing is correct, so they
+ * are not reported.
+ */
+const DESKTOP_ONLY = new Set([
+  'getDocumentTheme',
+  'onDocumentThemeChanged',
+  'getAiPanelPrefs',
+  'onAiPanelPrefsChanged',
+  'getAiSettings',
+  'aiGskStatus',
+  'onRecoveryPrompt',
+  'consumeHeadlessExport',
+  'onWorkbookRenamed',
+  'onSidecarCrashed',
+  'onCloseSaveRequest',
+  'onMcpCommand',
+  'signalMcpReady',
+])
+
 const reported = new Set<string>()
 
+/** Development builds name a method the shim does not answer yet, once. */
 function report(name: string): void {
-  if (reported.has(name)) return
+  if (!import.meta.env.DEV || DESKTOP_ONLY.has(name) || reported.has(name)) return
   reported.add(name)
   console.warn(`[newui] desktopApi.${name} is not implemented in the browser`)
 }
@@ -240,10 +263,21 @@ function watchRemoteChanges(haven: HavenConnection): void {
   }, REMOTE_POLL_MS)
 }
 
+/** Relabels the File menu after a language switch (set once it is installed). */
+let setFileMenuStrings: ((strings: ReturnType<typeof welcomeStrings>) => void) | undefined
+
 function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
   return {
     getLanguage: async () => language as Awaited<ReturnType<DesktopApi['getLanguage']>>,
     getTheme: async () => toUiTheme(haven?.context.theme.mode),
+    // Haven's language switches without a reload; so does the editor.
+    onLanguageChanged: (handler) =>
+      haven?.session.onLocaleChange((locale) => {
+        language = toLang(locale)
+        welcomeLanguage = locale.slice(0, 2).toLowerCase()
+        setFileMenuStrings?.(welcomeStrings(welcomeLanguage))
+        handler(language as Parameters<typeof handler>[0])
+      }) ?? (() => {}),
     onThemeChanged: (handler) => haven?.session.onThemeChange((theme) => handler(toUiTheme(theme.mode))) ?? (() => {}),
     // Inside Haven the picker opens right away instead of an empty demo grid.
     hasQueuedWorkbook: async () => haven !== null,
@@ -321,7 +355,7 @@ export async function installDesktopApiShim(): Promise<void> {
   ;(window as unknown as { __newui: unknown }).__newui = devHooks
   if (haven) {
     watchRemoteChanges(haven)
-    installFileMenu(welcomeStrings(welcomeLanguage), haven.canWrite, (action) => {
+    setFileMenuStrings = installFileMenu(welcomeStrings(welcomeLanguage), haven.canWrite, (action) => {
       onFileAction(haven!, action).catch((error) => console.error(`[newui] ${action} failed`, error))
     })
   }

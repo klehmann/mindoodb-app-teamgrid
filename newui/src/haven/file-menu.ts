@@ -14,20 +14,25 @@ const STYLE = `
 .tg-file-menu hr{border:0;border-top:1px solid var(--border);margin:4px 0}
 `
 
-export function installFileMenu(strings: WelcomeStrings, canWrite: boolean, onAction: (action: FileAction) => void) {
+/** Installs the File button and menu; the returned function switches its language. */
+export function installFileMenu(
+  initial: WelcomeStrings,
+  canWrite: boolean,
+  onAction: (action: FileAction) => void,
+): (strings: WelcomeStrings) => void {
+  let strings = initial
   const style = document.createElement('style')
   style.textContent = STYLE
   document.head.append(style)
   const trigger = document.createElement('button')
   trigger.type = 'button'
   trigger.className = 'tg-file'
-  trigger.textContent = `${strings.file} ▾`
   trigger.setAttribute('aria-haspopup', 'menu')
   trigger.setAttribute('aria-expanded', 'false')
   document.body.append(trigger)
 
   const dots = (label: string) => label.replace(/\.\.\.$/, '…')
-  const entries: (readonly [FileAction, string] | null)[] = [
+  const entries = (): (readonly [FileAction, string] | null)[] => [
     ...(canWrite ? ([['new', `${strings.newDocument}…`]] as const) : []),
     ['open', `${strings.openDocument}…`],
     ...(canWrite ? ([['template', dots(strings.newFromTemplate)]] as const) : []),
@@ -57,7 +62,7 @@ export function installFileMenu(strings: WelcomeStrings, canWrite: boolean, onAc
     menu = document.createElement('div')
     menu.className = 'tg-file-menu'
     menu.setAttribute('role', 'menu')
-    for (const entry of entries) {
+    for (const entry of entries()) {
       if (!entry) {
         menu.append(document.createElement('hr'))
         continue
@@ -78,4 +83,12 @@ export function installFileMenu(strings: WelcomeStrings, canWrite: boolean, onAc
     document.addEventListener('keydown', onKey, true)
     ;(menu.querySelector('button') as HTMLElement | null)?.focus()
   })
+
+  const setStrings = (next: WelcomeStrings) => {
+    strings = next
+    trigger.textContent = `${strings.file} ▾`
+    close()
+  }
+  setStrings(initial)
+  return setStrings
 }
