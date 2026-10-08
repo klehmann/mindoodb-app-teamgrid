@@ -229,6 +229,16 @@ export interface WelcomeOptions {
  * Shows the welcome screen until the user picked something to open; it then
  * stays behind the editor's loading and is removed by `closeWelcome`.
  */
+/** Answers the welcome screen on screen, if any (an agent opening a workbook). */
+let answerWelcome: ((choice: WelcomeChoice) => void) | null = null
+
+/** Picks `choice` on the welcome screen as if the user had; false when none is shown. */
+export function chooseOnWelcome(choice: WelcomeChoice): boolean {
+  if (!answerWelcome || !document.getElementById('tg-welcome')) return false
+  answerWelcome(choice)
+  return true
+}
+
 export function showWelcome(options: WelcomeOptions): Promise<WelcomeChoice> {
   installStyle()
   const strings = welcomeStrings(options.language)
@@ -242,7 +252,12 @@ export function showWelcome(options: WelcomeOptions): Promise<WelcomeChoice> {
   page.append(inner)
   document.body.append(page)
 
-  return new Promise((resolve) => {
+  return new Promise((settle) => {
+    const resolve = (choice: WelcomeChoice) => {
+      answerWelcome = null
+      settle(choice)
+    }
+    answerWelcome = resolve
     const newButton = button(`${strings.newDocument}…`, 'tg-btn--primary', ICONS.new)
     const openButton = button(strings.openDocument, '', ICONS.open)
     const templateButton = button(strings.newFromTemplate.replace(/\.\.\.$/, '…'), '', ICONS.template)

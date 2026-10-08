@@ -156,6 +156,8 @@ import type { ApplyOutcome, ChangePlan } from '@genoffice/xlsx-gateway/domain/wo
 import { createElectronTransport } from './ai/transport'
 import {
   MAX_READ_RANGE_CELLS,
+  WORKBOOK_TOOLS,
+  executeWorkbookTool,
   type ActiveSheetInfo,
   type FrozenSelection,
   type SheetsSkillDeps,
@@ -4442,6 +4444,21 @@ export function App({
           error: 'the spreadsheet is not ready',
         },
     })
+  }, [])
+  // [TeamGrid] The built-in AI's workbook tools, for the host's agents
+  // (newui/src/haven/agent-tools.ts): same readers and apply path, so their
+  // edits land in the edit journal and undo history like the AI's.
+  useEffect(() => {
+    const target = window as unknown as { teamGridWorkbookTools?: unknown }
+    target.teamGridWorkbookTools = {
+      tools: WORKBOOK_TOOLS,
+      hasWorkbook: () => mcpSheetHandlersRef.current?.hasWorkbook() ?? false,
+      execute: (name: string, input: Record<string, unknown>) =>
+        executeWorkbookTool({ id: `teamgrid-${Date.now()}`, name, input }, sheetsSkillDeps()),
+    }
+    return () => {
+      delete target.teamGridWorkbookTools
+    }
   }, [])
   /// Re-renders the floating visuals after a journal mutation (edits and
   /// their undo/redo closures share it).

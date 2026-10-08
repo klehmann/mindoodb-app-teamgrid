@@ -74,6 +74,25 @@ position (`src/model/view-sheet.ts`, `src/haven/view-sheets.ts`,
 "Kontakte nach Firma". Its mock hands out one navigator per view, so the top
 level category is not applied there.
 
+## AI agents (WebMCP)
+
+Inside Haven the editor offers agent tools with the prefix `teamgrid_`
+(`src/haven/agent-tools.ts`). The workbook tools are GenOffice's own, the ones
+its built-in AI uses (`ai/tools.ts`, exposed on `window.teamGridWorkbookTools` by
+`patches/sheets-agent-tools.patch`): `workbook_context`, `read_range`,
+`read_cells`, `aggregate_range`, `find_cells`, `read_formats`,
+`read_sheet_features`, `trace_precedents` / `trace_dependents`, `select_range`,
+`load_guide` (the operation guides) and `apply_operations` (GenOffice's
+`propose_operations`, applied at once). Edits land in the edit journal and undo
+history like the user's; AutoSave writes them. They work on the open workbook
+(`scope: "document"`), as do `undo`, `redo` and `save`. TeamGrid's own tools find
+and open workbooks: `workbooks_list`, `workbook_open` (also from the welcome
+screen), `workbook_create` (empty or from a template) and `workbook_close`.
+
+A sheet's data extent comes from the opened file, so cells written since then lie
+outside it until the next save reopens the workbook; a read that runs into this
+saves and reads again.
+
 ## Small screens
 
 Below 1100px the tab row uses short labels and tabs that do not fit go
