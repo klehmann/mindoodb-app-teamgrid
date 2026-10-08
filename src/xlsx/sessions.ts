@@ -16,6 +16,7 @@ import {
   type WorkbookSaveRequest,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import type { HavenConnection } from '../haven/connection'
+import { workbookToOpen } from '../haven/legacy-copy'
 import {
   createWorkbook,
   loadWorkbook,
@@ -102,7 +103,8 @@ export async function openWorkbookBytes(bytes: Uint8Array, name: string, locale:
 
 /** Opens a stored workbook: renders it to xlsx and opens that in the editor. */
 export async function openStoredWorkbook(haven: HavenConnection, id: string, locale: string): Promise<WorkbookFile> {
-  return (await openLoaded(haven, await loadWorkbook(haven, id), await loadXlsxEngine(), locale)).file
+  const target = await workbookToOpen(haven, id)
+  return (await openLoaded(haven, await loadWorkbook(haven, target), await loadXlsxEngine(), locale)).file
 }
 
 async function openLoaded(haven: HavenConnection, loaded: LoadedWorkbook, engine: XlsxEngine, locale: string) {
@@ -138,9 +140,10 @@ export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8A
 
 /** A new workbook with a template's content (pictures included) and fresh ids. */
 export async function createFromTemplate(haven: HavenConnection, templateId: string, subject: string, locale: string) {
-  const template = await loadWorkbook(haven, templateId)
+  const sourceId = await workbookToOpen(haven, templateId)
+  const template = await loadWorkbook(haven, sourceId)
   const { bytes } = await workbookToXlsx(template.stored.workbook, await loadXlsxEngine(), {
-    loadImage: (attachment) => readAttachmentBase64(haven, templateId, attachment),
+    loadImage: (attachment) => readAttachmentBase64(haven, sourceId, attachment),
   })
   return importXlsxAsDocument(haven, bytes, subject, locale)
 }

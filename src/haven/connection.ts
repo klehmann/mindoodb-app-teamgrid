@@ -10,6 +10,7 @@ import {
   type MindooDBAppSession,
 } from 'mindoodb-app-sdk'
 
+import { LEGACY_FORM } from '../model/legacy'
 import { TEAMGRID_FORM, TEAMGRID_SCHEMA_VERSION, type Workbook } from '../model/schema'
 
 export interface WorkbookSummary {
@@ -17,6 +18,8 @@ export interface WorkbookSummary {
   subject: string
   istemplate: boolean
   updatedAt?: string
+  /** A TeamGrid 1.x workbook: opening it opens a copy in the current format. */
+  legacy?: boolean
 }
 
 export interface HavenConnection {
@@ -48,28 +51,43 @@ export function connectHaven(): Promise<HavenConnection | null> {
   return connection
 }
 
-export async function listWorkbooks(haven: HavenConnection): Promise<WorkbookSummary[]> {
-  const workbooks: WorkbookSummary[] = []
+/** Documents of one form: id, the listed fields, last change. */
+async function listForm(haven: HavenConnection, form: string) {
+  const items: { id: string; data: Record<string, unknown>; updatedAt?: string }[] = []
   let cursor: string | null = null
   do {
     const page = await haven.database.documents.list({
       cursor,
       limit: 200,
-      filter: { form: TEAMGRID_FORM },
-      fields: ['subject', 'form', 'istemplate'],
+      filter: { form },
+      fields: ['subject', 'form', 'istemplate', 'copiedFrom'],
     })
     for (const item of page.items) {
-      if (item.data?.form !== TEAMGRID_FORM) continue
-      workbooks.push({
-        id: item.id,
-        subject: typeof item.data.subject === 'string' && item.data.subject ? item.data.subject : item.id,
-        istemplate: item.data.istemplate === true,
-        ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}),
-      })
+      if (item.data?.form === form) items.push({ id: item.id, data: item.data, ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}) })
     }
     cursor = page.items.length > 0 ? page.nextCursor : null
   } while (cursor)
-  return workbooks.sort((left, right) => left.subject.localeCompare(right.subject))
+  return items
+}
+
+/**
+ * The workbooks to offer: the current ones, plus TeamGrid 1.x workbooks that
+ * have no copy yet (opening one copies it, see legacy-copy.ts).
+ */
+export async function listWorkbooks(haven: HavenConnection): Promise<WorkbookSummary[]> {
+  const [current, legacy] = await Promise.all([listForm(haven, TEAMGRID_FORM), listForm(haven, LEGACY_FORM)])
+  const copied = new Set(current.map((item) => item.data.copiedFrom).filter((id): id is string => typeof id === 'string'))
+  const summary = (item: (typeof current)[number], isLegacy: boolean): WorkbookSummary => ({
+    id: item.id,
+    subject: typeof item.data.subject === 'string' && item.data.subject ? item.data.subject : item.id,
+    istemplate: item.data.istemplate === true,
+    ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}),
+    ...(isLegacy ? { legacy: true } : {}),
+  })
+  return [
+    ...current.map((item) => summary(item, false)),
+    ...legacy.filter((item) => !copied.has(item.id)).map((item) => summary(item, true)),
+  ].sort((left, right) => left.subject.localeCompare(right.subject))
 }
 
 export interface WorkbookProperties {

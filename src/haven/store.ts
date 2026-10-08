@@ -176,15 +176,30 @@ export async function writeWorkbook(haven: HavenConnection, loaded: LoadedWorkbo
   }
 }
 
+/** Document fields of a new workbook beyond its title. */
+export interface NewWorkbookFields {
+  tags?: string[]
+  istemplate?: boolean
+  /** The TeamGrid 1.x document this workbook was copied from. */
+  copiedFrom?: string
+}
+
 /** Creates a workbook: the top document, then its chunks with their content. */
-export async function createWorkbook(haven: HavenConnection, subject: string, next: Workbook, writes: WorkbookWrites) {
+export async function createWorkbook(
+  haven: HavenConnection,
+  subject: string,
+  next: Workbook,
+  writes: WorkbookWrites,
+  fields: NewWorkbookFields = {},
+) {
   const created = await haven.database.documents.create({
     set: toStored({
       form: TEAMGRID_FORM,
       kind: TEAMGRID_KIND,
       subject,
-      tags: [],
-      istemplate: false,
+      tags: fields.tags ?? [],
+      istemplate: fields.istemplate ?? false,
+      ...(fields.copiedFrom ? { copiedFrom: fields.copiedFrom } : {}),
       teamgrid: { schemaVersion: TEAMGRID_SCHEMA_VERSION, workbook: topWorkbook(next) },
     }) as Record<string, unknown>,
   })

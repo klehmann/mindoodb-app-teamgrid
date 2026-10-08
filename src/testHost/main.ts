@@ -7,6 +7,7 @@
 import type { MindooDBAppDefinition } from 'mindoodb-app-sdk'
 import { mockDatabasesFromDefinition, mountHavenTestHost } from 'mindoodb-app-sdk/testing'
 
+import { LEGACY } from '../testing/legacy-sample'
 import { CONTACTS, CONTACTS_VIEW, openContactsView } from './contacts-view'
 
 async function start() {
@@ -25,7 +26,7 @@ async function start() {
     },
     // Real Automerge documents: saves merge at their baseHeads as in Haven, and
     // __havenTestHost.applyRemoteUpdate plays a second device.
-    databases: mockDatabasesFromDefinition(definition, { teamgrid: CONTACTS }, { automerge: true }).map((database) =>
+    databases: mockDatabasesFromDefinition(definition, { teamgrid: [...CONTACTS, { id: 'teamgrid1_sample', data: LEGACY }] }, { automerge: true }).map((database) =>
       database.info.id === 'teamgrid'
         ? { ...database, methods: { ...database.methods, views: { open: (_id, options) => openContactsView(options) } } }
         : database,

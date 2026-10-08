@@ -92,6 +92,16 @@ eight TeamGrid languages (from `Intl`, plus Excel's German "Mrz"/"Mo" style),
 the list that holds every source cell, the UI language first, and the source's
 writing (JANUAR → FEBRUAR).
 
+## TeamGrid 1.x workbooks
+
+Workbooks of TeamGrid 1.x (form `teamgrid`) are listed next to the current
+ones. Opening one creates a copy in the current format (form
+`teamgrid-next`, field `copiedFrom` = the original's id) and opens that; the
+original is never written. From then on the list shows the copy instead of
+the original. The conversion keeps all ids, so formulas, chart ranges and
+view sheets stay bound (`src/model/legacy.ts`, `src/haven/legacy-copy.ts`).
+The test host seeds a 1.x sample workbook ("Umsatz 2025").
+
 ## Small screens
 
 Below 1100px the tab row uses short labels and tabs that do not fit go
@@ -113,6 +123,4 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
   names, tab colors; chart types GenOffice cannot create (bubble, stock,
   surface) and chart styling beyond its chart-add options.
 - Not yet: WASM in a Web Worker, revisions (Haven time travel), encryption,
-  the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP, and opening
-  TeamGrid 1.x workbooks (form `teamgrid`): the new editor lists and opens only
-  its own (form `teamgrid-next`).
+  the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.
