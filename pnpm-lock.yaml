@@ -56,8 +56,8 @@ importers:
         specifier: ^0.8.3
         version: 0.8.3
       mindoodb-app-sdk:
-        specifier: 0.0.62
-        version: 0.0.62(@automerge/automerge@3.4.1)
+        specifier: 0.0.66
+        version: 0.0.66(@automerge/automerge@3.4.1)(mindoodb@0.0.74)
       mindoodb-view-language:
         specifier: 0.0.16
         version: 0.0.16
@@ -157,6 +157,9 @@ packages:
 
   '@automerge/automerge@3.4.1':
     resolution: {integrity: sha512-zsZpbs/iDPvp+ZojIYd+gxmbcPVz2Xbkcx778G8zrt3E0zS+6saHJOm666lOuZyNRlTV4wHw9qzGTKueedeCsQ==}
+
+  '@automerge/automerge@3.5.0':
+    resolution: {integrity: sha512-ejbqJWfXWM2QbTcUK/5ugYiQiyOP7LYVAp/RuSvthCc07oek0FClMxEuouuhjrLjVPDSI34RP1ftGc45PF7WRA==}
 
   '@babel/code-frame@7.29.0':
     resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
@@ -2569,12 +2572,12 @@ packages:
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
 
-  mindoodb-app-sdk@0.0.62:
-    resolution: {integrity: sha512-WFU5RQ3mcoFr42Ur27sgoxQkQzns/WxDtc6vaooqp7/XH4XbvpVcyyUnzVPZw5HrM2obJqe9WisRGFIn3nvcpw==}
+  mindoodb-app-sdk@0.0.66:
+    resolution: {integrity: sha512-kKDmsjW/nc+DGITM1fPa0X0uV3Pcao7Tx2dw5lTwzr3/4g5rknHCev14Du9YOYaxSpSAQVEDYG3mQow5p7nmww==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
       '@automerge/automerge': ^3.3.2
-      mindoodb: '>=0.0.71'
+      mindoodb: '>=0.0.74'
     peerDependenciesMeta:
       '@automerge/automerge':
         optional: true
@@ -2611,8 +2614,8 @@ packages:
       tweetnacl:
         optional: true
 
-  mindoodb@0.0.67:
-    resolution: {integrity: sha512-JC7DiDNhFEtdsZKUTq82ZmNo9TP19I/cDXaZd+QBU/Vm58h/3etenF6Nz121KQh5gBKEatJM10kwxseJLFMS4g==}
+  mindoodb@0.0.74:
+    resolution: {integrity: sha512-EHUGeQeC6orHcleJqAFbdKO2BBAqwqXHPkJLGmQDvjoLK/EL8gtb9JOlp3V3KJy+DHuGJnTbBOleKSboz9cmzQ==}
     engines: {node: '>=22.13.0'}
     hasBin: true
     peerDependencies:
@@ -3494,6 +3497,8 @@ snapshots:
   '@asamuzakjp/nwsapi@2.3.9': {}
 
   '@automerge/automerge@3.4.1': {}
+
+  '@automerge/automerge@3.5.0': {}
 
   '@babel/code-frame@7.29.0':
     dependencies:
@@ -5918,11 +5923,12 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mindoodb-app-sdk@0.0.62(@automerge/automerge@3.4.1):
+  mindoodb-app-sdk@0.0.66(@automerge/automerge@3.4.1)(mindoodb@0.0.74):
     dependencies:
       mindoodb-view-language: 0.0.18
     optionalDependencies:
       '@automerge/automerge': 3.4.1
+      mindoodb: 0.0.74
     transitivePeerDependencies:
       - '@number0/iroh'
       - expo-standard-web-crypto
@@ -5943,7 +5949,7 @@ snapshots:
 
   mindoodb-view-language@0.0.18:
     dependencies:
-      mindoodb: 0.0.67
+      mindoodb: 0.0.74
     transitivePeerDependencies:
       - '@number0/iroh'
       - expo-standard-web-crypto
@@ -5958,11 +5964,10 @@ snapshots:
       minisearch: 7.2.0
       uuid: 11.1.1
 
-  mindoodb@0.0.67:
+  mindoodb@0.0.74:
     dependencies:
-      '@automerge/automerge': 3.4.1
+      '@automerge/automerge': 3.5.0
       minisearch: 7.2.0
-      uuid: 11.1.1
 
   miniflare@4.20260508.0:
     dependencies:
