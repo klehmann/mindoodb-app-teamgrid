@@ -35,6 +35,8 @@
 
 import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 
+import type { StoredRule } from './rules'
+
 import type { WorkbookFile, WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 
 /** GenOffice's description of a visual added in the editor (save request). */
@@ -113,6 +115,9 @@ export interface IdArea {
   startColumnId: ColumnId
   endRowId: RowId
   endColumnId: ColumnId
+  /** Reaches past the last row/column with an id to the sheet's end (A:A, 1:1). */
+  rowsToEnd?: true
+  columnsToEnd?: true
 }
 
 /** One column's criteria of an autoFilter (GenOffice's filter column state). */
@@ -231,6 +236,9 @@ export interface Worksheet {
   /** The sheet's autoFilter: its area and the criteria per column offset. */
   autoFilter?: { area: IdArea; columns: FilterColumn[] }
   pageSetup?: PageSetup
+  /** Conditional formats and data validation rules, keyed by content (rules.ts). */
+  conditionalFormatsById?: Record<string, StoredRule>
+  dataValidationsById?: Record<string, StoredRule>
   rowOrder: RowId[]
   columnOrder: ColumnId[]
   rowsById: Record<RowId, RowMeta>

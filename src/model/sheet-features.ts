@@ -11,13 +11,27 @@ type PageSetupState = WorkbookSaveRequest['pageSetupStates'][number]
 /** An area by ids; undefined when a corner lies outside the sheet's rows/columns. */
 export function areaToIds(area: CellArea, rowIds: readonly RowId[], columnIds: readonly ColumnId[]): IdArea | undefined {
   const startRowId = rowIds[area.startRow]
-  const endRowId = rowIds[area.endRow]
   const startColumnId = columnIds[area.startColumn]
-  const endColumnId = columnIds[area.endColumn]
-  return startRowId && endRowId && startColumnId && endColumnId
-    ? { startRowId, startColumnId, endRowId, endColumnId }
-    : undefined
+  // An area reaching past the grid (a whole column, a rule on rows not used
+  // yet) ends at the grid's last row/column and remembers to reach further.
+  const rowsToEnd = area.endRow >= rowIds.length
+  const columnsToEnd = area.endColumn >= columnIds.length
+  const endRowId = rowIds[Math.min(area.endRow, rowIds.length - 1)]
+  const endColumnId = columnIds[Math.min(area.endColumn, columnIds.length - 1)]
+  if (!startRowId || !endRowId || !startColumnId || !endColumnId) return undefined
+  return {
+    startRowId,
+    startColumnId,
+    endRowId,
+    endColumnId,
+    ...(rowsToEnd ? { rowsToEnd: true as const } : {}),
+    ...(columnsToEnd ? { columnsToEnd: true as const } : {}),
+  }
 }
+
+/** Excel's last row and column (0-based). */
+const LAST_ROW = 1_048_575
+const LAST_COLUMN = 16_383
 
 /** An id area at its current positions; undefined when a corner was deleted. */
 export function areaToIndices(
@@ -26,9 +40,9 @@ export function areaToIndices(
   columnIndex: ReadonlyMap<ColumnId, number>,
 ): CellArea | undefined {
   const startRow = rowIndex.get(area.startRowId)
-  const endRow = rowIndex.get(area.endRowId)
+  const endRow = area.rowsToEnd ? LAST_ROW : rowIndex.get(area.endRowId)
   const startColumn = columnIndex.get(area.startColumnId)
-  const endColumn = columnIndex.get(area.endColumnId)
+  const endColumn = area.columnsToEnd ? LAST_COLUMN : columnIndex.get(area.endColumnId)
   return startRow !== undefined && endRow !== undefined && startColumn !== undefined && endColumn !== undefined
     ? { startRow, endRow, startColumn, endColumn }
     : undefined
@@ -45,6 +59,30 @@ function columnLabel(index: number): string {
   for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) label = String.fromCharCode(65 + ((n - 1) % 26)) + label
   return label
 }
+
+/** Rows and columns the sheet's rules, filter, links, notes and print area reach (counts). */
+export function featureExtent(sheet: SidecarSheet): { rows: number; columns: number } {
+  let rows = 0
+  let columns = 0
+  // Areas close to the used grid get ids for every cell; far-reaching ones
+  // (A:A) end at the grid and are marked to reach on (areaToIds).
+  const area = (cells: CellArea) => {
+    if (cells.endRow < NEAR) rows = Math.max(rows, cells.endRow + 1)
+    if (cells.endColumn < NEAR) columns = Math.max(columns, cells.endColumn + 1)
+  }
+  const cell = (row: number, column: number) => area({ startRow: row, startColumn: column, endRow: row, endColumn: column })
+  for (const rule of sheet.conditionalRules ?? []) rule.ranges.forEach(area)
+  for (const rule of sheet.dataValidations ?? []) rule.ranges.forEach(area)
+  if (sheet.autoFilter) area(sheet.autoFilter)
+  for (const link of sheet.hyperlinks ?? []) cell(link.row, link.column)
+  for (const comment of sheet.meta.comments ?? []) cell(comment.row, comment.column)
+  const printArea = sheet.meta.printArea ? parsePrintArea(sheet.meta.printArea) : undefined
+  if (printArea) area(printArea)
+  return { rows, columns }
+}
+
+/** How far past the used grid a feature area still gets ids of its own. */
+const NEAR = 2_000
 
 /** `'Daten'!$A$1:$D$20` (first range of a list) → its area. */
 export function parsePrintArea(text: string): CellArea | undefined {

@@ -137,8 +137,10 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
   autoFilter with its criteria, print settings (orientation, paper, scale,
   fit, margin preset, gridlines/headings, header/footer, print area, print
   titles, page breaks) and tab colors (`src/model/sheet-features.ts`).
-- Not stored yet (lost on reload): conditional formats, data validation,
-  tables, pivots, sparklines; chart types GenOffice cannot create (bubble, stock,
+- Conditional formats and data validation: Univer's rule JSON (made from the
+  file by GenOffice's own converters) with id-bound areas, keyed by content
+  (`src/model/rules.ts`).
+- Not stored yet (lost on reload): tables, pivots, sparklines; chart types GenOffice cannot create (bubble, stock,
   surface) and chart styling beyond its chart-add options.
 - Not yet: WASM in a Web Worker, encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

@@ -26,6 +26,7 @@ import {
   type LoadedWorkbook,
 } from '../haven/store'
 import { workbookToXlsx } from '../model/export'
+import { loadRuleConverters } from '../model/rules'
 import { readWholeWorkbook } from '../model/sidecar-read'
 import { emptyStoredWorkbook, newWorkbook, syncWorkbook, visualFileKey, type WorkbookWrites } from '../model/sync'
 import type { XlsxEngine } from './engine'
@@ -138,6 +139,7 @@ async function readNewImages(engine: XlsxEngine, sessionId: string, writes: Work
 /** Imports an xlsx as a new stored workbook and returns the new document id. */
 export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8Array, subject: string, locale: string) {
   const engine = await loadXlsxEngine()
+  await loadRuleConverters()
   const opened = (await engine.open(bytes, locale)) as WorkbookFile
   try {
     const { next, writes } = syncWorkbook({
@@ -224,6 +226,7 @@ export async function saveSession(request: WorkbookSaveRequest, locale: string):
   }
 
   const engine = await loadXlsxEngine()
+  await loadRuleConverters()
   const saved = (await engine.open(bytes, locale)) as WorkbookFile
   let sync
   try {

@@ -19,6 +19,7 @@ import { applyTabColors } from '../xlsx/tab-colors'
 import type { XlsxEngine } from '../xlsx/engine'
 import { createAxesLookup, NO_HOME, renderFormula, type SheetAxes } from './formula-refs'
 import { liveIds, liveSheets, type VisualId, type Workbook, type Worksheet } from './schema'
+import { cfState, dvState } from './rules'
 import { areaToIndices, pageSetupState } from './sheet-features'
 import { styleOf } from './styles'
 import { visualAddition } from './visuals'
@@ -206,6 +207,10 @@ function appendSheet(
   }
 
   if (notes.length) request.noteStates.push({ sheetId, notes })
+  const conditionalFormats = cfState(sheet.conditionalFormatsById, sheetId, rowIndex, columnIndex)
+  if (conditionalFormats) request.cfStates.push(conditionalFormats)
+  const validations = dvState(sheet.dataValidationsById, sheetId, rowIndex, columnIndex)
+  if (validations) request.dvStates.push(validations)
   const setup = pageSetupState(sheet.pageSetup, sheetId, rowIndex, columnIndex)
   if (setup) request.pageSetupStates.push(setup)
   const filterArea = sheet.autoFilter ? areaToIndices(sheet.autoFilter.area, rowIndex, columnIndex) : undefined

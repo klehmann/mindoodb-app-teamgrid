@@ -33,6 +33,7 @@ import {
 } from './schema'
 import type { SidecarWorkbook } from './sidecar-read'
 import { canonicalJson, toStyleEdit, withoutLegacyStyle } from './styles'
+import { featureExtent } from './sheet-features'
 import { anchorExtent, normalizeAnchor, sheetSizes, storedVisual } from './visuals'
 
 /** Rows a chunk takes before appending at its end opens a new one. */
@@ -291,6 +292,7 @@ function buildAll(
       deletedColumnIds: plan.columns.deleted,
       deletedAt,
       styles,
+      file: read.file,
       axes: lookup,
     })
   })
@@ -430,9 +432,11 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
     const id = storedIdByName.get(sheet.meta.name)
     if (!id) throw new Error(`Saved sheet ${sheet.meta.name} has no stored counterpart.`)
     const previous = workbook.worksheetsById[id] ?? emptySheet(id, sheet.meta.name)
-    // Ids must also cover the cells visuals are anchored to.
-    let rowCount = sheet.meta.rowCount
-    let columnCount = sheet.meta.columnCount
+    // Ids must also cover the cells visuals are anchored to, and the areas of
+    // rules, the filter, links and notes (a rule may reach past the last value).
+    const features = featureExtent(sheet)
+    let rowCount = Math.max(sheet.meta.rowCount, features.rows)
+    let columnCount = Math.max(sheet.meta.columnCount, features.columns)
     for (const visual of read.file.visuals) {
       if (visual.sheetId !== sheet.meta.id) continue
       const extent = anchorExtent(visual)
@@ -668,6 +672,14 @@ function diffWorkbook(
       top.map([...path, 'mergesById'], previous.mergesById, sheet.mergesById, false)
       top.list([...path, 'visualOrder'], previous.visualOrder ?? [], sheet.visualOrder)
       top.map([...path, 'visualsById'], previous.visualsById ?? {}, sheet.visualsById, false)
+      for (const field of ['conditionalFormatsById', 'dataValidationsById'] as const) {
+        const before = previous[field]
+        const after = sheet[field]
+        // A map that is missing on one side is put or removed whole.
+        if (before && after) top.map([...path, field], before, after, false)
+        else if (before) top.unset.push({ path: [...path, field] })
+        else if (after) top.put([...path, field], after)
+      }
       const scalars = (value: Record<string, unknown>) => {
         const {
           columnOrder: _c,
@@ -676,6 +688,8 @@ function diffWorkbook(
           mergesById: _m,
           visualOrder: _vo,
           visualsById: _v,
+          conditionalFormatsById: _cf,
+          dataValidationsById: _dv,
           ...rest
         } = value
         return rest

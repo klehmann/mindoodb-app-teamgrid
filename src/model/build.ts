@@ -16,6 +16,8 @@ import {
   type Worksheet,
 } from './schema'
 import type { SidecarSheet } from './sidecar-read'
+import type { WorkbookFile } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
+import { readConditionalFormats, readDataValidations } from './rules'
 import { attachNotesAndLinks, readAutoFilter, readPageSetup } from './sheet-features'
 import { canonicalJson, styleFields } from './styles'
 
@@ -33,6 +35,8 @@ export interface BuildSheetInput {
   deletedRowIds: ReadonlySet<RowId>
   deletedColumnIds: ReadonlySet<ColumnId>
   deletedAt: string
+  /** The file the sheet was read from (differential styles, names, sheets for rules). */
+  file: Pick<WorkbookFile, 'dxfStyles' | 'definedNames' | 'sheets'>
   /** Style table of the file the sheet was read from, by OOXML xf index (undefined = default). */
   styles: readonly (StoredStyle | undefined)[]
   axes: AxesLookup
@@ -150,6 +154,10 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
   if (autoFilter) next.autoFilter = autoFilter
   const pageSetup = readPageSetup(sheet, rowIds, columnIds)
   if (pageSetup) next.pageSetup = pageSetup
+  const conditionalFormats = readConditionalFormats(sheet, input.file.dxfStyles, rowIds, columnIds)
+  if (conditionalFormats) next.conditionalFormatsById = conditionalFormats
+  const dataValidations = readDataValidations(sheet, input.file, rowIds, columnIds)
+  if (dataValidations) next.dataValidationsById = dataValidations
   if (meta.hidden) next.hidden = true
   if (meta.tabColor) next.tabColor = meta.tabColor
   if (!meta.showGridLines) next.showGridLines = false
