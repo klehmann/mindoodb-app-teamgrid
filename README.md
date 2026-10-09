@@ -143,7 +143,12 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
 - Tables (built-in style, banded rows; custom styles fall back to Excel's
   default, totals rows are not written) and sparkline groups, with id-bound
   areas and sources (`src/model/objects.ts`).
-- Not stored yet (lost on reload): pivots; chart types GenOffice cannot create (bubble, stock,
+- PivotTables: their xlsx parts (table, cache definition, records) as an
+  attachment of the top document named by content hash, output area and
+  source range by id; put back into every file built, with both references
+  rewritten (`src/model/pivots.ts`, `src/xlsx/pivot-parts.ts`). Refresh in
+  the editor updates the parts, the next save stores them.
+- Not stored yet (lost on reload): chart types GenOffice cannot create (bubble, stock,
   surface) and chart styling beyond its chart-add options.
 - Not yet: WASM in a Web Worker, encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

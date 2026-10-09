@@ -33,6 +33,8 @@ import {
 } from './schema'
 import type { SidecarWorkbook } from './sidecar-read'
 import { canonicalJson, toStyleEdit, withoutLegacyStyle } from './styles'
+import type { ExtractedPivot } from '../xlsx/pivot-parts'
+import { storedPivots, type NewPivotParts } from './pivots'
 import { featureExtent } from './sheet-features'
 import { anchorExtent, normalizeAnchor, sheetSizes, storedVisual } from './visuals'
 
@@ -320,6 +322,8 @@ export interface SyncInput {
   read: SidecarWorkbook
   /** The session's visuals: file visual (`drawingPath#drawingIndex`) → stored id, and per sheet the file order. */
   visuals?: { byFileKey: ReadonlyMap<string, VisualId>; orderBySheet: ReadonlyMap<SheetId, VisualId[]> }
+  /** The saved file's PivotTables (pivot-parts.ts); omitted = none. */
+  pivots?: readonly ExtractedPivot[]
 }
 
 export interface SyncResult {
@@ -375,7 +379,7 @@ export function writesFor(stored: StoredWorkbook, next: Workbook, changedSheetId
   return { ...diffWorkbook(stored, next, createdChunks), newImages: [] }
 }
 
-export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals }: SyncInput): SyncResult {
+export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [] }: SyncInput): SyncResult {
   const workbook = stored.workbook
   // Visual anchors with their far corner in the cell it falls into.
   const sizesBySheet = new Map(fileRead.sheets.map((sheet) => [sheet.meta.id, sheetSizes(sheet)]))
@@ -485,6 +489,15 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
       sheet.visualOrder.push(id)
       sheet.visualsById[id] = visual
     })
+  }
+
+  const pivotUploads: NewPivotParts[] = []
+  for (const sheet of sheets) {
+    const pivotsById = storedPivots(sheet.name, pivots, plans.get(sheet.id)!.stored.pivotsById, lookup, pivotUploads)
+    if (pivotsById) sheet.pivotsById = pivotsById
+  }
+  for (const upload of pivotUploads) {
+    newImages.push({ attachment: upload.attachment, mediaType: 'application/json', fileVisualId: '', bytes: upload.bytes })
   }
 
   const namesById = definedNames(read, workbook.namesById ?? {}, (index) => {
@@ -672,7 +685,7 @@ function diffWorkbook(
       top.map([...path, 'mergesById'], previous.mergesById, sheet.mergesById, false)
       top.list([...path, 'visualOrder'], previous.visualOrder ?? [], sheet.visualOrder)
       top.map([...path, 'visualsById'], previous.visualsById ?? {}, sheet.visualsById, false)
-      for (const field of ['conditionalFormatsById', 'dataValidationsById', 'tablesById', 'sparklinesById'] as const) {
+      for (const field of ['conditionalFormatsById', 'dataValidationsById', 'tablesById', 'sparklinesById', 'pivotsById'] as const) {
         const before = previous[field] as Record<string, unknown> | undefined
         const after = sheet[field] as Record<string, unknown> | undefined
         // A map that is missing on one side is put or removed whole.
@@ -692,6 +705,7 @@ function diffWorkbook(
           dataValidationsById: _dv,
           tablesById: _t,
           sparklinesById: _s,
+          pivotsById: _p,
           ...rest
         } = value
         return rest

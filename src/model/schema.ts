@@ -36,6 +36,7 @@
 import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 
 import type { StoredSparklineGroup, StoredTable } from './objects'
+import type { StoredPivot } from './pivots'
 import type { StoredRule } from './rules'
 
 import type { WorkbookFile, WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
@@ -243,6 +244,8 @@ export interface Worksheet {
   /** Tables by lower-case name, sparkline groups by content (objects.ts). */
   tablesById?: Record<string, StoredTable>
   sparklinesById?: Record<string, StoredSparklineGroup>
+  /** PivotTables by lower-case name (pivots.ts). */
+  pivotsById?: Record<string, StoredPivot>
   rowOrder: RowId[]
   columnOrder: ColumnId[]
   rowsById: Record<RowId, RowMeta>

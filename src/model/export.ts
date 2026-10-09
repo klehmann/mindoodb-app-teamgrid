@@ -15,7 +15,9 @@ import type {
   WorkbookStructuralOp,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
+import { injectPivots, type PivotParts } from '../xlsx/pivot-parts'
 import { applyTabColors } from '../xlsx/tab-colors'
+import { pivotPlacements } from './pivots'
 import type { XlsxEngine } from '../xlsx/engine'
 import { createAxesLookup, NO_HOME, renderFormula, type SheetAxes } from './formula-refs'
 import { liveIds, liveSheets, type VisualId, type Workbook, type Worksheet } from './schema'
@@ -163,6 +165,18 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     bytes,
     new Map(sheets.filter((sheet) => sheet.tabColor).map((sheet) => [sheet.name, sheet.tabColor!])),
   ))
+  if (options.loadImage) {
+    const loadImage = options.loadImage
+    const placements = await pivotPlacements(sheets, lookup, async (attachment) => {
+      const base64 = await loadImage(attachment).catch(() => undefined)
+      if (!base64) return undefined
+      const binary = atob(base64)
+      const raw = new Uint8Array(binary.length)
+      for (let index = 0; index < binary.length; index += 1) raw[index] = binary.charCodeAt(index)
+      return JSON.parse(new TextDecoder().decode(raw)) as PivotParts
+    })
+    bytes = new Uint8Array(await injectPivots(bytes, placements))
+  }
   return { bytes, visualOrder }
 }
 

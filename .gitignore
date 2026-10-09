@@ -7,3 +7,4 @@ coverage/
 settings.json
 public/test-fixture.xlsx
 public/frame-test.html
+public/pivot-fixture.xlsx

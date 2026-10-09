@@ -26,6 +26,7 @@ import {
   type LoadedWorkbook,
 } from '../haven/store'
 import { workbookToXlsx } from '../model/export'
+import { extractPivots } from './pivot-parts'
 import { loadRuleConverters } from '../model/rules'
 import { readWholeWorkbook } from '../model/sidecar-read'
 import { emptyStoredWorkbook, newWorkbook, syncWorkbook, visualFileKey, type WorkbookWrites } from '../model/sync'
@@ -132,6 +133,8 @@ export async function openHistoricalWorkbook(haven: HavenConnection, id: string,
 /** Reads the bytes of pictures a save or import adds, while the file's session is open. */
 async function readNewImages(engine: XlsxEngine, sessionId: string, writes: WorkbookWrites) {
   for (const image of writes.newImages) {
+    // Pivot parts come with their bytes; pictures are read from the file.
+    if (image.bytes) continue
     image.bytes = await engine.readMediaBytes({ sessionId, visualId: image.fileVisualId })
   }
 }
@@ -146,6 +149,7 @@ export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8A
       stored: emptyStoredWorkbook(),
       storedIdByFileId: new Map(),
       read: await readWholeWorkbook(engine, opened),
+      pivots: await extractPivots(bytes),
     })
     await readNewImages(engine, opened.sessionId, writes)
     return await createWorkbook(haven, subject, next, writes)
@@ -236,6 +240,7 @@ export async function saveSession(request: WorkbookSaveRequest, locale: string):
       request,
       read: await readWholeWorkbook(engine, saved),
       visuals: document.visuals,
+      pivots: await extractPivots(bytes),
     })
     await readNewImages(engine, saved.sessionId, sync.writes)
   } finally {
