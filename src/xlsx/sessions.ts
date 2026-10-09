@@ -16,6 +16,7 @@ import {
   type WorkbookSaveRequest,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import type { HavenConnection } from '../haven/connection'
+import { loadWorkbookAt } from '../haven/history'
 import { workbookToOpen } from '../haven/legacy-copy'
 import {
   createWorkbook,
@@ -54,6 +55,7 @@ async function openBytes(
   name: string,
   locale: string,
   document?: Omit<StoredDocument, 'storedIdByFileId' | 'visuals'> & { visualOrder: Map<string, string[]> },
+  readOnly = false,
 ) {
   const engine = await loadXlsxEngine()
   const opened = (await engine.open(bytes, locale)) as Omit<WorkbookFile, 'sha256' | 'readOnly'>
@@ -90,7 +92,7 @@ async function openBytes(
     name,
     sha256: await sha256Hex(bytes),
     fileBytes: bytes.byteLength,
-    readOnly: document ? !document.haven.canWrite : false,
+    readOnly: readOnly || (document ? !document.haven.canWrite : false),
     // A stored workbook saves in place; a plain xlsx asks where to put it.
     needsSaveAs: !document,
   })
@@ -112,6 +114,18 @@ async function openLoaded(haven: HavenConnection, loaded: LoadedWorkbook, engine
     loadImage: (attachment) => readAttachmentBase64(haven, loaded.id, attachment),
   })
   return openBytes(bytes, loaded.subject, locale, { haven, loaded, visualOrder })
+}
+
+/**
+ * Opens a workbook as it was at `timestamp`, read-only and detached from its
+ * document: nothing the editor does reaches the stored workbook.
+ */
+export async function openHistoricalWorkbook(haven: HavenConnection, id: string, timestamp: number, locale: string) {
+  const { subject, workbook } = await loadWorkbookAt(haven, id, timestamp)
+  const { bytes } = await workbookToXlsx(workbook, await loadXlsxEngine(), {
+    loadImage: (attachment) => readAttachmentBase64(haven, id, attachment).catch(() => undefined),
+  })
+  return (await openBytes(bytes, subject, locale, undefined, true)).file
 }
 
 /** Reads the bytes of pictures a save or import adds, while the file's session is open. */

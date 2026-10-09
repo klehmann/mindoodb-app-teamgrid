@@ -35,7 +35,7 @@ export interface LoadedWorkbook {
   feedCursor: string | null
 }
 
-function chunkContentOf(document: MindooDBAppDocument): ChunkContent {
+export function chunkContentOf(document: Pick<MindooDBAppDocument, 'data'>): ChunkContent {
   const data = document.data as Partial<ChunkContent>
   return {
     sheetId: data.sheetId ?? '',

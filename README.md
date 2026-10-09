@@ -102,6 +102,18 @@ the original. The conversion keeps all ids, so formulas, chart ranges and
 view sheets stay bound (`src/model/legacy.ts`, `src/haven/legacy-copy.ts`).
 The test host seeds a 1.x sample workbook ("Umsatz 2025").
 
+## Revisions
+
+File → Browse revisions lists the open workbook's revisions: the timelines
+of the top document and its row blocks merged, the writes of one save (same
+author, within 1.5 s) counted once. Picking one opens the workbook as every
+document stood at that time, read-only and detached from the stored
+document, with a banner leading back to the current state
+(`src/haven/history.ts`). In Haven's time travel the whole app is read-only
+and a banner names the date. The mock only keeps document history from
+App SDK PR klehmann/mindoodb-app-sdk#20 on (`pnpm dev:local` with that
+branch checked out).
+
 ## Small screens
 
 Below 1100px the tab row uses short labels and tabs that do not fit go
@@ -125,5 +137,5 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
   filters, notes, hyperlinks, tables, pivots, sparklines, page setup, tab
   colors; chart types GenOffice cannot create (bubble, stock,
   surface) and chart styling beyond its chart-add options.
-- Not yet: WASM in a Web Worker, revisions (Haven time travel), encryption,
+- Not yet: WASM in a Web Worker, encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

@@ -26,6 +26,8 @@ export interface HavenConnection {
   session: MindooDBAppSession
   context: MindooDBAppLaunchContext
   database: MindooDBAppDatabase
+  databaseId: string
+  /** False in Haven's time travel, which opens every database read-only. */
   canWrite: boolean
 }
 
@@ -46,7 +48,8 @@ export function connectHaven(): Promise<HavenConnection | null> {
     if (!databaseId) throw new Error('Haven granted this app no database.')
     const database = await session.openDatabase(databaseId)
     const info = context.databases.find((entry) => entry.id === databaseId)
-    return { session, context, database, canWrite: info?.capabilities.includes('update') ?? false }
+    const canWrite = !context.timeTravelDate && (info?.capabilities.includes('update') ?? false)
+    return { session, context, database, databaseId, canWrite }
   })()
   return connection
 }
@@ -122,7 +125,7 @@ export async function writeProperties(haven: HavenConnection, id: string, proper
 }
 
 /** The top-document part of a stored workbook (sheets without their chunk fields). */
-export function topWorkbookOf(document: MindooDBAppDocument): Workbook {
+export function topWorkbookOf(document: Pick<MindooDBAppDocument, 'data'>): Workbook {
   const teamgrid = document.data.teamgrid as { schemaVersion?: number; workbook?: Workbook } | undefined
   if (!teamgrid?.workbook || teamgrid.schemaVersion !== TEAMGRID_SCHEMA_VERSION) {
     throw new Error('This document is not a TeamGrid workbook of this version.')

@@ -147,6 +147,41 @@ export function chooseWorkbook(
   })
 }
 
+export interface RevisionChoice {
+  timestamp: number
+  author?: string
+  current: boolean
+}
+
+/** Lists a workbook's revisions (newest first); resolves with the picked one or null. */
+export function chooseRevision<T extends RevisionChoice>(
+  revisions: readonly T[],
+  texts: { title: string; intro: string; empty: string; current: string },
+  strings: WelcomeStrings,
+  language: string,
+): Promise<T | null> {
+  return dialog<T>(texts.title, strings, (done) => {
+    const body = element('div')
+    body.append(element('div', 'tg-hint', texts.intro))
+    const list = element('ul')
+    if (revisions.length === 0) list.append(element('li', 'tg-empty', texts.empty))
+    const format = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'medium' })
+    for (const revision of revisions) {
+      const item = element('li')
+      const pick = element('button')
+      pick.type = 'button'
+      pick.append(element('span', undefined, format.format(revision.timestamp)))
+      const detail = [revision.author, revision.current ? texts.current : undefined].filter(Boolean).join(' · ')
+      if (detail) pick.append(element('span', 'tg-date', detail))
+      pick.addEventListener('click', () => done(revision))
+      item.append(pick)
+      list.append(item)
+    }
+    body.append(list)
+    return { body }
+  })
+}
+
 /** Asks for a title; resolves with it (the default when left empty) or null. */
 export function askTitle(title: string, initial: string, strings: WelcomeStrings): Promise<string | null> {
   return dialog<string>(title, strings, (done) => {

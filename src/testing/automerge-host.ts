@@ -67,8 +67,12 @@ export class AutomergeTestHost {
   private files = new Map<string, Uint8Array>()
   private feed: string[] = []
   private counter = 0
+  /** Every write per document: when, by whom, and the state it left (newest last). */
+  private history = new Map<string, { timestamp: number; publicKey: string; data: Record<string, unknown> }[]>()
   /** Actor of the next writes; set per replica in tests. */
   actor = HOST_ACTOR
+  /** Clock of the history entries (ms); tests advance it between saves. */
+  now = 1_000_000
 
   /** Merges another replica's documents into this one (both directions give the same result). */
   syncFrom(other: AutomergeTestHost): void {
@@ -85,6 +89,8 @@ export class AutomergeTestHost {
     copy.files = new Map(this.files)
     copy.feed = [...this.feed]
     copy.counter = this.counter
+    copy.history = new Map([...this.history].map(([id, entries]) => [id, [...entries]]))
+    copy.now = this.now
     copy.actor = actor ?? this.actor
     for (const [id, doc] of copy.docs) copy.docs.set(id, A.clone(doc, { actor: copy.actor }))
     return copy
@@ -97,10 +103,14 @@ export class AutomergeTestHost {
 
   private changed(id: string) {
     this.feed.push(id)
+    const entries = this.history.get(id) ?? []
+    entries.push({ timestamp: this.now, publicKey: this.actor, data: plain(this.docs.get(id)!) as Record<string, unknown> })
+    this.history.set(id, entries)
   }
 
   readonly connection: HavenConnection = {
     canWrite: true,
+    databaseId: 'test',
     session: {} as HavenConnection['session'],
     context: {} as HavenConnection['context'],
     database: {
@@ -127,6 +137,22 @@ export class AutomergeTestHost {
           this.docs.set(id, A.merge(this.docs.get(id)!, next))
           this.changed(id)
           return this.snapshot(id)
+        },
+        listHistory: async (id: string) =>
+          (this.history.get(id) ?? [])
+            .map((entry, index) => ({
+              revisionId: `${id}@${index}`,
+              timestamp: entry.timestamp,
+              publicKey: entry.publicKey,
+              isDeleted: false,
+              isCurrent: false,
+            }))
+            .reverse(),
+        getAtTimestamp: async (id: string, timestamp: number) => {
+          const entry = [...(this.history.get(id) ?? [])].reverse().find((candidate) => candidate.timestamp <= timestamp)
+          return entry
+            ? { id, timestamp: entry.timestamp, state: 'exists', data: entry.data }
+            : { id, timestamp, state: 'missing', data: null }
         },
         getHeadCursor: async () => ({ cursor: String(this.feed.length) }),
         list: async (query: { cursor?: string | null }) => {

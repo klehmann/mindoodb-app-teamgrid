@@ -22,8 +22,12 @@ import {
 } from './haven/connection'
 import { installFillSeries } from './fill-series'
 import { installFileMenu, type FileAction } from './haven/file-menu'
+import { hideBanner, showBanner } from './haven/banner'
+import { canBrowseHistory, listRevisions } from './haven/history'
+import { historyStrings } from './haven/history-strings'
 import {
   askTitle,
+  chooseRevision,
   chooseWorkbook,
   closeWelcome,
   editProperties,
@@ -31,7 +35,7 @@ import {
   welcomeStrings,
   type WelcomeChoice,
 } from './haven/welcome'
-import { changedSinceLoad } from './haven/store'
+import { changedSinceLoad, loadWorkbook } from './haven/store'
 import { loadXlsxEngine } from './xlsx/engine'
 import { viewSheetCommands, type ViewSheetCommands } from './haven/view-sheets'
 import {
@@ -39,6 +43,7 @@ import {
   createEmptyDocument,
   createFromTemplate,
   importXlsxAsDocument,
+  openHistoricalWorkbook,
   openStoredWorkbook,
   openWorkbookBytes,
   readPivotDefinition,
@@ -142,9 +147,52 @@ function toUiTheme(mode: string | undefined): UiTheme {
   return mode === 'light' || mode === 'dark' ? mode : 'system'
 }
 
-function opened(file: WorkbookFile): WorkbookFile {
+/** A revision to open next (File → Browse revisions), and the workbook the open session shows an older state of. */
+let pendingRevision: { id: string; timestamp: number } | null = null
+let historicalOf: string | null = null
+/** Haven's time travel: everything is read-only as of this time (ms). */
+let timeTravelDate: number | null = null
+
+function opened(file: WorkbookFile, revisionOf: string | null = null): WorkbookFile {
   activeSessionId = file.sessionId
+  historicalOf = revisionOf
+  if (revisionOf) {
+    const strings = historyStrings(welcomeLanguage)
+    showBanner(strings.historicalBanner, { label: strings.returnToCurrent, run: () => openInEditor(revisionOf) })
+  } else if (!timeTravelDate) {
+    hideBanner()
+  }
   return file
+}
+
+function showTimeTravelBanner(): void {
+  if (!timeTravelDate) return
+  const date = new Intl.DateTimeFormat(welcomeLanguage, { dateStyle: 'medium', timeStyle: 'short' }).format(timeTravelDate)
+  showBanner(historyStrings(welcomeLanguage).timeTravelBanner.replace('{date}', date))
+}
+
+/** Lists the open workbook's revisions and opens the picked one read-only (or the current state). */
+async function browseRevisions(haven: HavenConnection): Promise<void> {
+  const id = historicalOf ?? (activeSessionId ? storedDocumentOf(activeSessionId)?.loaded.id : undefined)
+  if (!id) return
+  const strings = historyStrings(welcomeLanguage)
+  await waitForSave()
+  let revisions
+  try {
+    revisions = await listRevisions(haven, await loadWorkbook(haven, id))
+  } catch (error) {
+    console.error('[newui] listing revisions failed', error)
+    showBanner(strings.listFailed)
+    return
+  }
+  const picked = await chooseRevision(revisions, strings, welcomeStrings(welcomeLanguage), welcomeLanguage)
+  if (!picked) return
+  if (picked.current) {
+    openInEditor(id)
+    return
+  }
+  pendingRevision = { id, timestamp: picked.timestamp }
+  devHooks.menu('open')
 }
 
 /** Creates or picks the workbook a welcome-screen or file-menu choice stands for. */
@@ -163,6 +211,17 @@ async function workbookForChoice(haven: HavenConnection, choice: WelcomeChoice):
  * import) until something opened; with one open, the list of workbooks.
  */
 async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFile | null> {
+  if (pendingRevision) {
+    const { id, timestamp } = pendingRevision
+    pendingRevision = null
+    try {
+      return opened(await openHistoricalWorkbook(haven, id, timestamp, language), id)
+    } catch (error) {
+      console.error('[newui] opening the revision failed', error)
+      showBanner(historyStrings(welcomeLanguage).loadFailed)
+      return null
+    }
+  }
   if (pendingDocumentId) {
     const id = pendingDocumentId
     pendingDocumentId = null
@@ -234,6 +293,8 @@ async function onFileAction(haven: HavenConnection, action: FileAction): Promise
     const session = sessionFor(activeSessionId!)
     // The title may have changed in the properties since the session opened.
     download(session.bytes, storedDocumentOf(activeSessionId!)?.loaded.subject ?? session.name)
+  } else if (action === 'revisions') {
+    await browseRevisions(haven)
   } else if (action === 'properties' && stored) {
     const properties = await editProperties(await readProperties(haven, stored.loaded.id), strings)
     if (!properties) return
@@ -372,7 +433,9 @@ export async function installDesktopApiShim(): Promise<void> {
   ;(window as unknown as { desktopApi: unknown }).desktopApi = api
   ;(window as unknown as { __newui: unknown }).__newui = devHooks
   if (haven) {
-    watchRemoteChanges(haven)
+    timeTravelDate = haven.context.timeTravelDate ?? null
+    // Time travel is a frozen state: nothing changes underneath.
+    if (!timeTravelDate) watchRemoteChanges(haven)
     const connected = haven
     ;(window as unknown as { teamGridViewSheets: ViewSheetCommands }).teamGridViewSheets = viewSheetCommands({
       haven: connected,
@@ -382,9 +445,16 @@ export async function installDesktopApiShim(): Promise<void> {
       waitForSave,
       reopen: reopenAt,
     })
-    setFileMenuStrings = installFileMenu(welcomeStrings(welcomeLanguage), haven.canWrite, (action) => {
-      onFileAction(haven!, action).catch((error) => console.error(`[newui] ${action} failed`, error))
-    })
+    const historyAvailable = canBrowseHistory(haven) && !timeTravelDate
+    setFileMenuStrings = installFileMenu(
+      welcomeStrings(welcomeLanguage),
+      haven.canWrite,
+      (action) => {
+        onFileAction(haven!, action).catch((error) => console.error(`[newui] ${action} failed`, error))
+      },
+      () => (historyAvailable ? historyStrings(welcomeLanguage).browseRevisions : undefined),
+    )
+    showTimeTravelBanner()
   }
   window.addEventListener(
     'keydown',

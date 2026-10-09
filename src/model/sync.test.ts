@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { changedSinceLoad, createWorkbook, loadWorkbook, writeWorkbook, type LoadedWorkbook } from '../haven/store'
+import { listRevisions, loadWorkbookAt } from '../haven/history'
 import { AutomergeTestHost } from '../testing/automerge-host'
 import { createAxesLookup, renderFormula } from './formula-refs'
 import { liveIds } from './schema'
@@ -220,5 +221,35 @@ describe('stored workbook', () => {
     await save(host, other, [['a'], ['b, edited elsewhere']])
     expect(await changedSinceLoad(host.connection, watching)).toBe(true)
     expect(await changedSinceLoad(host.connection, watching)).toBe(false)
+  })
+})
+
+describe('revisions', () => {
+  /** Values by visible row of the workbook's first sheet. */
+  function values(workbook: import('./schema').Workbook): Grid {
+    const sheet = Object.values(workbook.worksheetsById)[0]!
+    const axes = sheetAxes(sheet)
+    return liveIds(sheet.rowOrder, sheet.rowsById).map((rowId) =>
+      axes.columnIds.map((columnId) => (sheet.cellsById[`${rowId}:${columnId}`]?.value ?? null) as string | number | null),
+    )
+  }
+
+  it('lists one revision per save and reads the workbook as it was then', async () => {
+    const host = new AutomergeTestHost()
+    const id = await importGrid(host, [['a', 1], ['b', 2]])
+    host.now += 60_000
+    await save(host, await loadWorkbook(host.connection, id), [['a', 10], ['b', 2]])
+    host.now += 60_000
+    host.actor = 'bb'.repeat(16)
+    await save(host, await loadWorkbook(host.connection, id), [['a', 10], ['b', 2], ['c', 3]])
+
+    const revisions = await listRevisions(host.connection, await loadWorkbook(host.connection, id))
+    expect(revisions.map((revision) => revision.current)).toEqual([true, false, false])
+    expect(revisions[0]!.timestamp).toBeGreaterThan(revisions[1]!.timestamp)
+
+    const at = async (index: number) => values((await loadWorkbookAt(host.connection, id, revisions[index]!.timestamp)).workbook)
+    expect(await at(2)).toEqual([['a', 1], ['b', 2]])
+    expect(await at(1)).toEqual([['a', 10], ['b', 2]])
+    expect(await at(0)).toEqual([['a', 10], ['b', 2], ['c', 3]])
   })
 })
