@@ -140,7 +140,10 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
 - Conditional formats and data validation: Univer's rule JSON (made from the
   file by GenOffice's own converters) with id-bound areas, keyed by content
   (`src/model/rules.ts`).
-- Not stored yet (lost on reload): tables, pivots, sparklines; chart types GenOffice cannot create (bubble, stock,
+- Tables (built-in style, banded rows; custom styles fall back to Excel's
+  default, totals rows are not written) and sparkline groups, with id-bound
+  areas and sources (`src/model/objects.ts`).
+- Not stored yet (lost on reload): pivots; chart types GenOffice cannot create (bubble, stock,
   surface) and chart styling beyond its chart-add options.
 - Not yet: WASM in a Web Worker, encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

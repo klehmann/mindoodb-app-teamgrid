@@ -19,6 +19,7 @@ import { applyTabColors } from '../xlsx/tab-colors'
 import type { XlsxEngine } from '../xlsx/engine'
 import { createAxesLookup, NO_HOME, renderFormula, type SheetAxes } from './formula-refs'
 import { liveIds, liveSheets, type VisualId, type Workbook, type Worksheet } from './schema'
+import { sparklineAdditions, tableAdditions } from './objects'
 import { cfState, dvState } from './rules'
 import { areaToIndices, pageSetupState } from './sheet-features'
 import { styleOf } from './styles'
@@ -211,6 +212,8 @@ function appendSheet(
   if (conditionalFormats) request.cfStates.push(conditionalFormats)
   const validations = dvState(sheet.dataValidationsById, sheetId, rowIndex, columnIndex)
   if (validations) request.dvStates.push(validations)
+  request.tableAdditions.push(...tableAdditions(sheet.tablesById, sheetId, rowIndex, columnIndex))
+  request.sparklineAdditions.push(...sparklineAdditions(sheet.sparklinesById, sheetId, home, lookup))
   const setup = pageSetupState(sheet.pageSetup, sheetId, rowIndex, columnIndex)
   if (setup) request.pageSetupStates.push(setup)
   const filterArea = sheet.autoFilter ? areaToIndices(sheet.autoFilter.area, rowIndex, columnIndex) : undefined

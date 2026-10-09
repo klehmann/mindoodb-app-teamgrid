@@ -35,6 +35,7 @@
 
 import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-schemas'
 
+import type { StoredSparklineGroup, StoredTable } from './objects'
 import type { StoredRule } from './rules'
 
 import type { WorkbookFile, WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
@@ -239,6 +240,9 @@ export interface Worksheet {
   /** Conditional formats and data validation rules, keyed by content (rules.ts). */
   conditionalFormatsById?: Record<string, StoredRule>
   dataValidationsById?: Record<string, StoredRule>
+  /** Tables by lower-case name, sparkline groups by content (objects.ts). */
+  tablesById?: Record<string, StoredTable>
+  sparklinesById?: Record<string, StoredSparklineGroup>
   rowOrder: RowId[]
   columnOrder: ColumnId[]
   rowsById: Record<RowId, RowMeta>

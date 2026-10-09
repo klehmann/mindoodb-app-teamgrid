@@ -156,3 +156,41 @@ describe('sheet features', () => {
     expect(backWorkbook.file.dxfStyles[highlight!.dxfIndex!]).toMatchObject({ bold: true, fillColor: expect.stringMatching(/FFFF00$/i) })
   })
 })
+
+describe('tables and sparklines', () => {
+  it.skipIf(!nodeEngineAvailable)('stores them by id and writes them back', async () => {
+    const engine = createNodeEngine()
+    const request = emptySaveRequest('source')
+    const rows = [['Monat', 'Umsatz', 'Kosten'], ['Jan', 10, 4], ['Feb', 12, 5], ['Mär', 9, 6]]
+    rows.forEach((row, rowIndex) =>
+      row.forEach((value, column) =>
+        request.edits.push({ sheetId: SHEET, row: rowIndex, column, writeValue: true, value } as never),
+      ),
+    )
+    request.tableAdditions.push({
+      sheetId: SHEET,
+      area: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 2 },
+      name: 'Zahlen',
+      columnNames: ['Monat', 'Umsatz', 'Kosten'],
+      style: 'TableStyleMedium9',
+      bandedRows: true,
+    } as WorkbookSaveRequest['tableAdditions'][number])
+    request.sparklineAdditions.push({
+      sheetId: SHEET,
+      type: 'line',
+      color: '#1F77B4',
+      cells: [{ cell: 'E2', sourceRef: 'Sheet1!B2:B4' }],
+    } as WorkbookSaveRequest['sparklineAdditions'][number])
+    const blank = new Uint8Array(await blankXlsxBuffer('Sheet1'))
+    const source = await read(engine, (await saveWorkbookInBrowser(blank, new Map([[SHEET, 'Sheet1']]), request)).bytes)
+
+    const { next } = syncWorkbook({ stored: emptyStoredWorkbook(), storedIdByFileId: new Map(), read: source })
+    const sheet = Object.values(next.worksheetsById)[0]!
+    expect(sheet.tablesById?.zahlen).toMatchObject({ name: 'Zahlen', style: 'TableStyleMedium9', bandedRows: true })
+    expect(Object.values(sheet.sparklinesById ?? {})).toHaveLength(1)
+
+    const back = (await read(engine, (await workbookToXlsx(next, engine)).bytes)).sheets[0]!
+    expect(back.meta.tables).toEqual(source.sheets[0]!.meta.tables)
+    expect(back.meta.sparklines).toEqual(source.sheets[0]!.meta.sparklines)
+  })
+})

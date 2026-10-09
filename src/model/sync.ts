@@ -672,9 +672,9 @@ function diffWorkbook(
       top.map([...path, 'mergesById'], previous.mergesById, sheet.mergesById, false)
       top.list([...path, 'visualOrder'], previous.visualOrder ?? [], sheet.visualOrder)
       top.map([...path, 'visualsById'], previous.visualsById ?? {}, sheet.visualsById, false)
-      for (const field of ['conditionalFormatsById', 'dataValidationsById'] as const) {
-        const before = previous[field]
-        const after = sheet[field]
+      for (const field of ['conditionalFormatsById', 'dataValidationsById', 'tablesById', 'sparklinesById'] as const) {
+        const before = previous[field] as Record<string, unknown> | undefined
+        const after = sheet[field] as Record<string, unknown> | undefined
         // A map that is missing on one side is put or removed whole.
         if (before && after) top.map([...path, field], before, after, false)
         else if (before) top.unset.push({ path: [...path, field] })
@@ -690,6 +690,8 @@ function diffWorkbook(
           visualsById: _v,
           conditionalFormatsById: _cf,
           dataValidationsById: _dv,
+          tablesById: _t,
+          sparklinesById: _s,
           ...rest
         } = value
         return rest

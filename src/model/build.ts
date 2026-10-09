@@ -17,6 +17,7 @@ import {
 } from './schema'
 import type { SidecarSheet } from './sidecar-read'
 import type { WorkbookFile } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
+import { readSparklines, readTables } from './objects'
 import { readConditionalFormats, readDataValidations } from './rules'
 import { attachNotesAndLinks, readAutoFilter, readPageSetup } from './sheet-features'
 import { canonicalJson, styleFields } from './styles'
@@ -158,6 +159,10 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
   if (conditionalFormats) next.conditionalFormatsById = conditionalFormats
   const dataValidations = readDataValidations(sheet, input.file, rowIds, columnIds)
   if (dataValidations) next.dataValidationsById = dataValidations
+  const tables = readTables(sheet, rowIds, columnIds)
+  if (tables) next.tablesById = tables
+  const sparklines = readSparklines(sheet, rowIds, columnIds, input.axes)
+  if (sparklines) next.sparklinesById = sparklines
   if (meta.hidden) next.hidden = true
   if (meta.tabColor) next.tabColor = meta.tabColor
   if (!meta.showGridLines) next.showGridLines = false

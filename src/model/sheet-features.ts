@@ -76,6 +76,13 @@ export function featureExtent(sheet: SidecarSheet): { rows: number; columns: num
   if (sheet.autoFilter) area(sheet.autoFilter)
   for (const link of sheet.hyperlinks ?? []) cell(link.row, link.column)
   for (const comment of sheet.meta.comments ?? []) cell(comment.row, comment.column)
+  for (const table of sheet.meta.tables ?? []) area(table.range)
+  for (const group of sheet.meta.sparklines ?? []) {
+    for (const entry of group.cells) {
+      const host = parsePrintArea(entry.cell)
+      if (host) area(host)
+    }
+  }
   const printArea = sheet.meta.printArea ? parsePrintArea(sheet.meta.printArea) : undefined
   if (printArea) area(printArea)
   return { rows, columns }
