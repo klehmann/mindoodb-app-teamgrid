@@ -133,9 +133,12 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
 - Defined names are stored by key (scope + lower-case name) with id-bound
   formulas, and written back on every open; formula cells are exported with
   their last result as cached value.
+- Stored with row/column ids: notes and hyperlinks (on their cells), the
+  autoFilter with its criteria, print settings (orientation, paper, scale,
+  fit, margin preset, gridlines/headings, header/footer, print area, print
+  titles, page breaks) and tab colors (`src/model/sheet-features.ts`).
 - Not stored yet (lost on reload): conditional formats, data validation,
-  filters, notes, hyperlinks, tables, pivots, sparklines, page setup, tab
-  colors; chart types GenOffice cannot create (bubble, stock,
+  tables, pivots, sparklines; chart types GenOffice cannot create (bubble, stock,
   surface) and chart styling beyond its chart-add options.
 - Not yet: WASM in a Web Worker, encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

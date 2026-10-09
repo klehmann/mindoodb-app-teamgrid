@@ -12,11 +12,20 @@ export type CellRecord = WorkbookRangeResult['cells'][number]
 export type RowRecord = WorkbookRangeResult['rows'][number]
 export type CellArea = WorkbookRangeResult['merges'][number]
 
-export interface SidecarSheet {
+/** Sheet-wide parts of a range read, delivered complete with any block. */
+type SheetWide = Pick<
+  WorkbookRangeResult,
+  'autoFilter' | 'autoFilterColumns' | 'rowBreaks' | 'colBreaks' | 'pageSetup'
+>
+
+export interface SidecarSheet extends Partial<SheetWide> {
   meta: SheetMetadata
   cells: CellRecord[]
   rows: RowRecord[]
   merges: CellArea[]
+  hyperlinks?: WorkbookRangeResult['hyperlinks']
+  conditionalRules?: WorkbookRangeResult['conditionalRules']
+  dataValidations?: WorkbookRangeResult['dataValidations']
 }
 
 export interface SidecarWorkbook {
@@ -35,6 +44,11 @@ export async function readWholeWorkbook(engine: XlsxEngine, file: WorkbookFile):
     const cells: CellRecord[] = []
     const rows: RowRecord[] = []
     const merges = new Map<string, CellArea>()
+    const hyperlinks: WorkbookRangeResult['hyperlinks'] = []
+    // Rules span ranges; a rule touching several blocks comes back with each.
+    const conditionalRules = new Map<string, WorkbookRangeResult['conditionalRules'][number]>()
+    const dataValidations = new Map<string, WorkbookRangeResult['dataValidations'][number]>()
+    let wide: Partial<SheetWide> = {}
     for (let startRow = 0; startRow < meta.rowCount; startRow += rowsPerRead) {
       const result = (await engine.readRange({
         sessionId: file.sessionId,
@@ -51,8 +65,29 @@ export async function readWholeWorkbook(engine: XlsxEngine, file: WorkbookFile):
       for (const merge of result.merges) {
         merges.set(`${merge.startRow}:${merge.startColumn}:${merge.endRow}:${merge.endColumn}`, merge)
       }
+      hyperlinks.push(...(result.hyperlinks ?? []))
+      for (const rule of result.conditionalRules ?? []) conditionalRules.set(JSON.stringify(rule), rule)
+      for (const rule of result.dataValidations ?? []) dataValidations.set(JSON.stringify(rule), rule)
+      if (startRow === 0) {
+        wide = {
+          autoFilter: result.autoFilter ?? null,
+          autoFilterColumns: result.autoFilterColumns ?? [],
+          rowBreaks: result.rowBreaks ?? [],
+          colBreaks: result.colBreaks ?? [],
+          pageSetup: result.pageSetup ?? null,
+        }
+      }
     }
-    sheets.push({ meta, cells, rows, merges: [...merges.values()] })
+    sheets.push({
+      meta,
+      cells,
+      rows,
+      merges: [...merges.values()],
+      hyperlinks,
+      conditionalRules: [...conditionalRules.values()],
+      dataValidations: [...dataValidations.values()],
+      ...wide,
+    })
   }
   return { file, sheets }
 }

@@ -16,6 +16,7 @@ import {
   type Worksheet,
 } from './schema'
 import type { SidecarSheet } from './sidecar-read'
+import { attachNotesAndLinks, readAutoFilter, readPageSetup } from './sheet-features'
 import { canonicalJson, styleFields } from './styles'
 
 export interface BuildSheetInput {
@@ -116,6 +117,8 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     if (Object.keys(cell).length > 0) cellsById[key] = cell
   }
 
+  attachNotesAndLinks(cellsById, sheet, rowIds, columnIds)
+
   const mergesById: Record<string, Merge> = {}
   for (const area of sheet.merges) {
     const merge: Merge = {
@@ -143,6 +146,10 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     visualsById: previous.visualsById ?? {},
   }
   if (previous.viewBinding) next.viewBinding = previous.viewBinding
+  const autoFilter = readAutoFilter(sheet, rowIds, columnIds)
+  if (autoFilter) next.autoFilter = autoFilter
+  const pageSetup = readPageSetup(sheet, rowIds, columnIds)
+  if (pageSetup) next.pageSetup = pageSetup
   if (meta.hidden) next.hidden = true
   if (meta.tabColor) next.tabColor = meta.tabColor
   if (!meta.showGridLines) next.showGridLines = false

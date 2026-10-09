@@ -15,9 +15,11 @@ import type {
   WorkbookStructuralOp,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
+import { applyTabColors } from '../xlsx/tab-colors'
 import type { XlsxEngine } from '../xlsx/engine'
 import { createAxesLookup, NO_HOME, renderFormula, type SheetAxes } from './formula-refs'
 import { liveIds, liveSheets, type VisualId, type Workbook, type Worksheet } from './schema'
+import { areaToIndices, pageSetupState } from './sheet-features'
 import { styleOf } from './styles'
 import { visualAddition } from './visuals'
 
@@ -155,6 +157,10 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     request.definedNamesState = { names: definedNames, preserveNames: [] } as WorkbookSaveRequest['definedNamesState']
     bytes = new Uint8Array((await saveWorkbookInBrowser(bytes, names, request)).bytes)
   }
+  bytes = new Uint8Array(await applyTabColors(
+    bytes,
+    new Map(sheets.filter((sheet) => sheet.tabColor).map((sheet) => [sheet.name, sheet.tabColor!])),
+  ))
   return { bytes, visualOrder }
 }
 
@@ -170,11 +176,14 @@ function appendSheet(
   const columnIndex = new Map(home.columnIds.map((id, index) => [id, index]))
 
   const edits: WorkbookCellEdit[] = request.edits
+  const notes: WorkbookSaveRequest['noteStates'][number]['notes'] = []
   for (const [key, cell] of Object.entries(sheet.cellsById)) {
     const [rowId, columnId] = key.split(':') as [string, string]
     const row = rowIndex.get(rowId)
     const column = columnIndex.get(columnId)
     if (row === undefined || column === undefined) continue
+    if (cell.note) notes.push({ row, column, author: cell.note.author, text: cell.note.text })
+    if (cell.link) request.hyperlinkEdits.push({ sheetId, row, column, target: cell.link })
     const style = styleOf(cell)
     const formula = cell.formula ? renderFormula(cell.formula, home, lookup) : undefined
     const hasContent = formula !== undefined || (cell.value !== undefined && cell.value !== null)
@@ -194,6 +203,23 @@ function appendSheet(
     if (formula !== undefined && cell.value !== undefined && cell.value !== null) {
       request.formulaValues.push({ sheetId, row, column, value: cell.value })
     }
+  }
+
+  if (notes.length) request.noteStates.push({ sheetId, notes })
+  const setup = pageSetupState(sheet.pageSetup, sheetId, rowIndex, columnIndex)
+  if (setup) request.pageSetupStates.push(setup)
+  const filterArea = sheet.autoFilter ? areaToIndices(sheet.autoFilter.area, rowIndex, columnIndex) : undefined
+  if (sheet.autoFilter && filterArea) {
+    const hiddenRows: number[] = []
+    for (let row = filterArea.startRow + 1; row <= filterArea.endRow; row += 1) {
+      if (sheet.rowsById[home.rowIds[row]!]?.hidden) hiddenRows.push(row)
+    }
+    request.filterStates.push({
+      sheetId,
+      filter: { range: filterArea, columns: sheet.autoFilter.columns },
+      hiddenRows,
+      visibilityRange: filterArea,
+    } as WorkbookSaveRequest['filterStates'][number])
   }
 
   const ops: WorkbookStructuralOp[] = request.structuralOps

@@ -101,6 +101,53 @@ interface LegacyStyleRef {
 export interface Cell extends StyleFields, LegacyStyleRef {
   value?: CellScalar
   formula?: Formula
+  /** A note (Excel's legacy comment). */
+  note?: { author: string; text: string }
+  /** Hyperlink target: a URL, or `#Sheet!A1` inside the workbook. */
+  link?: string
+}
+
+/** A cell area by its corner ids, so it moves with inserted rows and columns. */
+export interface IdArea {
+  startRowId: RowId
+  startColumnId: ColumnId
+  endRowId: RowId
+  endColumnId: ColumnId
+}
+
+/** One column's criteria of an autoFilter (GenOffice's filter column state). */
+export type FilterColumn = WorkbookSaveRequest['filterStates'][number] extends infer State
+  ? State extends { filter: { columns: (infer Column)[] } | null }
+    ? Column
+    : never
+  : never
+
+/** A header or footer: Excel's left/center/right sections, field codes verbatim. */
+export interface HeaderFooter {
+  left?: string
+  center?: string
+  right?: string
+}
+
+/** Print settings of a sheet, in GenOffice's page-setup terms; positions by id. */
+export interface PageSetup {
+  orientation?: 'portrait' | 'landscape'
+  paperSize?: number
+  scale?: number
+  fitToWidth?: number
+  fitToHeight?: number
+  fitToPage?: boolean
+  margins?: 'normal' | 'wide' | 'narrow'
+  printGridlines?: boolean
+  printHeadings?: boolean
+  header?: HeaderFooter
+  footer?: HeaderFooter
+  printArea?: IdArea
+  /** Rows repeated on every page. */
+  printTitleRows?: { startRowId: RowId; endRowId: RowId }
+  /** Manual breaks: the row/column after each break. */
+  rowBreaks?: RowId[]
+  colBreaks?: ColumnId[]
 }
 
 export interface RowMeta extends StyleFields, LegacyStyleRef {
@@ -181,6 +228,9 @@ export interface Worksheet {
   rightToLeft?: boolean
   frozenRows?: number
   frozenColumns?: number
+  /** The sheet's autoFilter: its area and the criteria per column offset. */
+  autoFilter?: { area: IdArea; columns: FilterColumn[] }
+  pageSetup?: PageSetup
   rowOrder: RowId[]
   columnOrder: ColumnId[]
   rowsById: Record<RowId, RowMeta>
