@@ -593,6 +593,8 @@ pub enum SheetPasswordHash {
     Legacy {
         legacy: String,
     },
+    // rename_all on the enum renames variants only; the fields need their own.
+    #[serde(rename_all = "camelCase")]
     Hashed {
         algorithm_name: String,
         hash_value: String,

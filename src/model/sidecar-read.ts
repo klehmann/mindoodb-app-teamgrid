@@ -15,7 +15,7 @@ export type CellArea = WorkbookRangeResult['merges'][number]
 /** Sheet-wide parts of a range read, delivered complete with any block. */
 type SheetWide = Pick<
   WorkbookRangeResult,
-  'autoFilter' | 'autoFilterColumns' | 'rowBreaks' | 'colBreaks' | 'pageSetup'
+  'autoFilter' | 'autoFilterColumns' | 'rowBreaks' | 'colBreaks' | 'pageSetup' | 'sheetProtection'
 >
 
 export interface SidecarSheet extends Partial<SheetWide> {
@@ -75,6 +75,7 @@ export async function readWholeWorkbook(engine: XlsxEngine, file: WorkbookFile):
           rowBreaks: result.rowBreaks ?? [],
           colBreaks: result.colBreaks ?? [],
           pageSetup: result.pageSetup ?? null,
+          sheetProtection: result.sheetProtection ?? null,
         }
       }
     }

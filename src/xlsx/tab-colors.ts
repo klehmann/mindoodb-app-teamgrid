@@ -1,6 +1,6 @@
-// Sheet tab colors, written straight into the worksheet parts: GenOffice's
-// save has no operation for them (the desktop app keeps a file's colors
-// verbatim), but TeamGrid builds every file from scratch.
+// Sheet tab colors and veryHidden sheets, written straight into the package:
+// GenOffice's save keeps them verbatim from the opened file but cannot set
+// them, and TeamGrid builds every file from scratch.
 import JSZip from 'jszip'
 
 /** `#RRGGBB` / `RRGGBB` / `AARRGGBB` → OOXML's ARGB, or undefined. */
@@ -50,4 +50,23 @@ export async function applyTabColors(bytes: Uint8Array, colors: ReadonlyMap<stri
     changed = true
   }
   return changed ? new Uint8Array(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })) : bytes
+}
+
+/** Marks the named sheets veryHidden (only a macro can show them again). */
+export async function applyVeryHidden(bytes: Uint8Array, names: ReadonlySet<string>): Promise<Uint8Array> {
+  if (names.size === 0) return bytes
+  const zip = await JSZip.loadAsync(bytes)
+  const workbookXml = await zip.file('xl/workbook.xml')?.async('text')
+  if (!workbookXml) return bytes
+  const unescape = (text: string) =>
+    text.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+  const next = workbookXml.replace(/<sheet\b[^>]*?\/?>/g, (element) => {
+    const name = /\bname="([^"]*)"/.exec(element)?.[1]
+    if (name === undefined || !names.has(unescape(name))) return element
+    const bare = element.replace(/\sstate="[^"]*"/, '')
+    return bare.replace(/^<sheet\b/, '<sheet state="veryHidden"')
+  })
+  if (next === workbookXml) return bytes
+  zip.file('xl/workbook.xml', next)
+  return new Uint8Array(await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' }))
 }

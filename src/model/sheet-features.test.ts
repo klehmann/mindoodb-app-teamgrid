@@ -11,6 +11,7 @@ import { FConditionalFormattingBuilder } from '@univerjs/sheets-conditional-form
 import { toUniverDvRule } from '../../vendor/genoffice/apps/sheets/src/renderer/univer-sync'
 import { createNodeEngine, nodeEngineAvailable } from '../testing/node-engine'
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
+import { applyVeryHidden } from '../xlsx/tab-colors'
 import type { XlsxEngine } from '../xlsx/engine'
 import { emptySaveRequest, workbookToXlsx } from './export'
 import { loadRuleConverters } from './rules'
@@ -19,6 +20,23 @@ import { readWholeWorkbook, type SidecarWorkbook } from './sidecar-read'
 import { emptyStoredWorkbook, syncWorkbook } from './sync'
 
 const SHEET = 'sheet-1'
+const ALLOW = {
+  selectLockedCells: true,
+  selectUnlockedCells: true,
+  formatCells: false,
+  formatColumns: false,
+  formatRows: false,
+  insertColumns: false,
+  insertRows: false,
+  insertHyperlinks: false,
+  deleteColumns: false,
+  deleteRows: false,
+  sort: false,
+  autoFilter: false,
+  pivotTables: false,
+  objects: false,
+  scenarios: false,
+}
 const area = { startRow: 0, startColumn: 0, endRow: 3, endColumn: 2 }
 
 async function sourceXlsx(): Promise<Uint8Array> {
@@ -192,5 +210,57 @@ describe('tables and sparklines', () => {
     const back = (await read(engine, (await workbookToXlsx(next, engine)).bytes)).sheets[0]!
     expect(back.meta.tables).toEqual(source.sheets[0]!.meta.tables)
     expect(back.meta.sparklines).toEqual(source.sheets[0]!.meta.sparklines)
+  })
+})
+
+describe('outlines, protection, comment threads and veryHidden sheets', () => {
+  it.skipIf(!nodeEngineAvailable)('stores them and writes them back', async () => {
+    const engine = createNodeEngine()
+    const request = emptySaveRequest('source')
+    for (let row = 0; row < 6; row += 1) {
+      request.edits.push({ sheetId: SHEET, row, column: 0, writeValue: true, value: row } as never)
+    }
+    request.sheetOps.push({ kind: 'add-sheet', sheetId: 'sheet-2', name: 'Geheim' })
+    request.sheetOrder = [SHEET, 'sheet-2']
+    request.structuralOps.push(
+      { sheetId: SHEET, kind: 'set-rows-outline', start: 1, end: 4, level: 1 },
+      { sheetId: SHEET, kind: 'set-rows-outline', start: 2, end: 3, level: 2, collapsed: true },
+      { sheetId: SHEET, kind: 'set-cols-outline', start: 1, end: 2, level: 1 },
+      { sheetId: SHEET, kind: 'set-outline-pr', summaryBelow: false, summaryRight: true },
+    )
+    const password = { algorithmName: 'SHA-512', hashValue: 'aGFzaA==', saltValue: 'c2FsdA==', spinCount: 100_000 }
+    request.sheetProtections.push({ sheetId: SHEET, protected: true, password, allow: { ...ALLOW, sort: true } })
+    const thread = {
+      id: '{00000000-0000-0000-0000-000000000001}',
+      personId: '{00000000-0000-0000-0000-0000000000AA}',
+      author: 'Karsten',
+      dT: '2026-10-15T10:00:00.00',
+      done: false,
+      replies: [
+        { id: '{00000000-0000-0000-0000-000000000002}', personId: '{00000000-0000-0000-0000-0000000000AA}', author: 'Karsten', dT: '2026-10-15T10:05:00.00', text: 'Erledigt?' },
+      ],
+    }
+    request.noteStates.push({ sheetId: SHEET, notes: [{ row: 0, column: 0, author: 'Karsten', text: 'Bitte prüfen', thread }] })
+    const blank = new Uint8Array(await blankXlsxBuffer('Sheet1'))
+    const saved = (await saveWorkbookInBrowser(blank, new Map([[SHEET, 'Sheet1']]), request)).bytes
+    const source = await read(engine, await applyVeryHidden(saved, new Set(['Geheim'])))
+
+    const { next } = syncWorkbook({ stored: emptyStoredWorkbook(), storedIdByFileId: new Map(), read: source })
+    const [sheet, secret] = next.worksheetOrder.map((id) => next.worksheetsById[id]!)
+    expect(secret).toMatchObject({ hidden: true, veryHidden: true })
+    expect(sheet!.protection).toEqual({ password, allow: { ...ALLOW, sort: true } })
+    expect(sheet!.outlineSummaryAbove).toBe(true)
+    expect(sheet!.rowsById[sheet!.rowOrder[2]!]).toMatchObject({ outlineLevel: 2 })
+    expect(sheet!.columnsById[sheet!.columnOrder[1]!]).toMatchObject({ outlineLevel: 1 })
+    expect(sheet!.cellsById[`${sheet!.rowOrder[0]}:${sheet!.columnOrder[0]}`]?.note?.thread?.replies).toHaveLength(1)
+
+    const back = await read(engine, (await workbookToXlsx(next, engine)).bytes)
+    const strip = (workbook: SidecarWorkbook) =>
+      workbook.sheets.map((entry) => ({
+        meta: { ...entry.meta, id: undefined, sourceXmlBytes: undefined },
+        rows: entry.rows.filter((row) => row.outlineLevel || row.collapsed).map(({ row, outlineLevel, collapsed, hidden }) => ({ row, outlineLevel, collapsed, hidden })),
+        protection: entry.sheetProtection,
+      }))
+    expect(strip(back)).toEqual(strip(source))
   })
 })

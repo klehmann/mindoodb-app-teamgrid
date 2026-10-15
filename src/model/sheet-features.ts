@@ -83,6 +83,13 @@ export function featureExtent(sheet: SidecarSheet): { rows: number; columns: num
       if (host) area(host)
     }
   }
+  // Grouped or hidden rows/columns past the last value (an outline over empty columns).
+  for (const span of sheet.meta.columnWidths ?? []) {
+    if (span.outlineLevel || span.collapsed || span.hidden) area({ startRow: 0, startColumn: span.startColumn, endRow: 0, endColumn: span.endColumn })
+  }
+  for (const row of sheet.rows) {
+    if (row.outlineLevel || row.collapsed || row.hidden) cell(row.row, 0)
+  }
   const printArea = sheet.meta.printArea ? parsePrintArea(sheet.meta.printArea) : undefined
   if (printArea) area(printArea)
   return { rows, columns }
@@ -202,7 +209,13 @@ export function attachNotesAndLinks(
   }
   for (const comment of sheet.meta.comments ?? []) {
     const cell = at(comment.row, comment.column)
-    if (cell) cell.note = { author: comment.author, text: comment.text }
+    if (!cell) continue
+    cell.note = { author: comment.author, text: comment.text }
+    if (comment.thread) {
+      // The legacy text also lists the replies; the save writes them from the thread.
+      const { text, ...thread } = comment.thread
+      cell.note = { author: comment.author, text, thread }
+    }
   }
   for (const link of sheet.hyperlinks ?? []) {
     const cell = at(link.row, link.column)

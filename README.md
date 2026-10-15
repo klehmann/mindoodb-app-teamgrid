@@ -159,6 +159,10 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
   autoFilter with its criteria, print settings (orientation, paper, scale,
   fit, margin preset, gridlines/headings, header/footer, print area, print
   titles, page breaks) and tab colors (`src/model/sheet-features.ts`).
+- Threaded comments (root text, author, replies, resolved flag) on their
+  note; row/column outline levels and collapsed groups, summary position;
+  sheet protection with allowed actions and password hash; veryHidden
+  sheets (`src/model/build.ts`, `src/xlsx/tab-colors.ts`).
 - Conditional formats and data validation: Univer's rule JSON (made from the
   file by GenOffice's own converters) with id-bound areas, keyed by content
   (`src/model/rules.ts`).

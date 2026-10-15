@@ -16,11 +16,11 @@ import type {
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import { injectPivots, type PivotParts } from '../xlsx/pivot-parts'
-import { applyTabColors } from '../xlsx/tab-colors'
+import { applyTabColors, applyVeryHidden } from '../xlsx/tab-colors'
 import { pivotPlacements } from './pivots'
 import type { XlsxEngine } from '../xlsx/engine'
 import { createAxesLookup, NO_HOME, renderFormula, type SheetAxes } from './formula-refs'
-import { liveIds, liveSheets, type VisualId, type Workbook, type Worksheet } from './schema'
+import { liveIds, liveSheets, type ColumnMeta, type RowMeta, type VisualId, type Workbook, type Worksheet } from './schema'
 import { sparklineAdditions, tableAdditions } from './objects'
 import { cfState, dvState } from './rules'
 import { areaToIndices, pageSetupState } from './sheet-features'
@@ -115,7 +115,7 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     }
   })
   sheets.forEach((sheet, index) => {
-    if (sheet.hidden) structure.sheetOps.push({ kind: 'set-sheet-hidden', sheetId: order[index]!, hidden: true })
+    if (sheet.hidden || sheet.veryHidden) structure.sheetOps.push({ kind: 'set-sheet-hidden', sheetId: order[index]!, hidden: true })
   })
   structure.sheetOrder = order
   if (structure.sheetOps.length > 0) {
@@ -165,6 +165,7 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     bytes,
     new Map(sheets.filter((sheet) => sheet.tabColor).map((sheet) => [sheet.name, sheet.tabColor!])),
   ))
+  bytes = new Uint8Array(await applyVeryHidden(bytes, new Set(sheets.filter((sheet) => sheet.veryHidden).map((sheet) => sheet.name))))
   if (options.loadImage) {
     const loadImage = options.loadImage
     const placements = await pivotPlacements(sheets, lookup, async (attachment) => {
@@ -198,7 +199,15 @@ function appendSheet(
     const row = rowIndex.get(rowId)
     const column = columnIndex.get(columnId)
     if (row === undefined || column === undefined) continue
-    if (cell.note) notes.push({ row, column, author: cell.note.author, text: cell.note.text })
+    if (cell.note) {
+      notes.push({
+        row,
+        column,
+        author: cell.note.author,
+        text: cell.note.text,
+        ...(cell.note.thread ? { thread: cell.note.thread } : {}),
+      })
+    }
     if (cell.link) request.hyperlinkEdits.push({ sheetId, row, column, target: cell.link })
     const style = styleOf(cell)
     const formula = cell.formula ? renderFormula(cell.formula, home, lookup) : undefined
@@ -257,6 +266,23 @@ function appendSheet(
   pushRuns(home.columnIds.length, (index) => (sheet.columnsById[home.columnIds[index]!]?.hidden ? 1 : undefined), (start, end) =>
     ops.push({ sheetId, kind: 'set-cols-hidden', start, end, hidden: true }),
   )
+  for (const [axis, ids, byId] of [
+    ['rows', home.rowIds, sheet.rowsById],
+    ['cols', home.columnIds, sheet.columnsById],
+  ] as const) {
+    // One run per level and collapsed flag (key = level × 2 + collapsed).
+    const outline = (index: number) => {
+      const meta: RowMeta | ColumnMeta | undefined = byId[ids[index]!]
+      return meta?.outlineLevel || meta?.collapsed ? (meta.outlineLevel ?? 0) * 2 + (meta.collapsed ? 1 : 0) : undefined
+    }
+    pushRuns(ids.length, outline, (start, end, key) =>
+      ops.push({ sheetId, kind: `set-${axis}-outline`, start, end, level: key >> 1, ...(key & 1 ? { collapsed: true } : {}) }),
+    )
+  }
+  if (sheet.outlineSummaryAbove || sheet.outlineSummaryLeft) {
+    ops.push({ sheetId, kind: 'set-outline-pr', summaryBelow: !sheet.outlineSummaryAbove, summaryRight: !sheet.outlineSummaryLeft })
+  }
+  if (sheet.protection) request.sheetProtections.push({ sheetId, protected: true, ...sheet.protection })
   for (const merge of Object.values(sheet.mergesById)) {
     const range = {
       startRow: rowIndex.get(merge.startRowId),

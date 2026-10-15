@@ -67,6 +67,8 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     if (record.height !== undefined) row.height = record.height
     if (record.customHeight) row.customHeight = true
     if (record.hidden) row.hidden = true
+    if (record.outlineLevel) row.outlineLevel = record.outlineLevel
+    if (record.collapsed) row.collapsed = true
     Object.assign(row, styleFields(record.styleIndex === undefined ? undefined : input.styles[record.styleIndex]))
     if (Object.keys(row).length > 0) rowsById[id] = row
   }
@@ -85,6 +87,8 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
       const column: ColumnMeta = {}
       if (span.width !== undefined) column.width = span.width
       if (span.hidden) column.hidden = true
+      if (span.outlineLevel) column.outlineLevel = span.outlineLevel
+      if (span.collapsed) column.collapsed = true
       Object.assign(column, styleFields(span.styleIndex === undefined ? undefined : input.styles[span.styleIndex]))
       if (Object.keys(column).length > 0) columnsById[id] = column
     }
@@ -164,7 +168,14 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
   const sparklines = readSparklines(sheet, rowIds, columnIds, input.axes)
   if (sparklines) next.sparklinesById = sparklines
   if (meta.hidden) next.hidden = true
+  if (meta.veryHidden) next.veryHidden = true
   if (meta.tabColor) next.tabColor = meta.tabColor
+  if (sheet.sheetProtection?.protected) {
+    const { allow, password } = sheet.sheetProtection
+    next.protection = { ...(allow ? { allow } : {}), ...(password ? { password } : {}) }
+  }
+  if (meta.outlineSummaryBelow === false) next.outlineSummaryAbove = true
+  if (meta.outlineSummaryRight === false) next.outlineSummaryLeft = true
   if (!meta.showGridLines) next.showGridLines = false
   if (meta.zoomScale !== undefined) next.zoomScale = meta.zoomScale
   if (meta.rightToLeft) next.rightToLeft = true

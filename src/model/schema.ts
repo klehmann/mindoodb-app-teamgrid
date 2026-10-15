@@ -39,7 +39,7 @@ import type { StoredSparklineGroup, StoredTable } from './objects'
 import type { StoredPivot } from './pivots'
 import type { StoredRule } from './rules'
 
-import type { WorkbookFile, WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
+import type { SheetThread, WorkbookFile, WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 
 /** GenOffice's description of a visual added in the editor (save request). */
 export type VisualAdd = WorkbookSaveRequest['visualAdditions'][number]
@@ -106,9 +106,18 @@ export interface Cell extends StyleFields, LegacyStyleRef {
   value?: CellScalar
   formula?: Formula
   /** A note (Excel's legacy comment). */
-  note?: { author: string; text: string }
+  note?: { author: string; text: string; thread?: NoteThread }
   /** Hyperlink target: a URL, or `#Sheet!A1` inside the workbook. */
   link?: string
+}
+
+/** A threaded (modern) comment on a note: who started it, its replies; the root text is the note's. */
+export type NoteThread = SheetThread
+
+type SheetProtectionWrite = WorkbookSaveRequest['sheetProtections'][number]
+export interface SheetProtection {
+  allow?: SheetProtectionWrite['allow']
+  password?: NonNullable<SheetProtectionWrite['password']>
 }
 
 /** A cell area by its corner ids, so it moves with inserted rows and columns. */
@@ -161,12 +170,17 @@ export interface RowMeta extends StyleFields, LegacyStyleRef {
   height?: number
   customHeight?: boolean
   hidden?: boolean
+  /** Outline (group) level 1–7 and whether the group below/right of it is collapsed. */
+  outlineLevel?: number
+  collapsed?: boolean
   deletedAt?: string
 }
 
 export interface ColumnMeta extends StyleFields, LegacyStyleRef {
   width?: number
   hidden?: boolean
+  outlineLevel?: number
+  collapsed?: boolean
   deletedAt?: string
 }
 
@@ -229,7 +243,14 @@ export interface Worksheet {
   name: string
   viewBinding?: ViewBinding
   hidden?: boolean
+  /** Hidden so that only a macro can show it again (Excel's veryHidden). */
+  veryHidden?: boolean
   tabColor?: string
+  /** Sheet protection: present = protected, with what is still allowed and the password hash. */
+  protection?: SheetProtection
+  /** Outline summary rows above / columns left of their groups (Excel's default is below/right). */
+  outlineSummaryAbove?: boolean
+  outlineSummaryLeft?: boolean
   showGridLines?: boolean
   zoomScale?: number
   rightToLeft?: boolean
