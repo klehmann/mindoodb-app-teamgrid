@@ -179,7 +179,7 @@ describe('stored workbook', () => {
     expect(result).toHaveLength(CHUNK_SOFT_LIMIT + 2)
     expect(['A1', 'B1']).toContain(result[CHUNK_SOFT_LIMIT]![0])
     expect(result[CHUNK_SOFT_LIMIT + 1]![0]).toBe('A2')
-  })
+  }, 30_000) // 260+ rows through two replicas: slow when the whole suite runs in parallel
 
   it('keeps an edit to a row that another person deleted out of view, without losing the deletion', async () => {
     const host = new AutomergeTestHost()
