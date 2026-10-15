@@ -93,6 +93,8 @@
   },
   "include": [
     "src",
+    "e2e",
+    "playwright.config.ts",
     "./vendor/genoffice/apps/sheets/src/renderer/env.d.ts"
   ]
 }

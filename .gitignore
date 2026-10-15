@@ -8,3 +8,8 @@ settings.json
 public/test-fixture.xlsx
 public/frame-test.html
 public/pivot-fixture.xlsx
+
+# Playwright and the fidelity report (e2e/fidelity)
+playwright-report/
+test-results/
+fidelity-report/
