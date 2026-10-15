@@ -282,8 +282,13 @@ async function openForAgent(id: string, timeoutMs = 30_000): Promise<void> {
   const before = activeSessionId
   if (answerWelcome) answerWelcome({ kind: 'open', id })
   else openInEditor(id)
-  for (const started = Date.now(); Date.now() - started < timeoutMs; ) {
+  for (let started = Date.now(), asked = started; Date.now() - started < timeoutMs; ) {
     await new Promise((resolve) => setTimeout(resolve, 100))
+    // The editor ignores Open while it is still loading the previous workbook's first range; ask again.
+    if (activeSessionId === before && pendingDocumentId === id && Date.now() - asked > 1_000) {
+      asked = Date.now()
+      devHooks.menu('open')
+    }
     const shown = activeSessionId && activeSessionId !== before ? storedDocumentOf(activeSessionId) : undefined
     const info = shown ? editorSkill()?.getActiveSheetInfo() : undefined
     if (info && info.mode !== 'none' && info.sheets.length > 0) return
