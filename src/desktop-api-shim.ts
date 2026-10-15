@@ -11,8 +11,10 @@ import type {
   DesktopApi,
   MenuAction,
   UiTheme,
+  WorkbookCreateDocumentRequest,
   WorkbookFile,
 } from '../vendor/genoffice/apps/sheets/src/shared/desktop-api'
+import { editorSkill, registerTeamgridAgentTools } from './agent/registerAgentTools'
 import {
   connectHaven,
   listWorkbooks,
@@ -110,6 +112,10 @@ let welcomeLanguage = 'en'
 let pendingDocumentId: string | null = null
 let activeSessionId: string | null = null
 let pendingEdits = 0
+/** Answers the welcome screen in place of the user (an agent opening a workbook). */
+let answerWelcome: ((choice: WelcomeChoice) => void) | null = null
+/** Takes the next file GenOffice's create_document writes (an agent's CSV export). */
+let documentSink: ((request: WorkbookCreateDocumentRequest) => void) | null = null
 
 function pickFile(accept: string): Promise<File | null> {
   if (devHooks.nextFile) {
@@ -239,11 +245,15 @@ async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFil
     return picked ? opened(await openStoredWorkbook(haven, picked.id, language)) : null
   }
   for (;;) {
-    const choice = await showWelcome({
-      language: welcomeLanguage,
-      canCreate: haven.canWrite,
-      listWorkbooks: () => listWorkbooks(haven),
+    const choice = await new Promise<WelcomeChoice>((resolve) => {
+      answerWelcome = resolve
+      void showWelcome({
+        language: welcomeLanguage,
+        canCreate: haven.canWrite,
+        listWorkbooks: () => listWorkbooks(haven),
+      }).then(resolve)
     })
+    answerWelcome = null
     try {
       const id = await workbookForChoice(haven, choice)
       if (!id) continue
@@ -260,6 +270,52 @@ async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFil
 function openInEditor(id: string): void {
   pendingDocumentId = id
   devHooks.menu('open')
+}
+
+/**
+ * Opens a stored workbook for an agent and resolves once the editor shows it:
+ * answers the welcome screen when it is up, else goes through the editor's
+ * open flow like the File menu. A TeamGrid 1.x workbook opens as its copy, so
+ * any newly opened stored workbook counts.
+ */
+async function openForAgent(id: string, timeoutMs = 30_000): Promise<void> {
+  const before = activeSessionId
+  if (answerWelcome) answerWelcome({ kind: 'open', id })
+  else openInEditor(id)
+  for (const started = Date.now(); Date.now() - started < timeoutMs; ) {
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    const shown = activeSessionId && activeSessionId !== before ? storedDocumentOf(activeSessionId) : undefined
+    const info = shown ? editorSkill()?.getActiveSheetInfo() : undefined
+    if (info && info.mode !== 'none' && info.sheets.length > 0) return
+  }
+  throw new Error('The workbook did not open in time.')
+}
+
+/** One worksheet as CSV through GenOffice's create_document (displayed values, as its CSV export). */
+async function csvForAgent(sheetId: string | undefined): Promise<{ name: string; text: string }> {
+  const skill = editorSkill()
+  if (!skill?.createDocument) throw new Error('The editor is not ready.')
+  let captured: WorkbookCreateDocumentRequest | null = null
+  documentSink = (request) => {
+    captured = request
+  }
+  try {
+    const outcome = await skill.createDocument({ type: 'csv', ...(sheetId ? { sheetId } : {}) })
+    if (!outcome.ok) throw new Error(outcome.error)
+  } finally {
+    documentSink = null
+  }
+  const request = captured as WorkbookCreateDocumentRequest | null
+  if (!request) throw new Error('The CSV export produced no file.')
+  return { name: request.title, text: request.content }
+}
+
+/** Saves an agent's edit: the editor reports it as pending a moment after the edit applied. */
+async function saveForAgent(): Promise<void> {
+  for (const started = Date.now(); pendingEdits === 0 && Date.now() - started < 500; ) {
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+  await waitForSave()
 }
 
 async function waitForSave(timeoutMs = 15_000): Promise<void> {
@@ -362,6 +418,14 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
     consumeNewBlankWorkbook: async () => false,
     getAutoSaveDefault: async () => ({ on: haven !== null, updatedAt: 0 }),
     onAutoSaveDefaultChanged: () => () => {},
+    async createDocument(request) {
+      if (!documentSink) {
+        report('createDocument')
+        return { ok: false, error: 'Creating files is not available in the browser.' }
+      }
+      documentSink(request)
+      return { ok: true }
+    },
     // AutoSave already writes every change to MindooDB; a separate crash
     // recovery copy has no place to go in the browser.
     writeWorkbookRecovery: async () => ({ ok: false }),
@@ -455,6 +519,51 @@ export async function installDesktopApiShim(): Promise<void> {
       () => (historyAvailable ? historyStrings(welcomeLanguage).browseRevisions : undefined),
     )
     showTimeTravelBanner()
+    registerTeamgridAgentTools(connected.session, {
+      databaseId: () => connected.databaseId,
+      canCreate: () => connected.canWrite && !timeTravelDate,
+      openWorkbook() {
+        if (!activeSessionId) return null
+        // An older revision opens as a plain file session, without a stored document.
+        if (historicalOf) {
+          return { workbookId: historicalOf, title: sessionFor(activeSessionId).name, readOnly: true, revisionOf: historicalOf }
+        }
+        const stored = storedDocumentOf(activeSessionId)
+        if (!stored) return null
+        return {
+          workbookId: stored.loaded.id,
+          title: stored.loaded.subject,
+          readOnly: !connected.canWrite || timeTravelDate !== null,
+        }
+      },
+      async listWorkbooks() {
+        return (await listWorkbooks(connected)).map((entry) => ({
+          workbookId: entry.id,
+          title: entry.subject,
+          template: entry.istemplate,
+          ...(entry.updatedAt ? { updatedAt: entry.updatedAt } : {}),
+          ...(entry.legacy ? { legacy: true } : {}),
+        }))
+      },
+      open: (id) => openForAgent(id),
+      async create({ title, templateId, xlsx }) {
+        const id = xlsx
+          ? await importXlsxAsDocument(connected, xlsx, title, language)
+          : templateId
+            ? await createFromTemplate(connected, templateId, title, language)
+            : await createEmptyDocument(connected, title, 'Tabelle1')
+        await openForAgent(id)
+        return id
+      },
+      save: saveForAgent,
+      async exportXlsx() {
+        if (!activeSessionId) throw new Error('No workbook is open.')
+        await waitForSave()
+        const session = sessionFor(activeSessionId)
+        return { name: storedDocumentOf(activeSessionId)?.loaded.subject ?? session.name, bytes: session.bytes }
+      },
+      exportCsv: csvForAgent,
+    })
   }
   window.addEventListener(
     'keydown',

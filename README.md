@@ -114,6 +114,28 @@ and a banner names the date. The mock only keeps document history from
 App SDK PR klehmann/mindoodb-app-sdk#20 on (`pnpm dev:local` with that
 branch checked out).
 
+## Agent tools
+
+Inside Haven, TeamGrid offers tools to AI agents (WebMCP, prefix
+`teamgrid_`, `src/agent/`). Reading and editing the open workbook goes through
+GenOffice Sheets' own AI skill (`ai/tools.ts`), which the App publishes as
+`window.teamGridSkillDeps` (`patches/sheets-agent-tools.patch`): the same
+readers, the same workbook DSL and the same plan/apply path as its built-in
+assistant, so an agent's batch is one undo step in the grid.
+
+| Tool | What |
+|---|---|
+| `get_context` | open workbook, sheets with ids and extents, active sheet, selection |
+| `workbooks_list`, `workbook_open`, `workbook_create` | stored workbooks and templates; create blank, from a template or from an imported .xlsx (`fileRef`) |
+| `workbook_export` | .xlsx, or one sheet as .csv, as a `fileRef` for `haven_files_export` |
+| `read_cells`, `read_range`, `read_formats`, `read_sheet_features`, `find_cells`, `aggregate_range`, `trace_precedents`, `trace_dependents`, `select_range` | GenOffice's readers |
+| `apply_ops` | a batch in GenOffice's workbook DSL (cells, formulas, formats, layout, sheets, charts, shapes, pivots, tables, filters, conditional formats, validation, names); saved to MindooDB before it returns |
+| `ops_guide` | GenOffice's op guides, per group |
+
+After a write, opening or creating, the tools wait until the editor shows
+the saved workbook and Univer finished recalculating, so the next read sees
+formula results. In the test host: `__havenTestHost.agent.call('apply_ops', …)`.
+
 ## Small screens
 
 Below 1100px the tab row uses short labels and tabs that do not fit go

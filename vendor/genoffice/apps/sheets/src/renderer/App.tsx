@@ -1605,6 +1605,9 @@ export function App({
       createDocument: (request) => createAiDocument({ univerRef, lazyWorkbookRef }, request),
     }
   }
+  // [TeamGrid] Haven's agent tools (src/agent/) read and edit the open
+  // workbook through the AI skill's deps; refreshed every render.
+  ;(window as unknown as { teamGridSkillDeps?: () => SheetsSkillDeps }).teamGridSkillDeps = sheetsSkillDeps
 
   useEffect(() => {
     void window.desktopApi.getAiSettings().then(setAiSettingsState)

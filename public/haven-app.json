@@ -6,6 +6,7 @@
   "description": "Collaborative spreadsheets with Excel features, charts, xlsx import and export, and sheets from MindooDB views.",
   "version": "2.0.0",
   "runtime": "iframe",
+  "agentToolPrefix": "teamgrid",
   "hosting": "external",
   "defaultLaunchDatabaseId": "teamgrid",
   "databases": [
