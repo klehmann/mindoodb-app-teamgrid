@@ -77,13 +77,13 @@ export function setAttribute(element: string, name: string, value: string): stri
 }
 
 /** `xl/worksheets/sheet1.xml` → `xl/worksheets/_rels/sheet1.xml.rels`. */
-function relsPathOf(part: string): string {
+export function relsPathOf(part: string): string {
   const slash = part.lastIndexOf('/')
   return `${part.slice(0, slash)}/_rels/${part.slice(slash + 1)}.rels`
 }
 
 /** A relationship target relative to its source part, as a zip path. */
-function resolveTarget(source: string, target: string): string {
+export function resolveTarget(source: string, target: string): string {
   if (target.startsWith('/')) return target.slice(1)
   const parts = source.split('/').slice(0, -1)
   for (const segment of target.split('/')) {
@@ -93,7 +93,7 @@ function resolveTarget(source: string, target: string): string {
   return parts.join('/')
 }
 
-async function relationships(zip: JSZip, part: string) {
+export async function relationships(zip: JSZip, part: string) {
   const xml = await zip.file(relsPathOf(part))?.async('text')
   return [...(xml ?? '').matchAll(/<Relationship\b[^>]*>/g)].map((match) => ({
     id: attribute(match[0], 'Id') ?? '',
@@ -103,7 +103,7 @@ async function relationships(zip: JSZip, part: string) {
 }
 
 /** Worksheet name → its part path. */
-async function sheetParts(zip: JSZip): Promise<Map<string, string>> {
+export async function sheetParts(zip: JSZip): Promise<Map<string, string>> {
   const workbook = (await zip.file('xl/workbook.xml')?.async('text')) ?? ''
   const rels = new Map((await relationships(zip, 'xl/workbook.xml')).map((rel) => [rel.id, rel.target]))
   const parts = new Map<string, string>()

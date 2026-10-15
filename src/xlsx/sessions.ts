@@ -28,6 +28,7 @@ import {
 import { workbookToXlsx } from '../model/export'
 import { extractPivots } from './pivot-parts'
 import { extractTableParts } from './table-parts'
+import { extractCharts } from './chart-parts'
 import { loadRuleConverters } from '../model/rules'
 import { readWholeWorkbook } from '../model/sidecar-read'
 import { emptyStoredWorkbook, newWorkbook, syncWorkbook, visualFileKey, type WorkbookWrites } from '../model/sync'
@@ -152,6 +153,7 @@ export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8A
       read: await readWholeWorkbook(engine, opened),
       pivots: await extractPivots(bytes),
       tableParts: await extractTableParts(bytes),
+      charts: await extractCharts(bytes),
     })
     await readNewImages(engine, opened.sessionId, writes)
     return await createWorkbook(haven, subject, next, writes)
@@ -244,6 +246,7 @@ export async function saveSession(request: WorkbookSaveRequest, locale: string):
       visuals: document.visuals,
       pivots: await extractPivots(bytes),
       tableParts: await extractTableParts(bytes),
+      charts: await extractCharts(bytes),
     })
     await readNewImages(engine, saved.sessionId, sync.writes)
   } finally {

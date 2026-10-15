@@ -198,6 +198,10 @@ function storedChart(chart: ReadChart, lookup: AxesLookup): StoredChart | null {
   return stored
 }
 
+function placeholderChart(): StoredChart {
+  return { chartType: 'column', title: '', series: [{ name: '', categories: [], values: [0] }] } as StoredChart
+}
+
 /**
  * The stored form of a visual the editor's file holds. Pictures carry only
  * their media type here; the caller keeps or uploads the bytes. Returns null
@@ -208,12 +212,14 @@ export function storedVisual(
   home: SheetAxes,
   lookup: AxesLookup,
   attachment: string,
+  raw?: StoredChart['raw'],
 ): StoredVisual | null {
   const anchor = anchorToIds(visual.anchor, home)
   if (!anchor) return null
-  if (visual.kind === 'chart' && visual.chart) {
-    const chart = storedChart(visual.chart, lookup)
-    return chart ? { kind: 'chart', anchor, chart } : null
+  if (visual.kind === 'chart' && (visual.chart || raw)) {
+    // A chart type chart-add cannot create still gets a chart to put the kept part over.
+    const chart = (visual.chart && storedChart(visual.chart, lookup)) || (raw ? placeholderChart() : null)
+    return chart ? { kind: 'chart', anchor, chart: raw ? { ...chart, raw } : chart } : null
   }
   if (visual.kind === 'image' && visual.mediaType && IMAGE_TYPES.has(visual.mediaType)) {
     return {
@@ -242,9 +248,10 @@ export function visualAddition(
   const anchor = anchorToIndices(visual.anchor, home)
   if (!anchor) return null
   if (visual.kind === 'chart' && visual.chart) {
+    const { raw: _raw, ...stored } = visual.chart
     const chart = {
-      ...visual.chart,
-      series: visual.chart.series.map(({ valuesRef, categoriesRef, ...series }) => ({
+      ...stored,
+      series: stored.series.map(({ valuesRef, categoriesRef, ...series }) => ({
         ...series,
         ...(valuesRef ? { valuesRef: renderFormula(valuesRef, NO_HOME, lookup) } : {}),
         ...(categoriesRef ? { categoriesRef: renderFormula(categoriesRef, NO_HOME, lookup) } : {}),

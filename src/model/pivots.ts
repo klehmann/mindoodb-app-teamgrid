@@ -21,7 +21,8 @@ export interface NewPivotParts {
   bytes: Uint8Array
 }
 
-function hash(text: string): string {
+/** A short hash of attachment content, so unchanged content keeps its attachment. */
+export function contentHash(text: string): string {
   let h1 = 0x811c9dc5
   let h2 = 0x01000193
   for (let index = 0; index < text.length; index += 1) {
@@ -49,7 +50,7 @@ export function storedPivots(
     const sourceSheet = pivot.source ? lookup.bySheetName(pivot.source.sheetName) : undefined
     const sourceArea = pivot.source && sourceSheet ? areaToIds(pivot.source.area, sourceSheet.rowIds, sourceSheet.columnIds) : undefined
     const json = JSON.stringify(pivot.parts)
-    const attachment = `pivot-${hash(json)}.json`
+    const attachment = `pivot-${contentHash(json)}.json`
     const key = pivot.name.toLowerCase()
     if (previous?.[key]?.attachment !== attachment && !uploads.some((upload) => upload.attachment === attachment)) {
       uploads.push({ attachment, bytes: new TextEncoder().encode(json) })

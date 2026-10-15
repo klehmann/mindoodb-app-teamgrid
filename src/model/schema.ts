@@ -218,6 +218,12 @@ export type StoredChart = Omit<ChartAdd, 'series'> & {
     valuesRef?: Formula
     categoriesRef?: Formula
   })[]
+  /**
+   * The file's chart part (with its style and colors), kept as an attachment
+   * of the top document and put back over the chart the export adds; its
+   * data references bound to ids like formulas (src/xlsx/chart-parts.ts).
+   */
+  raw?: { attachment: string; refs: Formula[] }
 }
 
 export interface StoredVisual {

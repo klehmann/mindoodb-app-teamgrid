@@ -18,6 +18,7 @@ import {
   createId,
   nameKey,
   type DefinedName,
+  type StoredChart,
   liveIds,
   liveSheets,
   type Cell,
@@ -34,8 +35,9 @@ import {
 import type { SidecarWorkbook } from './sidecar-read'
 import { canonicalJson, toStyleEdit, withoutLegacyStyle } from './styles'
 import type { ExtractedPivot } from '../xlsx/pivot-parts'
-import { storedPivots, type NewPivotParts } from './pivots'
+import { contentHash, storedPivots, type NewPivotParts } from './pivots'
 import { addTableExtras, isBuiltInTableStyle } from './objects'
+import type { ExtractedChart } from '../xlsx/chart-parts'
 import type { ExtractedTableParts, StoredTableStyle } from '../xlsx/table-parts'
 import { featureExtent } from './sheet-features'
 import { anchorExtent, normalizeAnchor, sheetSizes, storedVisual } from './visuals'
@@ -328,6 +330,8 @@ export interface SyncInput {
   pivots?: readonly ExtractedPivot[]
   /** Table switches and custom table styles from the saved file (table-parts.ts). */
   tableParts?: ExtractedTableParts
+  /** The saved file's chart parts by chart path (chart-parts.ts). */
+  charts?: ReadonlyMap<string, ExtractedChart>
 }
 
 export interface SyncResult {
@@ -383,7 +387,7 @@ export function writesFor(stored: StoredWorkbook, next: Workbook, changedSheetId
   return { ...diffWorkbook(stored, next, createdChunks), newImages: [] }
 }
 
-export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts }: SyncInput): SyncResult {
+export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts, charts }: SyncInput): SyncResult {
   const workbook = stored.workbook
   // Visual anchors with their far corner in the cell it falls into.
   const sizesBySheet = new Map(fileRead.sheets.map((sheet) => [sheet.meta.id, sheetSizes(sheet)]))
@@ -484,7 +488,22 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
       const id = ids[position]!
       const before = previous.visualsById?.[id]
       const extension = fileVisual.mediaType?.split('/')[1] ?? 'bin'
-      const visual = storedVisual(fileVisual, home, lookup, `${id}.${extension}`)
+      const kept = fileVisual.chartPath ? charts?.get(fileVisual.chartPath) : undefined
+      let raw: StoredChart['raw']
+      if (kept) {
+        const json = JSON.stringify(kept.parts)
+        raw = {
+          attachment: `chart-${contentHash(json)}.json`,
+          refs: kept.refs.map((ref) => parseFormula(ref.replace(/^=/, ''), NO_HOME, lookup)),
+        }
+        const unchanged = before?.chart?.raw?.attachment === raw.attachment
+        if (!unchanged && !newImages.some((image) => image.attachment === raw!.attachment)) {
+          newImages.push({ attachment: raw.attachment, mediaType: 'application/json', fileVisualId: '', bytes: new TextEncoder().encode(json) })
+        }
+        // Same references by id = same chart: an untouched chart is not rewritten.
+        if (before?.chart?.raw && canonicalJson(before.chart.raw) === canonicalJson(raw)) raw = before.chart.raw
+      }
+      const visual = storedVisual(fileVisual, home, lookup, `${id}.${extension}`, raw)
       if (!visual) return
       if (visual.image) {
         if (before?.image) visual.image = before.image

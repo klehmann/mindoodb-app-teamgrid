@@ -177,7 +177,12 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
   source range by id; put back into every file built, with both references
   rewritten (`src/model/pivots.ts`, `src/xlsx/pivot-parts.ts`). Refresh in
   the editor updates the parts, the next save stores them.
-- Not stored yet (lost on reload): chart types GenOffice cannot create (bubble, stock,
-  surface) and chart styling beyond its chart-add options.
+- Charts: besides GenOffice's chart-add form, the file's chart part (with
+  its style and colors parts) is kept as an attachment named by content
+  hash and put back over the chart the export adds, its `<c:f>` references
+  bound to ids (`src/xlsx/chart-parts.ts`). So chart types GenOffice cannot
+  create (bubble, stock, surface) and all chart styling survive.
+- Not stored: allow-edit ranges with a password of their own, slicers,
+  external links, macros.
 - Not yet: WASM in a Web Worker, encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

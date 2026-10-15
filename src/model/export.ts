@@ -18,6 +18,7 @@ import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import { injectPivots, type PivotParts } from '../xlsx/pivot-parts'
 import { applyTabColors, applyVeryHidden } from '../xlsx/tab-colors'
 import { applyCustomTableStyles } from '../xlsx/table-parts'
+import { applyCharts, type ChartParts, type ChartPlacement } from '../xlsx/chart-parts'
 import { pivotPlacements } from './pivots'
 import type { XlsxEngine } from '../xlsx/engine'
 import { createAxesLookup, NO_HOME, renderFormula, type SheetAxes } from './formula-refs'
@@ -176,14 +177,30 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
   bytes = new Uint8Array(await applyVeryHidden(bytes, new Set(sheets.filter((sheet) => sheet.veryHidden).map((sheet) => sheet.name))))
   if (options.loadImage) {
     const loadImage = options.loadImage
-    const placements = await pivotPlacements(sheets, lookup, async (attachment) => {
+    const loadJson = async <T>(attachment: string): Promise<T | undefined> => {
       const base64 = await loadImage(attachment).catch(() => undefined)
       if (!base64) return undefined
       const binary = atob(base64)
       const raw = new Uint8Array(binary.length)
       for (let index = 0; index < binary.length; index += 1) raw[index] = binary.charCodeAt(index)
-      return JSON.parse(new TextDecoder().decode(raw)) as PivotParts
-    })
+      return JSON.parse(new TextDecoder().decode(raw)) as T
+    }
+    const charts: ChartPlacement[] = []
+    for (const sheet of sheets) {
+      let index = 0
+      for (const id of visualOrder.get(sheet.id) ?? []) {
+        const chart = sheet.visualsById[id]?.chart
+        if (!chart) continue
+        const parts = chart.raw ? await loadJson<ChartParts>(chart.raw.attachment) : undefined
+        if (parts) {
+          const refs = chart.raw!.refs.map((ref) => renderFormula(ref, NO_HOME, lookup))
+          charts.push({ sheetName: sheet.name, index, parts, refs })
+        }
+        index += 1
+      }
+    }
+    bytes = new Uint8Array(await applyCharts(bytes, charts))
+    const placements = await pivotPlacements(sheets, lookup, (attachment) => loadJson<PivotParts>(attachment))
     bytes = new Uint8Array(await injectPivots(bytes, placements))
   }
   return { bytes, visualOrder }
