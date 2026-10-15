@@ -38,6 +38,7 @@ import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-sche
 import type { StoredSparklineGroup, StoredTable } from './objects'
 import type { StoredPivot } from './pivots'
 import type { StoredRule } from './rules'
+import type { StoredTableStyle } from '../xlsx/table-parts'
 
 import type { SheetThread, WorkbookFile, WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 
@@ -118,6 +119,12 @@ type SheetProtectionWrite = WorkbookSaveRequest['sheetProtections'][number]
 export interface SheetProtection {
   allow?: SheetProtectionWrite['allow']
   password?: NonNullable<SheetProtectionWrite['password']>
+}
+
+/** An allow-edit range ("Bereiche zum Bearbeiten zulassen") without a password of its own. */
+export interface ProtectedRange {
+  name: string
+  areas: IdArea[]
 }
 
 /** A cell area by its corner ids, so it moves with inserted rows and columns. */
@@ -248,6 +255,8 @@ export interface Worksheet {
   tabColor?: string
   /** Sheet protection: present = protected, with what is still allowed and the password hash. */
   protection?: SheetProtection
+  /** Ranges editable despite the protection, by lower-case name (sheet-features.ts). */
+  protectedRangesById?: Record<string, ProtectedRange>
   /** Outline summary rows above / columns left of their groups (Excel's default is below/right). */
   outlineSummaryAbove?: boolean
   outlineSummaryLeft?: boolean
@@ -306,6 +315,8 @@ export interface Workbook {
   worksheetOrder: SheetId[]
   worksheetsById: Record<SheetId, Worksheet>
   namesById?: Record<string, DefinedName>
+  /** Custom table styles the workbook's tables use, by name. */
+  tableStylesById?: Record<string, StoredTableStyle>
   /** Legacy style registry, read once and dropped by the next save. */
   stylesById?: Record<StyleId, StoredStyle>
 }

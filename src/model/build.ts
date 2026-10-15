@@ -19,7 +19,7 @@ import type { SidecarSheet } from './sidecar-read'
 import type { WorkbookFile } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { readSparklines, readTables } from './objects'
 import { readConditionalFormats, readDataValidations } from './rules'
-import { attachNotesAndLinks, readAutoFilter, readPageSetup } from './sheet-features'
+import { attachNotesAndLinks, readAutoFilter, readPageSetup, readProtectedRanges } from './sheet-features'
 import { canonicalJson, styleFields } from './styles'
 
 export interface BuildSheetInput {
@@ -174,6 +174,8 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
     const { allow, password } = sheet.sheetProtection
     next.protection = { ...(allow ? { allow } : {}), ...(password ? { password } : {}) }
   }
+  const protectedRanges = readProtectedRanges(sheet, rowIds, columnIds)
+  if (protectedRanges) next.protectedRangesById = protectedRanges
   if (meta.outlineSummaryBelow === false) next.outlineSummaryAbove = true
   if (meta.outlineSummaryRight === false) next.outlineSummaryLeft = true
   if (!meta.showGridLines) next.showGridLines = false

@@ -17,13 +17,14 @@ import type {
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import { injectPivots, type PivotParts } from '../xlsx/pivot-parts'
 import { applyTabColors, applyVeryHidden } from '../xlsx/tab-colors'
+import { applyCustomTableStyles } from '../xlsx/table-parts'
 import { pivotPlacements } from './pivots'
 import type { XlsxEngine } from '../xlsx/engine'
 import { createAxesLookup, NO_HOME, renderFormula, type SheetAxes } from './formula-refs'
 import { liveIds, liveSheets, type ColumnMeta, type RowMeta, type VisualId, type Workbook, type Worksheet } from './schema'
 import { sparklineAdditions, tableAdditions } from './objects'
 import { cfState, dvState } from './rules'
-import { areaToIndices, pageSetupState } from './sheet-features'
+import { areaToIndices, pageSetupState, protectedRangeState } from './sheet-features'
 import { styleOf } from './styles'
 import { visualAddition } from './visuals'
 
@@ -165,6 +166,13 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     bytes,
     new Map(sheets.filter((sheet) => sheet.tabColor).map((sheet) => [sheet.name, sheet.tabColor!])),
   ))
+  const customStyles = new Map<string, string>()
+  for (const sheet of sheets) {
+    for (const table of Object.values(sheet.tablesById ?? {})) {
+      if (table.style && workbook.tableStylesById?.[table.style]) customStyles.set(table.name, table.style)
+    }
+  }
+  bytes = new Uint8Array(await applyCustomTableStyles(bytes, Object.values(workbook.tableStylesById ?? {}), customStyles))
   bytes = new Uint8Array(await applyVeryHidden(bytes, new Set(sheets.filter((sheet) => sheet.veryHidden).map((sheet) => sheet.name))))
   if (options.loadImage) {
     const loadImage = options.loadImage
@@ -283,6 +291,8 @@ function appendSheet(
     ops.push({ sheetId, kind: 'set-outline-pr', summaryBelow: !sheet.outlineSummaryAbove, summaryRight: !sheet.outlineSummaryLeft })
   }
   if (sheet.protection) request.sheetProtections.push({ sheetId, protected: true, ...sheet.protection })
+  const editable = protectedRangeState(sheet.protectedRangesById, sheetId, rowIndex, columnIndex)
+  if (editable) request.protectedRangeStates.push(editable)
   for (const merge of Object.values(sheet.mergesById)) {
     const range = {
       startRow: rowIndex.get(merge.startRowId),

@@ -35,6 +35,8 @@ import type { SidecarWorkbook } from './sidecar-read'
 import { canonicalJson, toStyleEdit, withoutLegacyStyle } from './styles'
 import type { ExtractedPivot } from '../xlsx/pivot-parts'
 import { storedPivots, type NewPivotParts } from './pivots'
+import { addTableExtras, isBuiltInTableStyle } from './objects'
+import type { ExtractedTableParts, StoredTableStyle } from '../xlsx/table-parts'
 import { featureExtent } from './sheet-features'
 import { anchorExtent, normalizeAnchor, sheetSizes, storedVisual } from './visuals'
 
@@ -324,6 +326,8 @@ export interface SyncInput {
   visuals?: { byFileKey: ReadonlyMap<string, VisualId>; orderBySheet: ReadonlyMap<SheetId, VisualId[]> }
   /** The saved file's PivotTables (pivot-parts.ts); omitted = none. */
   pivots?: readonly ExtractedPivot[]
+  /** Table switches and custom table styles from the saved file (table-parts.ts). */
+  tableParts?: ExtractedTableParts
 }
 
 export interface SyncResult {
@@ -379,7 +383,7 @@ export function writesFor(stored: StoredWorkbook, next: Workbook, changedSheetId
   return { ...diffWorkbook(stored, next, createdChunks), newImages: [] }
 }
 
-export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [] }: SyncInput): SyncResult {
+export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts }: SyncInput): SyncResult {
   const workbook = stored.workbook
   // Visual anchors with their far corner in the cell it falls into.
   const sizesBySheet = new Map(fileRead.sheets.map((sheet) => [sheet.meta.id, sheetSizes(sheet)]))
@@ -500,6 +504,18 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
     newImages.push({ attachment: upload.attachment, mediaType: 'application/json', fileVisualId: '', bytes: upload.bytes })
   }
 
+  const tableStylesById: Record<string, StoredTableStyle> = {}
+  for (const sheet of sheets) {
+    if (tableParts) addTableExtras(sheet.tablesById, tableParts.tables)
+    for (const table of Object.values(sheet.tablesById ?? {})) {
+      if (!table.style || isBuiltInTableStyle(table.style)) continue
+      // A custom style the file no longer defines: the table gets Excel's default.
+      const style = tableParts?.styles.get(table.style) ?? workbook.tableStylesById?.[table.style]
+      if (style) tableStylesById[table.style] = style
+      else delete table.style
+    }
+  }
+
   const namesById = definedNames(read, workbook.namesById ?? {}, (index) => {
     const sheet = read.sheets[index]
     return sheet ? storedIdByName.get(sheet.meta.name) : undefined
@@ -517,6 +533,7 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
     worksheetOrder: [...liveOrder, ...workbook.worksheetOrder.filter((id) => !liveOrder.includes(id))],
     worksheetsById,
     namesById,
+    ...(Object.keys(tableStylesById).length ? { tableStylesById } : {}),
   }
   const createdChunks = new Map<ChunkId, SheetId>()
   for (const sheet of sheets) placeRows(sheet, stored.rowHome.get(sheet.id) ?? new Map(), stored.chunks, createdChunks)
@@ -663,6 +680,8 @@ function diffWorkbook(
   if (before.stylesById) top.unset.push({ path: [...WORKBOOK_PATH, 'stylesById'] })
   if (before.namesById) top.map([...WORKBOOK_PATH, 'namesById'], before.namesById, next.namesById ?? {}, false)
   else if (next.namesById && Object.keys(next.namesById).length > 0) top.put([...WORKBOOK_PATH, 'namesById'], next.namesById)
+  if (before.tableStylesById) top.map([...WORKBOOK_PATH, 'tableStylesById'], before.tableStylesById, next.tableStylesById ?? {}, false)
+  else if (next.tableStylesById) top.put([...WORKBOOK_PATH, 'tableStylesById'], next.tableStylesById)
 
   const chunkPatches = new Map<ChunkId, PatchBuilder>()
   const chunkPatch = (chunkId: ChunkId) => {

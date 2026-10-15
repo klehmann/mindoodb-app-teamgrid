@@ -62,15 +62,15 @@ export function formatRef(area: CellArea): string {
 
 const unescapeXml = (text: string) =>
   text.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
-const escapeXml = (text: string) =>
+export const escapeXml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-function attribute(element: string, name: string): string | undefined {
+export function attribute(element: string, name: string): string | undefined {
   const match = new RegExp(`\\s${name.replace(':', '\\:')}="([^"]*)"`).exec(element)
   return match ? unescapeXml(match[1]!) : undefined
 }
 
-function setAttribute(element: string, name: string, value: string): string {
+export function setAttribute(element: string, name: string, value: string): string {
   const pattern = new RegExp(`(\\s${name.replace(':', '\\:')}=")[^"]*(")`)
   if (pattern.test(element)) return element.replace(pattern, `$1${escapeXml(value)}$2`)
   return element.replace(/^(<[\w:]+)/, `$1 ${name}="${escapeXml(value)}"`)

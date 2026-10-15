@@ -161,14 +161,17 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
   titles, page breaks) and tab colors (`src/model/sheet-features.ts`).
 - Threaded comments (root text, author, replies, resolved flag) on their
   note; row/column outline levels and collapsed groups, summary position;
-  sheet protection with allowed actions and password hash; veryHidden
+  sheet protection with allowed actions and password hash, allow-edit ranges
+  without a password of their own (password ones are dropped, so their cells
+  stay locked); veryHidden
   sheets (`src/model/build.ts`, `src/xlsx/tab-colors.ts`).
 - Conditional formats and data validation: Univer's rule JSON (made from the
   file by GenOffice's own converters) with id-bound areas, keyed by content
   (`src/model/rules.ts`).
-- Tables (built-in style, banded rows; custom styles fall back to Excel's
-  default, totals rows are not written) and sparkline groups, with id-bound
-  areas and sources (`src/model/objects.ts`).
+- Tables (style, header/totals row, banded rows/columns, first/last column,
+  filter buttons; custom table styles stored workbook-wide with their formats,
+  `src/xlsx/table-parts.ts`) and sparkline groups, with id-bound areas and
+  sources (`src/model/objects.ts`).
 - PivotTables: their xlsx parts (table, cache definition, records) as an
   attachment of the top document named by content hash, output area and
   source range by id; put back into every file built, with both references

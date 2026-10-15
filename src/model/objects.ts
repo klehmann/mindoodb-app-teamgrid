@@ -1,22 +1,29 @@
 // Tables (Excel ListObjects) and sparklines. Read from the file, kept with
 // row/column ids (sparkline sources as id-bound formulas, like chart ranges)
-// and written back as the gateway's table and sparkline additions. What the
-// gateway cannot create is not kept: custom table styles fall back to
-// Excel's default, totals rows and column stripes are not written.
+// and written back as the gateway's table and sparkline additions. Custom
+// table styles are kept workbook-wide (src/xlsx/table-parts.ts).
 import type { WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { NO_HOME, parseFormula, renderFormula, type AxesLookup, type SheetAxes } from './formula-refs'
 import type { ColumnId, Formula, IdArea, RowId } from './schema'
 import { areaToIds, areaToIndices } from './sheet-features'
 import type { SidecarSheet } from './sidecar-read'
 import { canonicalJson } from './styles'
+import type { ExtractedTableParts } from '../xlsx/table-parts'
 
 export interface StoredTable {
   name: string
   area: IdArea
   columnNames: string[]
-  /** A built-in style (TableStyleMedium2, …); absent = Excel's default. */
+  /** A built-in style (TableStyleMedium2, …) or a custom one of the workbook's `tableStylesById`; absent = Excel's default. */
   style?: string
   bandedRows: boolean
+  /** Table Design switches, stored only where they differ from Excel's default. */
+  headerRow?: false
+  totalsRow?: true
+  bandedColumns?: true
+  firstColumn?: true
+  lastColumn?: true
+  filterButton?: false
 }
 
 export interface StoredSparklineGroup {
@@ -57,7 +64,7 @@ export function readTables(
 ): Record<string, StoredTable> | undefined {
   const tables: Record<string, StoredTable> = {}
   for (const table of sheet.meta.tables ?? []) {
-    if (!table.name || table.headerRowCount !== 1) continue
+    if (!table.name || table.headerRowCount > 1 || (table.totalsRowCount ?? 0) > 1) continue
     const area = areaToIds(table.range, rowIds, columnIds)
     if (!area) continue
     const width = table.range.endColumn - table.range.startColumn + 1
@@ -66,8 +73,11 @@ export function readTables(
       name: table.name,
       area,
       columnNames,
-      ...(table.styleName && BUILT_IN_STYLE.test(table.styleName) ? { style: table.styleName } : {}),
+      ...(table.styleName ? { style: table.styleName } : {}),
       bandedRows: table.showRowStripes,
+      ...(table.headerRowCount === 0 ? { headerRow: false as const } : {}),
+      ...(table.totalsRowCount ? { totalsRow: true as const } : {}),
+      ...(table.showColumnStripes ? { bandedColumns: true as const } : {}),
     }
   }
   return Object.keys(tables).length ? tables : undefined
@@ -114,8 +124,14 @@ export function tableAdditions(
         area,
         name: table.name,
         columnNames,
-        ...(table.style ? { style: table.style } : {}),
+        ...(table.style && BUILT_IN_STYLE.test(table.style) ? { style: table.style } : {}),
         bandedRows: table.bandedRows,
+        ...(table.headerRow === false ? { headerRow: false } : {}),
+        ...(table.totalsRow ? { totalsRow: true } : {}),
+        ...(table.bandedColumns ? { bandedColumns: true } : {}),
+        ...(table.firstColumn ? { firstColumn: true } : {}),
+        ...(table.lastColumn ? { lastColumn: true } : {}),
+        ...(table.filterButton === false ? { filterButton: false } : {}),
       } as WorkbookSaveRequest['tableAdditions'][number],
     ]
   })
@@ -147,4 +163,20 @@ export function sparklineAdditions(
       } as WorkbookSaveRequest['sparklineAdditions'][number],
     ]
   })
+}
+
+/** Whether a table style is one of Excel's built-in ones. */
+export function isBuiltInTableStyle(style: string): boolean {
+  return BUILT_IN_STYLE.test(style)
+}
+
+/** Adds what only the package tells: the first/last column and filter button switches. */
+export function addTableExtras(tables: Record<string, StoredTable> | undefined, extras: ExtractedTableParts['tables']): void {
+  for (const [key, table] of Object.entries(tables ?? {})) {
+    const extra = extras.get(key)
+    if (!extra) continue
+    if (extra.firstColumn) table.firstColumn = true
+    if (extra.lastColumn) table.lastColumn = true
+    if (!extra.filterButton && table.headerRow !== false) table.filterButton = false
+  }
 }

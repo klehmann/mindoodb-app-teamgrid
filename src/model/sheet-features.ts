@@ -3,7 +3,7 @@
 // with row/column ids instead of positions (so they move with inserted rows),
 // and written back in GenOffice's save format on every open.
 import type { WorkbookSaveRequest } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
-import { cellKey, type ColumnId, type HeaderFooter, type IdArea, type PageSetup, type RowId, type Worksheet } from './schema'
+import { cellKey, type ColumnId, type ProtectedRange, type HeaderFooter, type IdArea, type PageSetup, type RowId, type Worksheet } from './schema'
 import type { CellArea, SidecarSheet } from './sidecar-read'
 
 type PageSetupState = WorkbookSaveRequest['pageSetupStates'][number]
@@ -90,6 +90,7 @@ export function featureExtent(sheet: SidecarSheet): { rows: number; columns: num
   for (const row of sheet.rows) {
     if (row.outlineLevel || row.collapsed || row.hidden) cell(row.row, 0)
   }
+  for (const range of sheet.protectedRanges ?? []) parseSqref(range.sqref).forEach(area)
   const printArea = sheet.meta.printArea ? parsePrintArea(sheet.meta.printArea) : undefined
   if (printArea) area(printArea)
   return { rows, columns }
@@ -97,6 +98,57 @@ export function featureExtent(sheet: SidecarSheet): { rows: number; columns: num
 
 /** How far past the used grid a feature area still gets ids of its own. */
 const NEAR = 2_000
+
+/** `A1:B3 D5` → its areas. */
+export function parseSqref(sqref: string): CellArea[] {
+  return sqref.split(/\s+/).flatMap((part) => {
+    const area = part ? parsePrintArea(part) : undefined
+    return area ? [area] : []
+  })
+}
+
+function formatArea(area: CellArea): string {
+  const start = `${columnLabel(area.startColumn)}${area.startRow + 1}`
+  const end = `${columnLabel(area.endColumn)}${area.endRow + 1}`
+  return start === end ? start : `${start}:${end}`
+}
+
+/**
+ * Allow-edit ranges, bound to ids. Ranges with a password of their own are
+ * left out: the save cannot write that password, and dropping the range
+ * keeps its cells locked instead of opening them to everyone.
+ */
+export function readProtectedRanges(
+  sheet: SidecarSheet,
+  rowIds: readonly RowId[],
+  columnIds: readonly ColumnId[],
+): Record<string, ProtectedRange> | undefined {
+  const ranges: Record<string, ProtectedRange> = {}
+  for (const range of sheet.protectedRanges ?? []) {
+    if (range.hasPassword) continue
+    const areas = parseSqref(range.sqref).map((area) => areaToIds(area, rowIds, columnIds))
+    if (areas.length === 0 || areas.some((area) => !area)) continue
+    ranges[range.name.toLowerCase()] = { name: range.name, areas: areas as ProtectedRange['areas'] }
+  }
+  return Object.keys(ranges).length > 0 ? ranges : undefined
+}
+
+/** Allow-edit ranges as GenOffice's save writes them; ranges whose cells were all deleted drop out. */
+export function protectedRangeState(
+  ranges: Record<string, ProtectedRange> | undefined,
+  sheetId: string,
+  rowIndex: ReadonlyMap<RowId, number>,
+  columnIndex: ReadonlyMap<ColumnId, number>,
+): { sheetId: string; ranges: { name: string; sqref: string }[] } | undefined {
+  const written = Object.values(ranges ?? {}).flatMap((range) => {
+    const areas = range.areas.flatMap((area) => {
+      const indices = areaToIndices(area, rowIndex, columnIndex)
+      return indices ? [formatArea(indices)] : []
+    })
+    return areas.length ? [{ name: range.name, sqref: areas.join(' ') }] : []
+  })
+  return written.length ? { sheetId, ranges: written } : undefined
+}
 
 /** `'Daten'!$A$1:$D$20` (first range of a list) → its area. */
 export function parsePrintArea(text: string): CellArea | undefined {

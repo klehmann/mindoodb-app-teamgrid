@@ -12,6 +12,7 @@ import { toUniverDvRule } from '../../vendor/genoffice/apps/sheets/src/renderer/
 import { createNodeEngine, nodeEngineAvailable } from '../testing/node-engine'
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import { applyVeryHidden } from '../xlsx/tab-colors'
+import { applyCustomTableStyles, extractTableParts } from '../xlsx/table-parts'
 import type { XlsxEngine } from '../xlsx/engine'
 import { emptySaveRequest, workbookToXlsx } from './export'
 import { loadRuleConverters } from './rules'
@@ -230,6 +231,7 @@ describe('outlines, protection, comment threads and veryHidden sheets', () => {
     )
     const password = { algorithmName: 'SHA-512', hashValue: 'aGFzaA==', saltValue: 'c2FsdA==', spinCount: 100_000 }
     request.sheetProtections.push({ sheetId: SHEET, protected: true, password, allow: { ...ALLOW, sort: true } })
+    request.protectedRangeStates.push({ sheetId: SHEET, ranges: [{ name: 'Eingaben', sqref: 'B2:C4 E1' }] })
     const thread = {
       id: '{00000000-0000-0000-0000-000000000001}',
       personId: '{00000000-0000-0000-0000-0000000000AA}',
@@ -250,6 +252,7 @@ describe('outlines, protection, comment threads and veryHidden sheets', () => {
     expect(secret).toMatchObject({ hidden: true, veryHidden: true })
     expect(sheet!.protection).toEqual({ password, allow: { ...ALLOW, sort: true } })
     expect(sheet!.outlineSummaryAbove).toBe(true)
+    expect(sheet!.protectedRangesById?.eingaben?.areas).toHaveLength(2)
     expect(sheet!.rowsById[sheet!.rowOrder[2]!]).toMatchObject({ outlineLevel: 2 })
     expect(sheet!.columnsById[sheet!.columnOrder[1]!]).toMatchObject({ outlineLevel: 1 })
     expect(sheet!.cellsById[`${sheet!.rowOrder[0]}:${sheet!.columnOrder[0]}`]?.note?.thread?.replies).toHaveLength(1)
@@ -260,7 +263,64 @@ describe('outlines, protection, comment threads and veryHidden sheets', () => {
         meta: { ...entry.meta, id: undefined, sourceXmlBytes: undefined },
         rows: entry.rows.filter((row) => row.outlineLevel || row.collapsed).map(({ row, outlineLevel, collapsed, hidden }) => ({ row, outlineLevel, collapsed, hidden })),
         protection: entry.sheetProtection,
+        editable: entry.protectedRanges,
       }))
     expect(strip(back)).toEqual(strip(source))
+  })
+})
+
+describe('table options and custom table styles', () => {
+  it.skipIf(!nodeEngineAvailable)('stores them and writes them back', async () => {
+    const engine = createNodeEngine()
+    const request = emptySaveRequest('source')
+    const rows = [['Monat', 'Umsatz'], ['Jan', 10], ['Feb', 12], ['Summe', '=SUBTOTAL(109,Zahlen[Umsatz])']]
+    rows.forEach((row, rowIndex) =>
+      row.forEach((value, column) => {
+        const formula = typeof value === 'string' && value.startsWith('=') ? { formula: value } : {}
+        request.edits.push({ sheetId: SHEET, row: rowIndex, column, writeValue: true, value: formula.formula ? null : value, ...formula } as never)
+      }),
+    )
+    request.tableAdditions.push({
+      sheetId: SHEET,
+      area: { startRow: 0, startColumn: 0, endRow: 3, endColumn: 1 },
+      name: 'Zahlen',
+      columnNames: ['Monat', 'Umsatz'],
+      bandedRows: false,
+      totalsRow: true,
+      firstColumn: true,
+      bandedColumns: true,
+      filterButton: false,
+    } as WorkbookSaveRequest['tableAdditions'][number])
+    const blank = new Uint8Array(await blankXlsxBuffer('Sheet1'))
+    const plain = (await saveWorkbookInBrowser(blank, new Map([[SHEET, 'Sheet1']]), request)).bytes
+    const custom = {
+      name: 'Hausstil',
+      pivot: false,
+      elements: [
+        { type: 'wholeTable', dxf: '<dxf><border><left style="thin"><color rgb="FF00447C"/></left></border></dxf>' },
+        { type: 'headerRow', dxf: '<dxf><font><b/><color rgb="FFFFFFFF"/></font><fill><patternFill><bgColor rgb="FF00447C"/></patternFill></fill></dxf>' },
+        { type: 'totalRow', dxf: '<dxf><font><b/></font></dxf>' },
+      ],
+    }
+    const bytes = await applyCustomTableStyles(plain, [custom], new Map([['Zahlen', 'Hausstil']]))
+    const parts = await extractTableParts(bytes)
+    expect(parts.styles.get('Hausstil')).toEqual(custom)
+    const source = await read(engine, bytes)
+
+    const { next } = syncWorkbook({ stored: emptyStoredWorkbook(), storedIdByFileId: new Map(), read: source, tableParts: parts })
+    expect(next.tableStylesById).toEqual({ Hausstil: custom })
+    expect(Object.values(next.worksheetsById)[0]!.tablesById?.zahlen).toMatchObject({
+      style: 'Hausstil',
+      totalsRow: true,
+      firstColumn: true,
+      bandedColumns: true,
+      filterButton: false,
+    })
+
+    const written = (await workbookToXlsx(next, engine)).bytes
+    expect((await read(engine, written)).sheets[0]!.meta.tables).toEqual(source.sheets[0]!.meta.tables)
+    const back = await extractTableParts(written)
+    expect(back.tables).toEqual(parts.tables)
+    expect(back.styles.get('Hausstil')).toEqual(custom)
   })
 })
