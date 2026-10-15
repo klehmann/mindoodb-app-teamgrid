@@ -455,6 +455,7 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
     readWorkbookRowOutline: async (request) => (await loadXlsxEngine()).readRowOutline(request) as never,
     // Threaded comments are signed with the Haven user's name.
     getUserDisplayName: async () => haven?.context.user.username || 'TeamGrid',
+    onUserDisplayNameChanged: () => () => {},
     // No printer list in a browser: GenOffice falls back to the system print dialog.
     listPrinters: async () => [],
     openSourcePath: async () => {},
