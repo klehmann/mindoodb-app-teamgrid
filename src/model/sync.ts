@@ -38,6 +38,7 @@ import type { ExtractedPivot } from '../xlsx/pivot-parts'
 import { contentHash, storedPivots, type NewPivotParts } from './pivots'
 import { addTableExtras, isBuiltInTableStyle } from './objects'
 import type { ExtractedChart } from '../xlsx/chart-parts'
+import type { ExternalLinkPart } from '../xlsx/external-links'
 import type { ExtractedTableParts, StoredTableStyle } from '../xlsx/table-parts'
 import { featureExtent } from './sheet-features'
 import { anchorExtent, normalizeAnchor, sheetSizes, storedVisual } from './visuals'
@@ -332,6 +333,8 @@ export interface SyncInput {
   tableParts?: ExtractedTableParts
   /** The saved file's chart parts by chart path (chart-parts.ts). */
   charts?: ReadonlyMap<string, ExtractedChart>
+  /** The saved file's links to other workbooks (external-links.ts); omitted = keep the stored ones. */
+  externalLinks?: readonly ExternalLinkPart[]
 }
 
 export interface SyncResult {
@@ -387,7 +390,7 @@ export function writesFor(stored: StoredWorkbook, next: Workbook, changedSheetId
   return { ...diffWorkbook(stored, next, createdChunks), newImages: [] }
 }
 
-export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts, charts }: SyncInput): SyncResult {
+export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts, charts, externalLinks }: SyncInput): SyncResult {
   const workbook = stored.workbook
   // Visual anchors with their far corner in the cell it falls into.
   const sizesBySheet = new Map(fileRead.sheets.map((sheet) => [sheet.meta.id, sheetSizes(sheet)]))
@@ -554,6 +557,16 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
     namesById,
     ...(Object.keys(tableStylesById).length ? { tableStylesById } : {}),
   }
+  if (externalLinks === undefined) {
+    if (workbook.externalLinks) next.externalLinks = workbook.externalLinks
+  } else if (externalLinks.length > 0) {
+    const json = JSON.stringify(externalLinks)
+    const attachment = `links-${contentHash(json)}.json`
+    if (workbook.externalLinks?.attachment !== attachment) {
+      newImages.push({ attachment, mediaType: 'application/json', fileVisualId: '', bytes: new TextEncoder().encode(json) })
+    }
+    next.externalLinks = { attachment }
+  }
   const createdChunks = new Map<ChunkId, SheetId>()
   for (const sheet of sheets) placeRows(sheet, stored.rowHome.get(sheet.id) ?? new Map(), stored.chunks, createdChunks)
   return { next, writes: { ...diffWorkbook(stored, next, createdChunks), newImages } }
@@ -699,6 +712,10 @@ function diffWorkbook(
   if (before.stylesById) top.unset.push({ path: [...WORKBOOK_PATH, 'stylesById'] })
   if (before.namesById) top.map([...WORKBOOK_PATH, 'namesById'], before.namesById, next.namesById ?? {}, false)
   else if (next.namesById && Object.keys(next.namesById).length > 0) top.put([...WORKBOOK_PATH, 'namesById'], next.namesById)
+  if (!equal(before.externalLinks, next.externalLinks)) {
+    if (next.externalLinks) top.put([...WORKBOOK_PATH, 'externalLinks'], next.externalLinks)
+    else top.unset.push({ path: [...WORKBOOK_PATH, 'externalLinks'] })
+  }
   if (before.tableStylesById) top.map([...WORKBOOK_PATH, 'tableStylesById'], before.tableStylesById, next.tableStylesById ?? {}, false)
   else if (next.tableStylesById) top.put([...WORKBOOK_PATH, 'tableStylesById'], next.tableStylesById)
 

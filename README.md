@@ -182,7 +182,10 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
   hash and put back over the chart the export adds, its `<c:f>` references
   bound to ids (`src/xlsx/chart-parts.ts`). So chart types GenOffice cannot
   create (bubble, stock, surface) and all chart styling survive.
+- Links to other workbooks: formulas keep `[n]Sheet!A1` verbatim, the
+  externalLink parts (path and cached values) are stored as an attachment
+  and written back in order (`src/xlsx/external-links.ts`).
 - Not stored: allow-edit ranges with a password of their own, slicers,
-  external links, macros.
+  macros.
 - Not yet: WASM in a Web Worker, encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

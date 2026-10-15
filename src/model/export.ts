@@ -18,6 +18,7 @@ import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import { injectPivots, type PivotParts } from '../xlsx/pivot-parts'
 import { applyTabColors, applyVeryHidden } from '../xlsx/tab-colors'
 import { applyCustomTableStyles } from '../xlsx/table-parts'
+import { applyExternalLinks, type ExternalLinkPart } from '../xlsx/external-links'
 import { applyCharts, type ChartParts, type ChartPlacement } from '../xlsx/chart-parts'
 import { pivotPlacements } from './pivots'
 import type { XlsxEngine } from '../xlsx/engine'
@@ -200,6 +201,8 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
       }
     }
     bytes = new Uint8Array(await applyCharts(bytes, charts))
+    const links = workbook.externalLinks ? await loadJson<ExternalLinkPart[]>(workbook.externalLinks.attachment) : undefined
+    if (links) bytes = new Uint8Array(await applyExternalLinks(bytes, links))
     const placements = await pivotPlacements(sheets, lookup, (attachment) => loadJson<PivotParts>(attachment))
     bytes = new Uint8Array(await injectPivots(bytes, placements))
   }

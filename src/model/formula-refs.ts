@@ -150,8 +150,16 @@ export function parseFormula(source: string, home: SheetAxes, sheets: AxesLookup
         }
         end += 1
       }
-      t += source.slice(index, end + 1)
+      const segment = source.slice(index, end + 1)
+      t += segment
       index = end + 1
+      // An external workbook's index ([1]Sheet1!A1, [1]!Name): its sheet and
+      // cells are the other file's, copied verbatim up to the next operator.
+      if (/^\[\d+\]$/.test(segment)) {
+        const external = /^[^\s(),;+\-*/&=<>^{}"%]*/.exec(source.slice(index))![0]
+        t += external
+        index += external.length
+      }
       continue
     }
     const previous = index > 0 ? source[index - 1]! : ''

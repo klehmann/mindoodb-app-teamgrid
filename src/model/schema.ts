@@ -323,6 +323,8 @@ export interface Workbook {
   namesById?: Record<string, DefinedName>
   /** Custom table styles the workbook's tables use, by name. */
   tableStylesById?: Record<string, StoredTableStyle>
+  /** Links to other workbooks, `[1]`, `[2]`, … in order: their parts as an attachment of the top document. */
+  externalLinks?: { attachment: string }
   /** Legacy style registry, read once and dropped by the next save. */
   stylesById?: Record<StyleId, StoredStyle>
 }
