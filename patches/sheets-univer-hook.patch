@@ -1,0 +1,12 @@
+diff --git a/apps/sheets/src/renderer/create-univer.ts b/apps/sheets/src/renderer/create-univer.ts
+index 66ff7fd..9dcfdad 100644
+--- a/apps/sheets/src/renderer/create-univer.ts
++++ b/apps/sheets/src/renderer/create-univer.ts
+@@ -53,5 +53,7 @@ export function createUniver(options: CreateUniverOptions): { univer: Univer; un
+     univer.registerPlugin(plugin, pluginOptions)
+   }
+ 
++  // [TeamGrid] Lets the host add to the running Univer (src/fill-series.ts).
++  ;(window as unknown as { teamGridOnUniver?: (univer: Univer) => void }).teamGridOnUniver?.(univer)
+   return { univer, univerAPI: FUniver.newAPI(univer) }
+ }

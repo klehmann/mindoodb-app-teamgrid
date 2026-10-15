@@ -1,0 +1,11 @@
+--- a/packages/xlsx-gateway/src/gateway/xlsx-gateway.ts
++++ b/packages/xlsx-gateway/src/gateway/xlsx-gateway.ts
+@@ -1836,7 +1836,7 @@
+     if (canonical === path) continue
+     zip.remove(path)
+     if (file && !file.dir && canonical && !zip.files[canonical]) {
+-      zip.file(canonical, await file.async('nodebuffer'), { createFolders: false, date: file.date })
++      zip.file(canonical, await file.async('uint8array'), { createFolders: false, date: file.date })
+     }
+   }
+   return zip

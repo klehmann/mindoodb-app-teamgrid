@@ -1,0 +1,247 @@
+/*
+ * Narrow windows: a tablet, TeamGrid inside another app, a phone. ExcelShell
+ * (patches/sheets-responsive-ribbon.patch) moves tabs that do not fit into
+ * "More", folds ribbon groups into dropdown buttons and, on a phone, shows a
+ * tab's commands as a bottom sheet. This file does the styling.
+ */
+
+/* GenOffice's desktop window has a 720px minimum; TeamGrid runs in any frame. */
+html body {
+  min-width: 0;
+}
+
+/* Tabs keep their width; the ones that do not fit go into "More". */
+html .ribbon-tabs > * {
+  flex-shrink: 0;
+}
+
+/* …except the status line, which takes what the tabs leave */
+html .ribbon-tabs > .workbook-status {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+html .ribbon-tab-short,
+html .ribbon-group-caption {
+  display: none;
+}
+
+html .ribbon-tabs-more {
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+
+html .ribbon-tab-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 0;
+  padding: 7px 9px 6px;
+  border-bottom: 2.5px solid transparent;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+html .ribbon-tab-more:hover,
+html .ribbon-tab-more.open {
+  color: var(--accent);
+}
+
+/* "More" sits at the end of the tabs: its menu opens below it, towards the left. */
+html .ribbon-tabs-more .ribbon-more-menu {
+  position: absolute;
+  position-anchor: auto;
+  position-visibility: always;
+  top: 100%;
+  left: auto;
+  right: 0;
+  min-width: 180px;
+}
+
+/* ── folded groups ─────────────────────────────────────────────────────── */
+
+html .ribbon-fold-button strong {
+  white-space: nowrap;
+}
+
+html .ribbon-fold-pop {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  max-width: calc(100vw - 16px);
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-menu);
+}
+
+html .ribbon-fold-pop > .ribbon-group-content {
+  flex-wrap: wrap;
+  min-height: 64px;
+}
+
+/* ── tablet ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  html .ribbon-tab-full {
+    display: none;
+  }
+
+  html .ribbon-tab-short {
+    display: inline;
+  }
+
+  /* AutoSave as a switch only; its tooltip names it */
+  html .autosave-text {
+    display: none;
+  }
+
+  html .ribbon-tabs > button:not(.qa-btn),
+  html .ribbon-tab-more {
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+}
+
+/* ── phone ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  html .ribbon-tabs {
+    gap: 0;
+  }
+
+  html .ribbon-tabs > button:not(.qa-btn),
+  html .ribbon-tab-more {
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 12px;
+  }
+
+  html .qa-sep,
+  html .workbook-status {
+    display: none;
+  }
+
+  /* Save As stays in the File menu */
+  html .ribbon-tabs .qa-btn:nth-of-type(2) {
+    display: none;
+  }
+
+  html .ribbon-tabs:not(.ribbon-tabs-mac) {
+    padding-left: 76px;
+  }
+
+  /* the status message gives way to zoom and the cell stats */
+  html .status-left {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  html .status-msg {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/*
+ * Phone (ExcelShell sets `tg-phone` on the header): a tab's commands open as a
+ * bottom sheet, every group in full with its caption, instead of the band.
+ */
+html .ribbon-sheet-head {
+  display: none;
+}
+
+html .excel-header.tg-phone .ribbon-sheet {
+  display: none;
+}
+
+html .excel-header.tg-phone.tg-sheet .ribbon-sheet {
+  display: block;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 70;
+  max-height: 55vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 12px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border-strong);
+  border-radius: 4px 4px 0 0;
+  box-shadow: var(--shadow-menu);
+}
+
+html .tg-phone .ribbon-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 -12px;
+  padding: 10px 12px 6px;
+  background: var(--surface);
+  font-weight: 600;
+}
+
+html .tg-phone .ribbon-sheet-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Groups flow side by side and wrap */
+html .tg-phone [data-ribbon-body] {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  column-gap: 16px;
+  height: auto;
+  overflow: visible;
+  padding: 0;
+}
+
+html .tg-phone [data-ribbon-body] .ribbon-group {
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+html .tg-phone [data-ribbon-body] .ribbon-group::after {
+  display: none;
+}
+
+html .tg-phone .ribbon-group-caption {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+html .tg-phone [data-ribbon-body] .ribbon-group-content {
+  flex-wrap: wrap;
+  min-height: 56px;
+}
+
+/* The grid shrinks above the open sheet (ExcelShell sets --tg-sheet-h) */
+html.tg-sheet-open .app-shell {
+  height: calc(100vh - var(--tg-sheet-h, 0px));
+}

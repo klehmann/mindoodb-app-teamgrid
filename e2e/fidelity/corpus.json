@@ -1,0 +1,1784 @@
+{
+  "$comment": "Excel-authored workbooks for the fidelity tests. scripts/fidelity/fetch-corpus.mjs downloads each file from its source at the pinned commit into corpus/<id>.xlsx. The formulas keep the results Excel computed, which the value tests compare TeamGrid against. Tags group the report (see e2e/fidelity/README.md).",
+  "sources": {
+    "ironcalc": {
+      "repo": "ironcalc/IronCalc",
+      "commit": "62b3d81075236d3d987dfd742026d1d493a8fd20",
+      "dir": "xlsx/tests/calc_tests",
+      "license": "MIT OR Apache-2.0",
+      "licenseFile": "LICENSE-MIT"
+    }
+  },
+  "cases": [
+    {
+      "id": "ironcalc-abs",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/ABS.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-accrint",
+      "source": "ironcalc",
+      "file": "FINANCIAL/ACCRINT.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-accrint-accrintm",
+      "source": "ironcalc",
+      "file": "FINANCIAL/ACCRINT_ACCRINTM.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-accrint-cases",
+      "source": "ironcalc",
+      "file": "FINANCIAL/accrint_cases.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-accrint-extended",
+      "source": "ironcalc",
+      "file": "FINANCIAL/ACCRINT_extended.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-accrintm",
+      "source": "ironcalc",
+      "file": "FINANCIAL/ACCRINTM.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-address",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/ADDRESS.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-and-or-xor",
+      "source": "ironcalc",
+      "file": "LOGICAL/AND_OR_XOR.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-arabic-roman",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/ARABIC_ROMAN.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-arithmetic",
+      "source": "ironcalc",
+      "file": "arithmetic.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-array-in-scalar-repro",
+      "source": "ironcalc",
+      "file": "array_in_scalar_repro.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-arraytotext",
+      "source": "ironcalc",
+      "file": "TEXT/ARRAYTOTEXT.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-atan2-power",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/ATAN2_POWER.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-avedev",
+      "source": "ironcalc",
+      "file": "STATISTICAL/AVEDEV.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-average",
+      "source": "ironcalc",
+      "file": "STATISTICAL/AVERAGE.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-base",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/BASE.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-bessel",
+      "source": "ironcalc",
+      "file": "ENGINEERING/BESSEL.xlsx",
+      "tags": [
+        "engineering"
+      ]
+    },
+    {
+      "id": "ironcalc-beta-gamma",
+      "source": "ironcalc",
+      "file": "STATISTICAL/BETA_GAMMA.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-betadist-betainv",
+      "source": "ironcalc",
+      "file": "STATISTICAL/BETADIST_BETAINV.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-binom",
+      "source": "ironcalc",
+      "file": "STATISTICAL/BINOM.xlsx",
+      "tags": [
+        "statistical"
+      ],
+      "skip": "TeamGrid stops responding after the import (found 2026-10-15)"
+    },
+    {
+      "id": "ironcalc-bits",
+      "source": "ironcalc",
+      "file": "ENGINEERING/BITs.xlsx",
+      "tags": [
+        "engineering"
+      ]
+    },
+    {
+      "id": "ironcalc-bycol-byrow",
+      "source": "ironcalc",
+      "file": "LOGICAL/BYCOL_BYROW.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-cell",
+      "source": "ironcalc",
+      "file": "INFORMATION/CELL.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-char",
+      "source": "ironcalc",
+      "file": "TEXT/CHAR.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-chisq",
+      "source": "ironcalc",
+      "file": "STATISTICAL/CHISQ.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-chisq-test",
+      "source": "ironcalc",
+      "file": "STATISTICAL/CHISQ_TEST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-choose",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/CHOOSE.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-choosecols-chooserows",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/CHOOSECOLS_CHOOSEROWS.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-combin-combina",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/COMBIN_COMBINA.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-complexs",
+      "source": "ironcalc",
+      "file": "ENGINEERING/COMPLEXs.xlsx",
+      "tags": [
+        "engineering"
+      ]
+    },
+    {
+      "id": "ironcalc-concat",
+      "source": "ironcalc",
+      "file": "TEXT/CONCAT.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-concatenate",
+      "source": "ironcalc",
+      "file": "TEXT/CONCATENATE.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-confidence",
+      "source": "ironcalc",
+      "file": "STATISTICAL/CONFIDENCE.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-consume-string",
+      "source": "ironcalc",
+      "file": "consume_string.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-convert",
+      "source": "ironcalc",
+      "file": "ENGINEERING/CONVERT.xlsx",
+      "tags": [
+        "engineering"
+      ]
+    },
+    {
+      "id": "ironcalc-correl-slope-intercept-rsq-steyx",
+      "source": "ironcalc",
+      "file": "STATISTICAL/CORREL_SLOPE_INTERCEPT_RSQ_STEYX.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-count",
+      "source": "ironcalc",
+      "file": "STATISTICAL/COUNT.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-countif",
+      "source": "ironcalc",
+      "file": "STATISTICAL/COUNTIF.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-countifs",
+      "source": "ironcalc",
+      "file": "STATISTICAL/COUNTIFS.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-coupdays",
+      "source": "ironcalc",
+      "file": "FINANCIAL/COUPDAYS.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-covariance",
+      "source": "ironcalc",
+      "file": "STATISTICAL/COVARIANCE.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-cumprinc-cumipmt",
+      "source": "ironcalc",
+      "file": "FINANCIAL/CUMPRINC_CUMIPMT.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-date",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/DATE.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-date-day-month-year",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/DATE_DAY_MONTH_YEAR.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-datevalue",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/DATEVALUE.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-datevalue-issue-1379",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/DATEVALUE_issue_1379.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-datevalue-issue-1380",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/DATEVALUE_issue_1380.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-daverage",
+      "source": "ironcalc",
+      "file": "DATABASE/DAVERAGE.xlsx",
+      "tags": [
+        "database"
+      ]
+    },
+    {
+      "id": "ironcalc-day-month-year",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/DAY_MONTH_YEAR.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-days-days360",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/DAYS_DAYS360.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-db-ddb",
+      "source": "ironcalc",
+      "file": "FINANCIAL/DB_DDB.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-dcount-dcounta-dget-dproduct",
+      "source": "ironcalc",
+      "file": "DATABASE/DCOUNT_DCOUNTA_DGET_DPRODUCT.xlsx",
+      "tags": [
+        "database"
+      ]
+    },
+    {
+      "id": "ironcalc-defined-names",
+      "source": "ironcalc",
+      "file": "defined_names.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-defined-names-for-unit-test",
+      "source": "ironcalc",
+      "file": "defined_names_for_unit_test.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-degrees-radians",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/DEGREES_RADIANS.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-devsq",
+      "source": "ironcalc",
+      "file": "STATISTICAL/DEVSQ.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-disc",
+      "source": "ironcalc",
+      "file": "FINANCIAL/DISC.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-dmin-dmax-daverage-dsum",
+      "source": "ironcalc",
+      "file": "DATABASE/DMIN_DMAX_DAVERAGE_DSUM.xlsx",
+      "tags": [
+        "database"
+      ]
+    },
+    {
+      "id": "ironcalc-dollars",
+      "source": "ironcalc",
+      "file": "TEXT/DOLLARs.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-drop-take",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/DROP_TAKE.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-dvar-dvarp-dstdev-dstdevp",
+      "source": "ironcalc",
+      "file": "DATABASE/DVAR_DVARP_DSTDEV_DSTDEVP.xlsx",
+      "tags": [
+        "database"
+      ]
+    },
+    {
+      "id": "ironcalc-edate",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/EDATE.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-eomonth",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/EOMONTH.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-eomonth-issue-1388",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/EOMONTH_issue_1388.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-erfs",
+      "source": "ironcalc",
+      "file": "ENGINEERING/ERFs.xlsx",
+      "tags": [
+        "engineering"
+      ]
+    },
+    {
+      "id": "ironcalc-error-broadcast",
+      "source": "ironcalc",
+      "file": "INFORMATION/error_broadcast.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-error-type",
+      "source": "ironcalc",
+      "file": "INFORMATION/ERROR.TYPE.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-escape-strings",
+      "source": "ironcalc",
+      "file": "escape_strings.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-even-odd",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/EVEN_ODD.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-exact",
+      "source": "ironcalc",
+      "file": "TEXT/EXACT.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-exp-sign",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/EXP_SIGN.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-expand",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/EXPAND.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-expon-dist",
+      "source": "ironcalc",
+      "file": "STATISTICAL/EXPON_DIST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-expondist",
+      "source": "ironcalc",
+      "file": "STATISTICAL/EXPONDIST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-f-dist",
+      "source": "ironcalc",
+      "file": "STATISTICAL/F_DIST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-f-test",
+      "source": "ironcalc",
+      "file": "STATISTICAL/F_TEST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-fact-doublefact",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/FACT_DOUBLEFACT.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-filter-errors",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/FILTER_ERRORS.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-find-search",
+      "source": "ironcalc",
+      "file": "TEXT/FIND_SEARCH.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-fisher",
+      "source": "ironcalc",
+      "file": "STATISTICAL/FISHER.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-fisher-fisherinv",
+      "source": "ironcalc",
+      "file": "STATISTICAL/FISHER_FISHERINV.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-floor-ceiling",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/FLOOR_CEILING.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-formulatext",
+      "source": "ironcalc",
+      "file": "INFORMATION/FORMULATEXT.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-frequency",
+      "source": "ironcalc",
+      "file": "STATISTICAL/FREQUENCY.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-fv",
+      "source": "ironcalc",
+      "file": "FINANCIAL/FV.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-fvschedule",
+      "source": "ironcalc",
+      "file": "FINANCIAL/FVSCHEDULE.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-gamma",
+      "source": "ironcalc",
+      "file": "STATISTICAL/GAMMA.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-gammaln-gammalnprecise",
+      "source": "ironcalc",
+      "file": "STATISTICAL/GAMMALN_GAMMALNPRECISE.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-gauss",
+      "source": "ironcalc",
+      "file": "STATISTICAL/GAUSS.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-gcd-lcm",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/GCD_LCM.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-geomean",
+      "source": "ironcalc",
+      "file": "STATISTICAL/GEOMEAN.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-gestep-delta",
+      "source": "ironcalc",
+      "file": "ENGINEERING/GESTEP_DELTA.xlsx",
+      "tags": [
+        "engineering"
+      ]
+    },
+    {
+      "id": "ironcalc-hstack-vstack",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/HSTACK_VSTACK.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-hvlookup",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/HVLOOKUP.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-hypergeom-dist",
+      "source": "ironcalc",
+      "file": "STATISTICAL/HYPERGEOM_DIST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-if-array",
+      "source": "ironcalc",
+      "file": "LOGICAL/IF_ARRAY.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-iferror",
+      "source": "ironcalc",
+      "file": "LOGICAL/IFERROR.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-ifna",
+      "source": "ironcalc",
+      "file": "LOGICAL/IFNA.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-ifs",
+      "source": "ironcalc",
+      "file": "LOGICAL/IFS.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-index",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/INDEX.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-indirect",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/INDIRECT.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-intrate",
+      "source": "ironcalc",
+      "file": "FINANCIAL/INTRATE.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-ipmt-ppmt",
+      "source": "ironcalc",
+      "file": "FINANCIAL/IPMT_PPMT.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-irr",
+      "source": "ironcalc",
+      "file": "FINANCIAL/IRR.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-is-information",
+      "source": "ironcalc",
+      "file": "INFORMATION/IS_INFORMATION.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-isomitted",
+      "source": "ironcalc",
+      "file": "INFORMATION/ISOMITTED.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-ispmt",
+      "source": "ironcalc",
+      "file": "FINANCIAL/ISPMT.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-isref",
+      "source": "ironcalc",
+      "file": "INFORMATION/ISREF.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-isref-isformula-isodd-iseven",
+      "source": "ironcalc",
+      "file": "INFORMATION/ISREF_ISFORMULA_ISODD_ISEVEN.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-issue-341",
+      "source": "ironcalc",
+      "file": "issue_341.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-lambda",
+      "source": "ironcalc",
+      "file": "LOGICAL/LAMBDA.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-lcm-gcd",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/LCM_GCD.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-let",
+      "source": "ironcalc",
+      "file": "LOGICAL/LET.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-linest-logest",
+      "source": "ironcalc",
+      "file": "STATISTICAL/LINEST_LOGEST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-log-log10-ln",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/LOG_LOG10_LN.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-logical",
+      "source": "ironcalc",
+      "file": "logical.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-lognorm",
+      "source": "ironcalc",
+      "file": "STATISTICAL/LOGNORM.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-makearray",
+      "source": "ironcalc",
+      "file": "LOGICAL/MAKEARRAY.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-map-reduce",
+      "source": "ironcalc",
+      "file": "LOGICAL/MAP_REDUCE.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-match",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/MATCH.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-match-lookup-arrays",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/MATCH_LOOKUP_arrays.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-max-min",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/MAX_MIN.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-meadian-kurt-skew-harmean",
+      "source": "ironcalc",
+      "file": "STATISTICAL/MEADIAN_KURT_SKEW_HARMEAN.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-mid-left-right-arrays",
+      "source": "ironcalc",
+      "file": "TEXT/MID_LEFT_RIGHT_arrays.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-min-max",
+      "source": "ironcalc",
+      "file": "STATISTICAL/MIN_MAX.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-min-max-extras",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/MIN_MAX_extras.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-mina-maxa",
+      "source": "ironcalc",
+      "file": "STATISTICAL/MINA_MAXA.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-minus-minus",
+      "source": "ironcalc",
+      "file": "TEXT/MINUS_MINUS.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-mirr",
+      "source": "ironcalc",
+      "file": "FINANCIAL/MIRR.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-mmult",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/MMULT.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-mod-quotient",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/MOD_QUOTIENT.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-mode",
+      "source": "ironcalc",
+      "file": "STATISTICAL/MODE.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-mround-trunc-int",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/MROUND_TRUNC_INT.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-multinomial",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/MULTINOMIAL.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-munit-mdeterm-minverse",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/MUNIT_MDETERM_MINVERSE.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-n",
+      "source": "ironcalc",
+      "file": "INFORMATION/N.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-networkdays-networkdays-intl",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/NETWORKDAYS_NETWORKDAYS.INTL.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-nominal-effect",
+      "source": "ironcalc",
+      "file": "FINANCIAL/NOMINAL_EFFECT.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-norm-dist",
+      "source": "ironcalc",
+      "file": "STATISTICAL/NORM_DIST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-now-today",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/NOW_TODAY.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-nper",
+      "source": "ironcalc",
+      "file": "FINANCIAL/NPER.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-npv",
+      "source": "ironcalc",
+      "file": "FINANCIAL/NPV.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-number-systems",
+      "source": "ironcalc",
+      "file": "ENGINEERING/NUMBER_SYSTEMS.xlsx",
+      "tags": [
+        "engineering"
+      ]
+    },
+    {
+      "id": "ironcalc-pduration",
+      "source": "ironcalc",
+      "file": "FINANCIAL/PDURATION.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-pearson",
+      "source": "ironcalc",
+      "file": "STATISTICAL/PEARSON.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-percentage",
+      "source": "ironcalc",
+      "file": "percentage.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-percentil-quartil",
+      "source": "ironcalc",
+      "file": "STATISTICAL/PERCENTIL_QUARTIL.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-permut-permutationa",
+      "source": "ironcalc",
+      "file": "STATISTICAL/PERMUT_PERMUTATIONA.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-phi",
+      "source": "ironcalc",
+      "file": "STATISTICAL/PHI.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-pmt",
+      "source": "ironcalc",
+      "file": "FINANCIAL/PMT.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-poisson",
+      "source": "ironcalc",
+      "file": "STATISTICAL/POISSON.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-power",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/POWER.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-price-yield",
+      "source": "ironcalc",
+      "file": "FINANCIAL/PRICE_YIELD.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-prob",
+      "source": "ironcalc",
+      "file": "STATISTICAL/PROB.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-product",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/PRODUCT.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-product-sum",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/PRODUCT_SUM.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-proper",
+      "source": "ironcalc",
+      "file": "TEXT/PROPER.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-pv",
+      "source": "ironcalc",
+      "file": "FINANCIAL/PV.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-quotes",
+      "source": "ironcalc",
+      "file": "quotes.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-range-operator",
+      "source": "ironcalc",
+      "file": "range_operator.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-rank-eq-rank-avg",
+      "source": "ironcalc",
+      "file": "STATISTICAL/RANK_EQ_RANK_AVG.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-rate",
+      "source": "ironcalc",
+      "file": "FINANCIAL/RATE.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-regex",
+      "source": "ironcalc",
+      "file": "TEXT/REGEX.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-rept",
+      "source": "ironcalc",
+      "file": "TEXT/REPT.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-round",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/ROUND.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-row-colum",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/ROW_COLUM.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-rri",
+      "source": "ironcalc",
+      "file": "FINANCIAL/RRI.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-scan",
+      "source": "ironcalc",
+      "file": "LOGICAL/SCAN.xlsx",
+      "tags": [
+        "logical"
+      ]
+    },
+    {
+      "id": "ironcalc-sequence",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/SEQUENCE.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-seriessum",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/SERIESSUM.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-sheet-sheets",
+      "source": "ironcalc",
+      "file": "INFORMATION/SHEET_SHEETS.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-simple-arrays",
+      "source": "ironcalc",
+      "file": "simple_arrays.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-simple-functions",
+      "source": "ironcalc",
+      "file": "simple_functions.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-sln-syd",
+      "source": "ironcalc",
+      "file": "FINANCIAL/SLN_SYD.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-small-large",
+      "source": "ironcalc",
+      "file": "STATISTICAL/SMALL_LARGE.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-sort",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/SORT.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-spill-operator",
+      "source": "ironcalc",
+      "file": "spill_operator.xlsx",
+      "tags": [
+        "general"
+      ]
+    },
+    {
+      "id": "ironcalc-sqrt-sqrtpi",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/SQRT_SQRTPI.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-standarize",
+      "source": "ironcalc",
+      "file": "STATISTICAL/STANDARIZE.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-stdev",
+      "source": "ironcalc",
+      "file": "STATISTICAL/STDEV.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-string-handling",
+      "source": "ironcalc",
+      "file": "TEXT/STRING_HANDLING.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-substitute",
+      "source": "ironcalc",
+      "file": "TEXT/SUBSTITUTE.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-sumif-array",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/SUMIF_array.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-sumif-average-if",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/SUMIF_AVERAGE_IF.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-sumifs",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/SUMIFS.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-sumproduct",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/SUMPRODUCT.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-sumsq",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/SUMSQ.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-sumx2my2-sumx2py2-sumxmy2",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/SUMX2MY2_SUMX2PY2_SUMXMY2.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-t-dist",
+      "source": "ironcalc",
+      "file": "STATISTICAL/T_DIST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-t-test",
+      "source": "ironcalc",
+      "file": "STATISTICAL/T_TEST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-t-value-valuetotext",
+      "source": "ironcalc",
+      "file": "TEXT/T_VALUE_VALUETOTEXT.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-tbills",
+      "source": "ironcalc",
+      "file": "FINANCIAL/TBILLs.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-text",
+      "source": "ironcalc",
+      "file": "TEXT/TEXT.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-textbefore-textafter",
+      "source": "ironcalc",
+      "file": "TEXT/TEXTBEFORE_TEXTAFTER.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-textjoin",
+      "source": "ironcalc",
+      "file": "TEXT/TEXTJOIN.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-textsplit",
+      "source": "ironcalc",
+      "file": "TEXT/TEXTSPLIT.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-time-hour-minute-second",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/TIME_HOUR_MINUTE_SECOND.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-timevalue",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/TIMEVALUE.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-timevalue-issue-1402",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/TIMEVALUE_issue_1402.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-tocol",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/TOCOL.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-transpose",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/TRANSPOSE.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-trend-growth",
+      "source": "ironcalc",
+      "file": "STATISTICAL/TREND_GROWTH.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-trigonometric",
+      "source": "ironcalc",
+      "file": "MATH_AND_TRIGONOMETRY/TRIGONOMETRIC.xlsx",
+      "tags": [
+        "math-and-trigonometry"
+      ]
+    },
+    {
+      "id": "ironcalc-trimmean",
+      "source": "ironcalc",
+      "file": "STATISTICAL/TRIMMEAN.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-trimrange",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/TRIMRANGE.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-type",
+      "source": "ironcalc",
+      "file": "INFORMATION/TYPE.xlsx",
+      "tags": [
+        "information"
+      ]
+    },
+    {
+      "id": "ironcalc-unicode",
+      "source": "ironcalc",
+      "file": "TEXT/UNICODE.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-upper-lower",
+      "source": "ironcalc",
+      "file": "TEXT/UPPER_LOWER.xlsx",
+      "tags": [
+        "text"
+      ]
+    },
+    {
+      "id": "ironcalc-variance",
+      "source": "ironcalc",
+      "file": "STATISTICAL/VARIANCE.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-weekday-weeknum-isoweeknum",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/WEEKDAY_WEEKNUM_ISOWEEKNUM.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-weekday-weeknum-isoweeknum-issue-1502",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/WEEKDAY_WEEKNUM_ISOWEEKNUM_issue_1502.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-weibull-dist",
+      "source": "ironcalc",
+      "file": "STATISTICAL/WEIBULL_DIST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    },
+    {
+      "id": "ironcalc-workday-workday-intl",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/WORKDAY_WORKDAY.INTL.xlsx",
+      "tags": [
+        "date-and-time"
+      ],
+      "skip": "TeamGrid stops responding after the import (found 2026-10-15)"
+    },
+    {
+      "id": "ironcalc-wrapcols-rows",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/WRAPCOLS_ROWS.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-xirr",
+      "source": "ironcalc",
+      "file": "FINANCIAL/XIRR.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-xlookup",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/XLOOKUP.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-xmatch",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/XMATCH.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-xmatch-arrays",
+      "source": "ironcalc",
+      "file": "LOOKUP_AND_REFERENCE/XMATCH_arrays.xlsx",
+      "tags": [
+        "lookup-and-reference"
+      ]
+    },
+    {
+      "id": "ironcalc-xnpv",
+      "source": "ironcalc",
+      "file": "FINANCIAL/XNPV.xlsx",
+      "tags": [
+        "financial"
+      ]
+    },
+    {
+      "id": "ironcalc-yearfrac-datedif",
+      "source": "ironcalc",
+      "file": "DATE_AND_TIME/YEARFRAC_DATEDIF.xlsx",
+      "tags": [
+        "date-and-time"
+      ]
+    },
+    {
+      "id": "ironcalc-z-test",
+      "source": "ironcalc",
+      "file": "STATISTICAL/Z_TEST.xlsx",
+      "tags": [
+        "statistical"
+      ]
+    }
+  ]
+}
