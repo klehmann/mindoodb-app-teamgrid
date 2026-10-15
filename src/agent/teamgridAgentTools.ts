@@ -20,6 +20,7 @@ import {
 import { parseAddress, type RangeBounds } from '@genoffice/xlsx-gateway/domain/cell-address'
 
 import { GUIDE_CATALOG } from '../../vendor/genoffice/apps/sheets/src/renderer/ai/guides'
+import { hasMacros } from '../xlsx/macros'
 import {
   buildWorkbookContext,
   executeWorkbookTool,
@@ -336,7 +337,8 @@ export function createTeamgridAgentTools(deps: TeamgridAgentDeps): MindooDBAppAg
       if (format !== 'xlsx' && format !== 'csv') fail('INVALID_INPUT', '"format" is "xlsx" or "csv".')
       if (format === 'xlsx') {
         const { name, bytes } = await deps.exportXlsx()
-        const fileName = /\.xls[xm]$/i.test(name) ? name : `${name}.xlsx`
+        const extension = hasMacros(bytes) ? '.xlsm' : '.xlsx'
+        const fileName = /\.xls[xm]$/i.test(name) ? name.replace(/\.xls[xm]$/i, extension) : `${name}${extension}`
         const { fileRef, size } = await deps.provideFile(bytes, fileName, XLSX_MIME)
         return { fileRef, name: fileName, size, next: NEXT_EXPORT }
       }

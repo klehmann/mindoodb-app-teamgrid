@@ -40,6 +40,7 @@ import { addTableExtras, isBuiltInTableStyle } from './objects'
 import type { ExtractedChart } from '../xlsx/chart-parts'
 import type { ExternalLinkPart } from '../xlsx/external-links'
 import type { SlicerParts } from '../xlsx/slicer-parts'
+import type { MacroParts } from '../xlsx/macros'
 import type { ExtractedTableParts, StoredTableStyle } from '../xlsx/table-parts'
 import { featureExtent } from './sheet-features'
 import { anchorExtent, normalizeAnchor, sheetSizes, storedVisual } from './visuals'
@@ -338,6 +339,8 @@ export interface SyncInput {
   externalLinks?: readonly ExternalLinkPart[]
   /** The saved file's slicers (slicer-parts.ts); null = none, omitted = keep the stored ones. */
   slicers?: SlicerParts | null
+  /** The saved file's VBA project (macros.ts); null = none, omitted = keep the stored one. */
+  macros?: MacroParts | null
 }
 
 export interface SyncResult {
@@ -394,7 +397,7 @@ export function writesFor(stored: StoredWorkbook, next: Workbook, changedSheetId
   return { ...diffWorkbook(stored, next, createdChunks), newImages: [] }
 }
 
-export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts, charts, externalLinks, slicers }: SyncInput): SyncResult {
+export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts, charts, externalLinks, slicers, macros }: SyncInput): SyncResult {
   const workbook = stored.workbook
   // Visual anchors with their far corner in the cell it falls into.
   const sizesBySheet = new Map(fileRead.sheets.map((sheet) => [sheet.meta.id, sheetSizes(sheet)]))
@@ -591,6 +594,22 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
     }
     next.slicers = { attachment }
   }
+  if (macros === undefined) {
+    if (workbook.macros) next.macros = workbook.macros
+  } else if (macros) {
+    const sheetCodeNames = Object.fromEntries(
+      Object.entries(macros.sheetCodeNames).flatMap(([name, codeName]) => {
+        const id = storedIdByName.get(name)
+        return id ? [[id, codeName]] : []
+      }),
+    )
+    const json = JSON.stringify({ ...macros, sheetCodeNames })
+    const attachment = `macros-${contentHash(json)}.json`
+    if (workbook.macros?.attachment !== attachment) {
+      newImages.push({ attachment, mediaType: 'application/json', fileVisualId: '', bytes: new TextEncoder().encode(json) })
+    }
+    next.macros = { attachment }
+  }
   if (externalLinks === undefined) {
     if (workbook.externalLinks) next.externalLinks = workbook.externalLinks
   } else if (externalLinks.length > 0) {
@@ -746,7 +765,7 @@ function diffWorkbook(
   if (before.stylesById) top.unset.push({ path: [...WORKBOOK_PATH, 'stylesById'] })
   if (before.namesById) top.map([...WORKBOOK_PATH, 'namesById'], before.namesById, next.namesById ?? {}, false)
   else if (next.namesById && Object.keys(next.namesById).length > 0) top.put([...WORKBOOK_PATH, 'namesById'], next.namesById)
-  for (const field of ['externalLinks', 'slicers'] as const) {
+  for (const field of ['externalLinks', 'slicers', 'macros'] as const) {
     if (equal(before[field], next[field])) continue
     if (next[field]) top.put([...WORKBOOK_PATH, field], next[field])
     else top.unset.push({ path: [...WORKBOOK_PATH, field] })

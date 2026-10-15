@@ -20,6 +20,7 @@ import { applyTabColors, applyVeryHidden } from '../xlsx/tab-colors'
 import { applyCustomTableStyles } from '../xlsx/table-parts'
 import { applyExternalLinks, type ExternalLinkPart } from '../xlsx/external-links'
 import { applySlicers, type SlicerFrame, type SlicerParts } from '../xlsx/slicer-parts'
+import { applyMacros, type MacroParts } from '../xlsx/macros'
 import { applyCharts, type ChartParts, type ChartPlacement } from '../xlsx/chart-parts'
 import { pivotPlacements } from './pivots'
 import type { XlsxEngine } from '../xlsx/engine'
@@ -226,6 +227,16 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
         })
       }
       bytes = new Uint8Array(await applySlicers(bytes, named, frames))
+    }
+    const macros = workbook.macros ? await loadJson<MacroParts>(workbook.macros.attachment) : undefined
+    if (macros) {
+      const sheetCodeNames = Object.fromEntries(
+        Object.entries(macros.sheetCodeNames).flatMap(([id, codeName]) => {
+          const sheet = workbook.worksheetsById[id]
+          return sheet && !sheet.deletedAt ? [[sheet.name, codeName]] : []
+        }),
+      )
+      bytes = new Uint8Array(await applyMacros(bytes, { ...macros, sheetCodeNames }))
     }
   }
   return { bytes, visualOrder }

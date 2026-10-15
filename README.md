@@ -190,7 +190,10 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
   name/stored id); the frame position is a visual with id-bound anchor
   (`src/xlsx/slicer-parts.ts`). Tested with table slicers; timelines are not
   kept.
-- Not stored: allow-edit ranges with a password of their own, timelines,
-  macros.
+- Macros (.xlsm): the VBA project with its signatures and the workbook/sheet
+  code names are stored as an attachment; an export is again an .xlsm and
+  downloads with that extension (`src/xlsx/macros.ts`). Macros never run in
+  the browser.
+- Not stored: allow-edit ranges with a password of their own, timelines.
 - Not yet: WASM in a Web Worker, encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

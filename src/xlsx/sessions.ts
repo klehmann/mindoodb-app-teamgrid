@@ -31,6 +31,7 @@ import { extractTableParts } from './table-parts'
 import { extractCharts } from './chart-parts'
 import { extractExternalLinks } from './external-links'
 import { extractSlicers } from './slicer-parts'
+import { extractMacros } from './macros'
 import { loadRuleConverters } from '../model/rules'
 import { readWholeWorkbook } from '../model/sidecar-read'
 import { emptyStoredWorkbook, newWorkbook, syncWorkbook, visualFileKey, type WorkbookWrites } from '../model/sync'
@@ -158,6 +159,7 @@ export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8A
       charts: await extractCharts(bytes),
       externalLinks: await extractExternalLinks(bytes),
       slicers: (await extractSlicers(bytes)) ?? null,
+      macros: (await extractMacros(bytes)) ?? null,
     })
     await readNewImages(engine, opened.sessionId, writes)
     return await createWorkbook(haven, subject, next, writes)
@@ -253,6 +255,7 @@ export async function saveSession(request: WorkbookSaveRequest, locale: string):
       charts: await extractCharts(bytes),
       externalLinks: await extractExternalLinks(bytes),
       slicers: (await extractSlicers(bytes)) ?? null,
+      macros: (await extractMacros(bytes)) ?? null,
     })
     await readNewImages(engine, saved.sessionId, sync.writes)
   } finally {

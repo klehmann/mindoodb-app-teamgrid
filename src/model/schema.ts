@@ -329,6 +329,8 @@ export interface Workbook {
   externalLinks?: { attachment: string }
   /** Slicer caches, parts and frames (src/xlsx/slicer-parts.ts) as an attachment of the top document; sheets by id. */
   slicers?: { attachment: string }
+  /** The VBA project of an .xlsm and its code names (src/xlsx/macros.ts), sheets by id. */
+  macros?: { attachment: string }
   /** Legacy style registry, read once and dropped by the next save. */
   stylesById?: Record<StyleId, StoredStyle>
 }

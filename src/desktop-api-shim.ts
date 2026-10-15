@@ -40,6 +40,7 @@ import {
 } from './haven/welcome'
 import { changedSinceLoad, loadWorkbook } from './haven/store'
 import { loadXlsxEngine } from './xlsx/engine'
+import { hasMacros } from './xlsx/macros'
 import { viewSheetCommands, type ViewSheetCommands } from './haven/view-sheets'
 import {
   closeSession,
@@ -142,7 +143,9 @@ function download(bytes: Uint8Array, name: string): void {
   })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
-  link.download = /\.xlsx$/i.test(name) ? name : `${name}.xlsx`
+  // A workbook with a VBA project is only valid as .xlsm.
+  const extension = hasMacros(bytes) ? '.xlsm' : '.xlsx'
+  link.download = /\.xls[xm]$/i.test(name) ? name.replace(/\.xls[xm]$/i, extension) : `${name}${extension}`
   link.click()
   setTimeout(() => URL.revokeObjectURL(link.href), 10_000)
 }
