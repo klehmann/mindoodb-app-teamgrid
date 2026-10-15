@@ -165,8 +165,22 @@ let historicalOf: string | null = null
 /** Haven's time travel: everything is read-only as of this time (ms). */
 let timeTravelDate: number | null = null
 
+/** The file the editor was last given (open, reopen after a save). */
+let activeFile: WorkbookFile | null = null
+
+/**
+ * Whether the editor shows `activeFile` yet: it keeps showing the previous
+ * workbook (or its blank start-up one) until the new file's first range loaded.
+ */
+function editorShowsActiveFile(): boolean {
+  const info = activeFile ? editorSkill()?.getActiveSheetInfo() : undefined
+  if (!info || info.mode !== 'lazy' || info.sheets.length !== activeFile!.sheets.length) return false
+  return activeFile!.sheets.every((sheet, index) => info.sheets[index]?.id === sheet.id && info.sheets[index]?.name === sheet.name)
+}
+
 function opened(file: WorkbookFile, revisionOf: string | null = null): WorkbookFile {
   activeSessionId = file.sessionId
+  activeFile = file
   historicalOf = revisionOf
   if (revisionOf) {
     const strings = historyStrings(welcomeLanguage)
@@ -296,8 +310,7 @@ async function openForAgent(id: string, timeoutMs = 30_000): Promise<void> {
       devHooks.menu('open')
     }
     const shown = activeSessionId && activeSessionId !== before ? storedDocumentOf(activeSessionId) : undefined
-    const info = shown ? editorSkill()?.getActiveSheetInfo() : undefined
-    if (info && info.mode !== 'none' && info.sheets.length > 0) return
+    if (shown && editorShowsActiveFile()) return
   }
   throw new Error('The workbook did not open in time.')
 }
@@ -538,6 +551,7 @@ export async function installDesktopApiShim(): Promise<void> {
     )
     showTimeTravelBanner()
     registerTeamgridAgentTools(connected.session, {
+      editorReady: editorShowsActiveFile,
       databaseId: () => connected.databaseId,
       canCreate: () => connected.canWrite && !timeTravelDate,
       openWorkbook() {

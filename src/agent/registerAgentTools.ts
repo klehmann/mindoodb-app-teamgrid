@@ -37,7 +37,10 @@ export function editorSkill(): SheetsSkillDeps | null {
 
 export function registerTeamgridAgentTools(
   session: MindooDBAppSession,
-  host: Omit<TeamgridAgentDeps, 'skill' | 'takeFile' | 'provideFile'>,
+  host: Omit<TeamgridAgentDeps, 'skill' | 'takeFile' | 'provideFile'> & {
+    /** The editor shows the file it was last given (not the previous or a blank workbook). */
+    editorReady(): boolean
+  },
 ): () => void {
   const agent = session.agent
   if (!agent) {
@@ -73,7 +76,7 @@ export function registerTeamgridAgentTools(
     for (;;) {
       const elapsed = Date.now() - since
       if (elapsed > SETTLE_TIMEOUT_MS) return
-      const ready = editorSkill()?.getActiveSheetInfo().mode !== 'none'
+      const ready = host.editorReady()
       const ran = lastCalculationStart >= since && lastCalculationEnd >= lastCalculationStart
       if (ready && !calculating && (ran || elapsed > QUIET_MS)) return
       await delay(25)
