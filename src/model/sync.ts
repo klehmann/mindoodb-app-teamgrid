@@ -39,6 +39,7 @@ import { contentHash, storedPivots, type NewPivotParts } from './pivots'
 import { addTableExtras, isBuiltInTableStyle } from './objects'
 import type { ExtractedChart } from '../xlsx/chart-parts'
 import type { ExternalLinkPart } from '../xlsx/external-links'
+import type { SlicerParts } from '../xlsx/slicer-parts'
 import type { ExtractedTableParts, StoredTableStyle } from '../xlsx/table-parts'
 import { featureExtent } from './sheet-features'
 import { anchorExtent, normalizeAnchor, sheetSizes, storedVisual } from './visuals'
@@ -335,6 +336,8 @@ export interface SyncInput {
   charts?: ReadonlyMap<string, ExtractedChart>
   /** The saved file's links to other workbooks (external-links.ts); omitted = keep the stored ones. */
   externalLinks?: readonly ExternalLinkPart[]
+  /** The saved file's slicers (slicer-parts.ts); null = none, omitted = keep the stored ones. */
+  slicers?: SlicerParts | null
 }
 
 export interface SyncResult {
@@ -355,12 +358,13 @@ export function visualFileKey(visual: { drawingPath?: string | undefined; drawin
 function definedNames(
   read: SidecarWorkbook,
   previous: Record<string, DefinedName>,
+  skip: ReadonlySet<string>,
   scopeOf: (sheetIndex: number) => SheetId | undefined,
   lookup: AxesLookup,
 ): Record<string, DefinedName> {
   const names: Record<string, DefinedName> = {}
   for (const entry of read.file.definedNames ?? []) {
-    if (entry.name.startsWith('_xlnm.')) continue
+    if (entry.name.startsWith('_xlnm.') || skip.has(entry.name.toLowerCase())) continue
     const scopeSheetId = entry.sheetIndex === undefined ? undefined : scopeOf(entry.sheetIndex)
     if (entry.sheetIndex !== undefined && !scopeSheetId) continue
     const key = nameKey(entry.name, scopeSheetId)
@@ -390,7 +394,7 @@ export function writesFor(stored: StoredWorkbook, next: Workbook, changedSheetId
   return { ...diffWorkbook(stored, next, createdChunks), newImages: [] }
 }
 
-export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts, charts, externalLinks }: SyncInput): SyncResult {
+export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts, charts, externalLinks, slicers }: SyncInput): SyncResult {
   const workbook = stored.workbook
   // Visual anchors with their far corner in the cell it falls into.
   const sizesBySheet = new Map(fileRead.sheets.map((sheet) => [sheet.meta.id, sheetSizes(sheet)]))
@@ -474,6 +478,14 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
     if (id) removedVisuals.add(id)
   }
   const newImages: NewImage[] = []
+  // Slicers are kept only with their frames (timelines are not).
+  const keptSlicers = new Set(
+    slicers === undefined
+      ? Object.values(workbook.worksheetsById).flatMap((sheet) =>
+          Object.values(sheet.visualsById ?? {}).flatMap((visual) => (visual.slicer ? [visual.slicer.name] : [])),
+        )
+      : Object.keys(slicers?.frames ?? {}),
+  )
   for (const [index, sheet] of sheets.entries()) {
     const fileSheet = read.sheets[index]!
     const fileVisuals = read.file.visuals.filter((visual) => visual.sheetId === fileSheet.meta.id)
@@ -506,7 +518,7 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
         // Same references by id = same chart: an untouched chart is not rewritten.
         if (before?.chart?.raw && canonicalJson(before.chart.raw) === canonicalJson(raw)) raw = before.chart.raw
       }
-      const visual = storedVisual(fileVisual, home, lookup, `${id}.${extension}`, raw)
+      const visual = storedVisual(fileVisual, home, lookup, `${id}.${extension}`, raw, keptSlicers)
       if (!visual) return
       if (visual.image) {
         if (before?.image) visual.image = before.image
@@ -538,7 +550,9 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
     }
   }
 
-  const namesById = definedNames(read, workbook.namesById ?? {}, (index) => {
+  // A slicer cache's name (=#N/A) belongs to the slicer, written with it.
+  const slicerNames = new Set((slicers?.caches ?? []).map((cache) => cache.name.toLowerCase()))
+  const namesById = definedNames(read, workbook.namesById ?? {}, slicerNames, (index) => {
     const sheet = read.sheets[index]
     return sheet ? storedIdByName.get(sheet.meta.name) : undefined
   }, lookup)
@@ -556,6 +570,26 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
     worksheetsById,
     namesById,
     ...(Object.keys(tableStylesById).length ? { tableStylesById } : {}),
+  }
+  if (slicers === undefined) {
+    if (workbook.slicers) next.slicers = workbook.slicers
+  } else if (slicers) {
+    // Sheets by stored id, so a renamed sheet keeps its slicers.
+    const idOf = (name: string) => storedIdByName.get(name) ?? name
+    const bound: SlicerParts = {
+      ...slicers,
+      caches: slicers.caches.map((cache) => ({
+        ...cache,
+        xml: cache.xml.replace(/\{\{tab:([^}]*)\}\}/g, (_match, name: string) => `{{tab:${idOf(name)}}}`),
+      })),
+      sheets: slicers.sheets.map((entry) => ({ ...entry, sheet: idOf(entry.sheet) })),
+    }
+    const json = JSON.stringify(bound)
+    const attachment = `slicers-${contentHash(json)}.json`
+    if (workbook.slicers?.attachment !== attachment) {
+      newImages.push({ attachment, mediaType: 'application/json', fileVisualId: '', bytes: new TextEncoder().encode(json) })
+    }
+    next.slicers = { attachment }
   }
   if (externalLinks === undefined) {
     if (workbook.externalLinks) next.externalLinks = workbook.externalLinks
@@ -712,9 +746,10 @@ function diffWorkbook(
   if (before.stylesById) top.unset.push({ path: [...WORKBOOK_PATH, 'stylesById'] })
   if (before.namesById) top.map([...WORKBOOK_PATH, 'namesById'], before.namesById, next.namesById ?? {}, false)
   else if (next.namesById && Object.keys(next.namesById).length > 0) top.put([...WORKBOOK_PATH, 'namesById'], next.namesById)
-  if (!equal(before.externalLinks, next.externalLinks)) {
-    if (next.externalLinks) top.put([...WORKBOOK_PATH, 'externalLinks'], next.externalLinks)
-    else top.unset.push({ path: [...WORKBOOK_PATH, 'externalLinks'] })
+  for (const field of ['externalLinks', 'slicers'] as const) {
+    if (equal(before[field], next[field])) continue
+    if (next[field]) top.put([...WORKBOOK_PATH, field], next[field])
+    else top.unset.push({ path: [...WORKBOOK_PATH, field] })
   }
   if (before.tableStylesById) top.map([...WORKBOOK_PATH, 'tableStylesById'], before.tableStylesById, next.tableStylesById ?? {}, false)
   else if (next.tableStylesById) top.put([...WORKBOOK_PATH, 'tableStylesById'], next.tableStylesById)

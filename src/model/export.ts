@@ -19,6 +19,7 @@ import { injectPivots, type PivotParts } from '../xlsx/pivot-parts'
 import { applyTabColors, applyVeryHidden } from '../xlsx/tab-colors'
 import { applyCustomTableStyles } from '../xlsx/table-parts'
 import { applyExternalLinks, type ExternalLinkPart } from '../xlsx/external-links'
+import { applySlicers, type SlicerFrame, type SlicerParts } from '../xlsx/slicer-parts'
 import { applyCharts, type ChartParts, type ChartPlacement } from '../xlsx/chart-parts'
 import { pivotPlacements } from './pivots'
 import type { XlsxEngine } from '../xlsx/engine'
@@ -205,6 +206,27 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     if (links) bytes = new Uint8Array(await applyExternalLinks(bytes, links))
     const placements = await pivotPlacements(sheets, lookup, (attachment) => loadJson<PivotParts>(attachment))
     bytes = new Uint8Array(await injectPivots(bytes, placements))
+    // Slicers last: they point at the tables and pivots written above.
+    const slicers = workbook.slicers ? await loadJson<SlicerParts>(workbook.slicers.attachment) : undefined
+    if (slicers) {
+      const nameOf = (id: string) => workbook.worksheetsById[id]?.name ?? id
+      const named: SlicerParts = {
+        ...slicers,
+        caches: slicers.caches.map((cache) => ({
+          ...cache,
+          xml: cache.xml.replace(/\{\{tab:([^}]*)\}\}/g, (_match, id: string) => `{{tab:${nameOf(id)}}}`),
+        })),
+        sheets: slicers.sheets.map((entry) => ({ ...entry, sheet: nameOf(entry.sheet) })),
+      }
+      const frames: SlicerFrame[] = []
+      for (const sheet of sheets) {
+        ;(visualOrder.get(sheet.id) ?? []).forEach((id, anchorIndex) => {
+          const slicer = sheet.visualsById[id]?.slicer
+          if (slicer) frames.push({ sheet: sheet.name, anchorIndex, name: slicer.name })
+        })
+      }
+      bytes = new Uint8Array(await applySlicers(bytes, named, frames))
+    }
   }
   return { bytes, visualOrder }
 }

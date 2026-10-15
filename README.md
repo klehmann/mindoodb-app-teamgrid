@@ -185,7 +185,12 @@ in `patches/sheets-responsive-ribbon.patch`, the styling in
 - Links to other workbooks: formulas keep `[n]Sheet!A1` verbatim, the
   externalLink parts (path and cached values) are stored as an attachment
   and written back in order (`src/xlsx/external-links.ts`).
-- Not stored: allow-edit ranges with a password of their own, slicers,
+- Slicers: caches, slicer parts, their extLst entries and drawing frames
+  kept as an attachment (table ids and sheet tab ids as placeholders by
+  name/stored id); the frame position is a visual with id-bound anchor
+  (`src/xlsx/slicer-parts.ts`). Tested with table slicers; timelines are not
+  kept.
+- Not stored: allow-edit ranges with a password of their own, timelines,
   macros.
 - Not yet: WASM in a Web Worker, encryption,
   the embeddable "spreadsheet" component of TeamGrid 1.x, WebMCP.

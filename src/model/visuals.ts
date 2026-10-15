@@ -213,9 +213,13 @@ export function storedVisual(
   lookup: AxesLookup,
   attachment: string,
   raw?: StoredChart['raw'],
+  keptSlicers?: ReadonlySet<string>,
 ): StoredVisual | null {
   const anchor = anchorToIds(visual.anchor, home)
   if (!anchor) return null
+  if (visual.kind === 'slicer') {
+    return visual.name && keptSlicers?.has(visual.name) ? { kind: 'slicer', anchor, slicer: { name: visual.name } } : null
+  }
   if (visual.kind === 'chart' && (visual.chart || raw)) {
     // A chart type chart-add cannot create still gets a chart to put the kept part over.
     const chart = (visual.chart && storedChart(visual.chart, lookup)) || (raw ? placeholderChart() : null)
@@ -263,5 +267,7 @@ export function visualAddition(
     return { anchor, image: { mediaType: visual.image.mediaType, base64: imageBase64 } }
   }
   if (visual.kind === 'shape' && visual.shape) return { anchor, shape: visual.shape }
+  // A placeholder at the slicer's position; slicer-parts.ts puts the real frame in.
+  if (visual.kind === 'slicer') return { anchor, shape: { shapeType: 'rect' } as NonNullable<VisualAdd['shape']> }
   return null
 }

@@ -227,12 +227,14 @@ export type StoredChart = Omit<ChartAdd, 'series'> & {
 }
 
 export interface StoredVisual {
-  kind: 'chart' | 'image' | 'shape'
+  kind: 'chart' | 'image' | 'shape' | 'slicer'
   anchor: VisualAnchor
   chart?: StoredChart
   shape?: NonNullable<VisualAdd['shape']>
   /** The picture's bytes live in an attachment of the top document. */
   image?: { attachment: string; mediaType: 'image/png' | 'image/jpeg' | 'image/gif' }
+  /** A slicer's frame; its parts are the workbook's `slicers`. */
+  slicer?: { name: string }
 }
 
 /**
@@ -325,6 +327,8 @@ export interface Workbook {
   tableStylesById?: Record<string, StoredTableStyle>
   /** Links to other workbooks, `[1]`, `[2]`, … in order: their parts as an attachment of the top document. */
   externalLinks?: { attachment: string }
+  /** Slicer caches, parts and frames (src/xlsx/slicer-parts.ts) as an attachment of the top document; sheets by id. */
+  slicers?: { attachment: string }
   /** Legacy style registry, read once and dropped by the next save. */
   stylesById?: Record<StyleId, StoredStyle>
 }
