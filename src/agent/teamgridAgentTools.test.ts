@@ -201,3 +201,14 @@ describe('TeamGrid agent tools', () => {
     expect(formatting.length).toBeGreaterThan(2000)
   })
 })
+
+describe('blocksOf', () => {
+  it('loads scattered cells as one block when it is small enough, else row by row', async () => {
+    const { blocksOf } = await import('./teamgridAgentTools')
+    expect(blocksOf(['A1', 'C3'])).toEqual([{ startRow: 0, endRow: 2, startColumn: 0, endColumn: 2 }])
+    expect(blocksOf(['A1', 'B5000'])).toEqual([
+      { startRow: 0, endRow: 0, startColumn: 0, endColumn: 0 },
+      { startRow: 4999, endRow: 4999, startColumn: 1, endColumn: 1 },
+    ])
+  })
+})

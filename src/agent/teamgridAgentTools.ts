@@ -17,10 +17,13 @@ import {
   type MindooDBAppAgentToolErrorCode,
 } from 'mindoodb-app-sdk'
 
+import { parseAddress, type RangeBounds } from '@genoffice/xlsx-gateway/domain/cell-address'
+
 import { GUIDE_CATALOG } from '../../vendor/genoffice/apps/sheets/src/renderer/ai/guides'
 import {
   buildWorkbookContext,
   executeWorkbookTool,
+  MAX_READ_RANGE_CELLS,
   WORKBOOK_TOOLS,
   type SheetsSkillDeps,
   type ToolExecution,
@@ -126,6 +129,29 @@ function sheetList(skill: SheetsSkillDeps) {
   }))
 }
 
+/**
+ * Blocks to load before reading scattered cells: their bounding box when GenOffice can
+ * stream it in one request, else one block per row.
+ */
+export function blocksOf(addresses: string[]): RangeBounds[] {
+  const cells = addresses.map((address) => parseAddress(address))
+  const box = {
+    startRow: Math.min(...cells.map((c) => c.row)),
+    endRow: Math.max(...cells.map((c) => c.row)),
+    startColumn: Math.min(...cells.map((c) => c.column)),
+    endColumn: Math.max(...cells.map((c) => c.column)),
+  }
+  if ((box.endRow - box.startRow + 1) * (box.endColumn - box.startColumn + 1) <= MAX_READ_RANGE_CELLS) return [box]
+  const rows = new Map<number, number[]>()
+  for (const cell of cells) rows.set(cell.row, [...(rows.get(cell.row) ?? []), cell.column])
+  return [...rows].map(([row, columns]) => ({
+    startRow: row,
+    endRow: row,
+    startColumn: Math.min(...columns),
+    endColumn: Math.max(...columns),
+  }))
+}
+
 function signatureIndex(): string {
   return [
     `Ops for ${PREFIX}_apply_ops (load a group for its fields):`,
@@ -184,6 +210,8 @@ export function createTeamgridAgentTools(deps: TeamgridAgentDeps): MindooDBAppAg
       canCreate: deps.canCreate(),
       workbook: { ...open },
       activeSheetId: info.sheetId,
+      // Too large to load whole: cells show Excel's stored results and formulas are not recalculated.
+      ...(info.streaming ? { streaming: true } : {}),
       ...(info.selection ? { selection: info.selection } : {}),
       sheets: sheetList(skill),
       overview: retarget(buildWorkbookContext(skill)),
@@ -351,6 +379,12 @@ export function createTeamgridAgentTools(deps: TeamgridAgentDeps): MindooDBAppAg
       const sheetId = optionalString(input, 'sheetId')
       if (sheetId && !skill.getActiveSheetInfo().sheets.some((sheet) => sheet.id === sheetId)) {
         fail('NOT_FOUND', `No sheet ${sheetId}.`, `call ${PREFIX}_get_context`)
+      }
+      // A large imported workbook streams into the grid by viewport; cells outside it read as empty.
+      for (const block of blocksOf(addresses)) {
+        if ((await skill.ensureRangeLoaded?.(block, sheetId)) === false) {
+          fail('INVALID_STATE', 'The requested cells could not be fully loaded; retry after workbook indexing completes.')
+        }
       }
       const read = skill.readCells(addresses, sheetId) as Record<
         string,
