@@ -8,6 +8,9 @@ export interface XlsxEngine {
     range: { startRow: number; endRow: number; startColumn: number; endColumn: number }
   }): Promise<unknown>
   readFormulaCells(input: { sessionId: string; sheetId: string }): Promise<unknown>
+  /** GenOffice's findWorkbookCells: a streamed find over the whole workbook. */
+  findCells(request: unknown): Promise<unknown>
+  readRowOutline(input: { sessionId: string; sheetId: string }): Promise<unknown>
   readMedia(input: { sessionId: string; visualId: string }): Promise<unknown>
   /** The image bytes behind a visual, without a base64 round trip. */
   readMediaBytes(input: { sessionId: string; visualId: string }): Promise<Uint8Array>

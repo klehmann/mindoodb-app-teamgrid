@@ -20,6 +20,7 @@ import {
 import type { HavenConnection } from './connection'
 import { loadWorkbook, writeWorkbook } from './store'
 import { viewSheetStrings, type ViewSheetStrings } from './view-sheet-strings'
+import { activeWorkbook } from '../univer-access'
 import { button, dialog, element } from './welcome'
 import type { WelcomeStrings } from './welcome-strings'
 
@@ -44,10 +45,7 @@ export interface ViewSheetCommands {
 }
 
 function activeSheetName(): string | undefined {
-  const api = (window as unknown as {
-    __univerAPI?: { getActiveWorkbook(): { getActiveSheet(): { getSheetName(): string } } | null }
-  }).__univerAPI
-  return api?.getActiveWorkbook()?.getActiveSheet().getSheetName()
+  return activeWorkbook()?.getActiveSheet().getSheetName()
 }
 
 function message(text: string, strings: ViewSheetStrings, welcome: WelcomeStrings): Promise<null> {

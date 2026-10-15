@@ -16,6 +16,8 @@ export function createNodeEngine(): XlsxEngine {
       open(bytes: Uint8Array, name: string | null, locale: string | null, shortDate: string | null): string
       readRange(session: string, sheet: string, r0: number, r1: number, c0: number, c1: number): string
       readFormulaCells(session: string, sheet: string): string
+      findCells(request: string): string
+      readRowOutline(session: string, sheet: string): string
       readMedia(session: string, visual: string): string
       readMediaBytes(session: string, visual: string): Uint8Array
       close(session: string): void
@@ -27,6 +29,8 @@ export function createNodeEngine(): XlsxEngine {
     readRange: async ({ sessionId, sheetId, range }) =>
       JSON.parse(engine.readRange(sessionId, sheetId, range.startRow, range.endRow, range.startColumn, range.endColumn)),
     readFormulaCells: async ({ sessionId, sheetId }) => JSON.parse(engine.readFormulaCells(sessionId, sheetId)),
+    findCells: async (request) => JSON.parse(engine.findCells(JSON.stringify(request))),
+    readRowOutline: async ({ sessionId, sheetId }) => JSON.parse(engine.readRowOutline(sessionId, sheetId)),
     readMedia: async ({ sessionId, visualId }) => JSON.parse(engine.readMedia(sessionId, visualId)),
     readMediaBytes: async ({ sessionId, visualId }) => engine.readMediaBytes(sessionId, visualId),
     close: async (sessionId) => engine.close(sessionId),

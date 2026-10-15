@@ -23,6 +23,7 @@ import {
   type HavenConnection,
 } from './haven/connection'
 import { installFillSeries } from './fill-series'
+import { activeWorkbook, installUniverAccess } from './univer-access'
 import { installFileMenu, type FileAction } from './haven/file-menu'
 import { hideBanner, showBanner } from './haven/banner'
 import { canBrowseHistory, listRevisions } from './haven/history'
@@ -77,6 +78,8 @@ const DESKTOP_ONLY = new Set([
   'onCloseSaveRequest',
   'onMcpCommand',
   'signalMcpReady',
+  'onAiSettingsChanged',
+  'openAiModelSettings',
 ])
 
 const reported = new Set<string>()
@@ -393,9 +396,7 @@ function reopenAt(id: string, sheetName: string): void {
   openInEditor(id)
   const started = Date.now()
   const timer = setInterval(() => {
-    const workbook = (window as unknown as {
-      __univerAPI?: { getActiveWorkbook(): { getSheetByName(name: string): { activate(): unknown } | null } | null }
-    }).__univerAPI?.getActiveWorkbook()
+    const workbook = activeWorkbook()
     const sheet = activeSessionId !== before ? workbook?.getSheetByName(sheetName) : null
     if (sheet) sheet.activate()
     if (sheet || Date.now() - started > 20_000) clearInterval(timer)
@@ -450,6 +451,13 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
     },
     readWorkbookRange: async (request) => (await loadXlsxEngine()).readRange(request) as never,
     readWorkbookFormulas: async (request) => (await loadXlsxEngine()).readFormulaCells(request) as never,
+    findWorkbookCells: async (request) => (await loadXlsxEngine()).findCells(request) as never,
+    readWorkbookRowOutline: async (request) => (await loadXlsxEngine()).readRowOutline(request) as never,
+    // Threaded comments are signed with the Haven user's name.
+    getUserDisplayName: async () => haven?.context.user.username || 'TeamGrid',
+    // No printer list in a browser: GenOffice falls back to the system print dialog.
+    listPrinters: async () => [],
+    openSourcePath: async () => {},
     readWorkbookMedia: async (request) => (await loadXlsxEngine()).readMedia(request) as never,
     readPivotDefinition: async (request) =>
       readPivotDefinition(request.sessionId, request.path, request.cachePath) as never,
@@ -482,6 +490,7 @@ export async function installDesktopApiShim(): Promise<void> {
   language = toLang(haven?.context.locale ?? navigator.language)
   welcomeLanguage = (haven?.context.locale ?? navigator.language).slice(0, 2).toLowerCase()
   installFillSeries(() => welcomeLanguage)
+  installUniverAccess()
   const api = new Proxy(createApi(haven), {
     get(target, property) {
       if (typeof property !== 'string') return undefined

@@ -1,3 +1,5 @@
+// one definition, in the package both carriers and both apps can reach
+export { REDACT_EL, REDACT_NS, REDACT_PREFIX } from '@genoffice/agent-core/redact-range'
 export * from './types'
 export {
   deobfuscateOdttf,
@@ -19,6 +21,7 @@ export { assertZipInflatesWithinLimits, assertZipWithinLimits, DOCX_ZIP_LIMITS }
 export { LAZY_MEDIA_SCHEME, isLazyMediaPart, lazyMediaUrl, parseLazyMediaUrl } from './lazy-media'
 export { setAltChunkHtmlConverter, type AltChunkHtmlConverter } from './alt-chunk'
 export { tocLevelOf } from './parse-fields'
+export { mergeStyleBorders } from './parse-props'
 export {
   saveDocx,
   findChartWorkbookPath,
@@ -168,7 +171,10 @@ export {
   toSymbolPua,
 } from './symbol-fonts'
 export {
-  bulletMarkerScale,
+  type BulletSubstitute,
+  substituteBullet,
+  markerFallbackFace,
+  SEGOE_UI_SYMBOL_RE,
   computeListMarkerInfos,
   computeListMarkers,
   computeListValues,

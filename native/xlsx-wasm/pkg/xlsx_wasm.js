@@ -26,6 +26,31 @@ export class XlsxEngine {
             throw takeFromExternrefTable0(ret[0]);
         }
     }
+    /**
+     * Sidecar `find_cells` result for a `findWorkbookCells` request (JSON).
+     * @param {string} request
+     * @returns {string}
+     */
+    findCells(request) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const ptr0 = passStringToWasm0(request, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ret = wasm.xlsxengine_findCells(this.__wbg_ptr, ptr0, len0);
+            var ptr2 = ret[0];
+            var len2 = ret[1];
+            if (ret[3]) {
+                ptr2 = 0; len2 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+        }
+    }
     constructor() {
         const ret = wasm.xlsxengine_new();
         this.__wbg_ptr = ret;
@@ -165,6 +190,34 @@ export class XlsxEngine {
             const ptr1 = passStringToWasm0(sheetId, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len1 = WASM_VECTOR_LEN;
             const ret = wasm.xlsxengine_readRange(this.__wbg_ptr, ptr0, len0, ptr1, len1, startRow, endRow, startColumn, endColumn);
+            var ptr3 = ret[0];
+            var len3 = ret[1];
+            if (ret[3]) {
+                ptr3 = 0; len3 = 0;
+                throw takeFromExternrefTable0(ret[2]);
+            }
+            deferred4_0 = ptr3;
+            deferred4_1 = len3;
+            return getStringFromWasm0(ptr3, len3);
+        } finally {
+            wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+        }
+    }
+    /**
+     * Sidecar `read_row_outline` result: the sheet's row outline levels.
+     * @param {string} sessionId
+     * @param {string} sheetId
+     * @returns {string}
+     */
+    readRowOutline(sessionId, sheetId) {
+        let deferred4_0;
+        let deferred4_1;
+        try {
+            const ptr0 = passStringToWasm0(sessionId, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len0 = WASM_VECTOR_LEN;
+            const ptr1 = passStringToWasm0(sheetId, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len1 = WASM_VECTOR_LEN;
+            const ret = wasm.xlsxengine_readRowOutline(this.__wbg_ptr, ptr0, len0, ptr1, len1);
             var ptr3 = ret[0];
             var len3 = ret[1];
             if (ret[3]) {

@@ -1,6 +1,6 @@
 --- a/apps/sheets/src/renderer/ExcelShell.tsx
 +++ b/apps/sheets/src/renderer/ExcelShell.tsx
-@@ -249,7 +249,7 @@
+@@ -303,7 +303,7 @@
    appGroupDefinedNames: '🏷',
    appGroupFormulaAuditing: '🔍',
    appGroupCalculation: '⟳',
@@ -9,7 +9,7 @@
    appGroupSortFilter: '⇅',
    appGroupDataTools: '⚡',
    appGroupForecast: '📈',
-@@ -2641,6 +2641,7 @@
+@@ -3363,6 +3363,7 @@
              </button>
            </div>
          </RibbonGroup>
@@ -17,7 +17,7 @@
          <RibbonGroup label={t('appGroupSortFilter')}>
            {largeMenu(t('appSort'), '⇅', t('appSortSelectionTitle'), [
              { value: 'sort:asc', label: t('appSortAToZ') },
-@@ -3965,13 +3966,56 @@
+@@ -4726,13 +4727,56 @@
          if (category) onCommand(`format:${category.pattern}`)
        }}
      />

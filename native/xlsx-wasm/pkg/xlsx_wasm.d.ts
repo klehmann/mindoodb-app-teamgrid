@@ -9,6 +9,10 @@ export class XlsxEngine {
     free(): void;
     [Symbol.dispose](): void;
     close(sessionId: string): void;
+    /**
+     * Sidecar `find_cells` result for a `findWorkbookCells` request (JSON).
+     */
+    findCells(request: string): string;
     constructor();
     /**
      * Opens an .xlsx from its bytes. Returns the sidecar `open` result
@@ -35,6 +39,10 @@ export class XlsxEngine {
      * `indexingComplete` is always true.
      */
     readRange(sessionId: string, sheetId: string, startRow: number, endRow: number, startColumn: number, endColumn: number): string;
+    /**
+     * Sidecar `read_row_outline` result: the sheet's row outline levels.
+     */
+    readRowOutline(sessionId: string, sheetId: string): string;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -43,12 +51,14 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_xlsxengine_free: (a: number, b: number) => void;
     readonly xlsxengine_close: (a: number, b: number, c: number) => [number, number];
+    readonly xlsxengine_findCells: (a: number, b: number, c: number) => [number, number, number, number];
     readonly xlsxengine_new: () => number;
     readonly xlsxengine_open: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
     readonly xlsxengine_readFormulaCells: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly xlsxengine_readMedia: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly xlsxengine_readMediaBytes: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly xlsxengine_readRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
+    readonly xlsxengine_readRowOutline: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;

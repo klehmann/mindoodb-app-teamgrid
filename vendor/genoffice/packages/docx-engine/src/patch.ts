@@ -1,4 +1,5 @@
 import JSZip from 'jszip'
+import { REDACT_EL, REDACT_NS, REDACT_PREFIX } from '@genoffice/agent-core/redact-range'
 import {
   applyImageWrap,
   generateParagraphXml,
@@ -68,6 +69,7 @@ import type {
   NewInkImage,
   NoteInfo,
   ParsedDoc,
+  RevisionInfo,
   SdtShell,
   SectionSettings,
   SourceInfo,
@@ -359,7 +361,7 @@ export type SaveBlock = (
   | { kind: 'chart'; chart: NewChart; extentPx?: { w: number; h: number } }
 ) & {
   /** Top-level tracked insertion/deletion wrapper. */
-  revision?: { kind: 'ins' | 'del'; author: string; date?: string; id?: string }
+  revision?: { kind: 'ins' | 'del' } & RevisionInfo
 }
 
 export interface SaveOptions {
@@ -755,6 +757,7 @@ export async function saveDocx(
     listParagraphStyleId: parsed.listParagraphStyleId,
     allocateHyperlinkRel,
     allocateBookmarkId: nextBookmarkIdAllocator(documentXml),
+    allocateRevisionId: nextRevisionIdAllocator(documentXml),
   }
 
   const newMedia: Array<{ path: string; base64: string }> = []
@@ -871,7 +874,6 @@ export async function saveDocx(
     relsXml: string
     base64: string
   }> = []
-  let chartDocPrId = 8000
   const embedChart = async (
     chart: NewChart,
     extentPx?: { w: number; h: number },
@@ -904,7 +906,7 @@ export async function saveDocx(
       base64: wbBase64,
     })
 
-    const docPrId = chartDocPrId++
+    const docPrId = DOCPR_ID_BASE + ++docPrSeq
     const cx = extentPx ? Math.max(1, Math.round(extentPx.w * 9525)) : 5486400
     const cy = extentPx ? Math.max(1, Math.round(extentPx.h * 9525)) : 3200400
     return (
@@ -1513,7 +1515,8 @@ export async function saveDocx(
       const attrs =
         ` w:id="${escapeXmlAttr(revision.id ?? '0')}"` +
         ` w:author="${escapeXmlAttr(revision.author)}"` +
-        (revision.date ? ` w:date="${escapeXmlAttr(revision.date)}"` : '')
+        (revision.date ? ` w:date="${escapeXmlAttr(revision.date)}"` : '') +
+        (revision.dateUtc ? ` w16du:dateUtc="${escapeXmlAttr(revision.dateUtc)}"` : '')
       xml = `<w:${revision.kind}${attrs}>${xml}</w:${revision.kind}>`
     }
     if (fbDocxIndex !== undefined && fb.kind !== 'original') {
@@ -1584,6 +1587,75 @@ export async function saveDocx(
     newDocumentXml = newDocumentXml.replace(
       /<w:document /,
       '<w:document xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" ',
+    )
+  }
+
+  // The same for the "withheld from the model" marker. An undeclared prefix is
+  // not a warning, it is a parse error: Word and LibreOffice both offer to
+  // repair the file and drop the run that carried it, which loses the reader's
+  // mark and hands the span back to the model on the next open.
+  //
+  // `mc:Ignorable` is the mechanism OOXML provides for exactly this — an
+  // element in a namespace the consumer does not know is skipped rather than
+  // treated as a schema violation, so the label rides along without the
+  // border's run failing a strict validator.
+  //
+  // A root that already declares `xmlns:mc` (every Word-saved file does) must
+  // not get a second one: a duplicate attribute is the same parse error this
+  // block exists to prevent. Its existing Ignorable list is extended instead.
+  if (
+    newDocumentXml.includes(`<${REDACT_EL}`) &&
+    !new RegExp(`<w:document[^>]*xmlns:${REDACT_PREFIX}=`).test(newDocumentXml)
+  ) {
+    const root = /<w:document\b[^>]*>/.exec(newDocumentXml)?.[0]
+    if (root) {
+      let next = root
+      if (!/xmlns:mc=/.test(next)) {
+        next = next.replace(
+          '<w:document',
+          '<w:document xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"',
+        )
+      }
+      next = next.replace('<w:document', `<w:document xmlns:${REDACT_PREFIX}="${REDACT_NS}"`)
+      const ignorable = /mc:Ignorable="([^"]*)"/.exec(next)
+      if (ignorable) {
+        if (!new RegExp(`\\b${REDACT_PREFIX}\\b`).test(ignorable[1] ?? '')) {
+          const existing = (ignorable[1] ?? '').trim()
+          next = next.replace(
+            /mc:Ignorable="[^"]*"/,
+            `mc:Ignorable="${existing ? `${existing} ${REDACT_PREFIX}` : REDACT_PREFIX}"`,
+          )
+        }
+      } else {
+        next = next.replace('<w:document', `<w:document mc:Ignorable="${REDACT_PREFIX}"`)
+      }
+      // a Word re-save drops every element whose namespace it does not process
+      // unless the root asks for it to be preserved verbatim — and a root that
+      // already preserves other elements needs ours added to that list, the
+      // same way the Ignorable list above is extended
+      const preserve = /mc:PreserveElements="([^"]*)"/.exec(next)
+      if (preserve) {
+        if (!new RegExp(`\\b${REDACT_EL}\\b`).test(preserve[1] ?? '')) {
+          const existing = (preserve[1] ?? '').trim()
+          next = next.replace(
+            /mc:PreserveElements="[^"]*"/,
+            `mc:PreserveElements="${existing ? `${existing} ${REDACT_EL}` : REDACT_EL}"`,
+          )
+        }
+      } else {
+        next = next.replace('<w:document', `<w:document mc:PreserveElements="${REDACT_EL}"`)
+      }
+      newDocumentXml = newDocumentXml.replace(root, next)
+    }
+  }
+
+  if (
+    newDocumentXml.includes(' w16du:dateUtc=') &&
+    !/<w:document[^>]*xmlns:w16du=/.test(newDocumentXml)
+  ) {
+    newDocumentXml = newDocumentXml.replace(
+      /<w:document /,
+      '<w:document xmlns:w16du="http://schemas.microsoft.com/office/word/2023/wordml/word16du" ',
     )
   }
 
@@ -2104,8 +2176,16 @@ function headerFooterPartXml(
     if (open && closeIdx >= 0) {
       const openIdx = originalXml.indexOf(open)
       const children = splitXmlChildren(originalXml.slice(openIdx + open.length, closeIdx))
+      // a text paragraph whose pictures are all inline blips is fully modelled
+      // (the parser keeps them on its runs), so it is regenerated like any text
+      const isModelledPictures = (xml: string) =>
+        /<w:t[\s>]/.test(xml) &&
+        !/<w:pict[\s>]|<w:object[\s>]|<wp:anchor[\s>]/.test(xml) &&
+        (xml.match(/<w:drawing[\s>][\s\S]*?<\/w:drawing>/g) ?? []).every(
+          (d) => d.includes('<wp:inline') && d.includes('<a:blip'),
+        )
       const isProtectedPara = (xml: string) =>
-        /<w:drawing[\s>]|<w:pict[\s>]|<w:object[\s>]/.test(xml)
+        /<w:drawing[\s>]|<w:pict[\s>]|<w:object[\s>]/.test(xml) && !isModelledPictures(xml)
       const isTextPara = (c: { name: string; xml: string }) =>
         c.name === 'w:p' && !isWatermarkChild(c) && !isProtectedPara(c.xml)
       if (children.some((c) => !isTextPara(c))) {
@@ -2560,6 +2640,14 @@ function maxDocPrId(documentXml: string): number {
 function nextBookmarkIdAllocator(documentXml: string): (name: string) => number {
   let next = maxBookmarkId(documentXml) + 1
   return () => next++
+}
+
+/** revision w:id is unique across every annotation in the part, so start above all existing ids */
+function nextRevisionIdAllocator(documentXml: string): () => string {
+  let next = 9001
+  for (const m of documentXml.matchAll(/\bw:id\s*=\s*["'](\d+)["']/g))
+    next = Math.max(next, parseInt(m[1], 10) + 1)
+  return () => String(next++)
 }
 
 /** Highest w:bookmarkStart/@w:id in the document, 0 when it holds no bookmark. */

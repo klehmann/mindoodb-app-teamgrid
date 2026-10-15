@@ -17,6 +17,24 @@
    }
  }
  
+@@ -50,14 +52,14 @@
+  * Reads the persisted density, honouring the legacy `'1'`/`'0'` values written
+  * by the two-state version so an existing collapsed ribbon stays collapsed.
+  */
+-export function readRibbonDensity(storageKey: string): RibbonDensity {
++export function readRibbonDensity(storageKey: string, fallback: RibbonDensity = 'full'): RibbonDensity {
+   try {
+     const raw = localStorage.getItem(storageKey)
+     if (raw === 'collapsed' || raw === 'compact') return raw
+     if (raw === '1') return 'collapsed'
+-    return 'full'
++    return raw == null ? fallback : 'full'
+   } catch {
+-    return 'full'
++    return fallback
+   }
+ }
+ 
 @@ -118,12 +120,14 @@
  export function useRibbonCollapse(
    storageKey: string,
@@ -27,8 +45,9 @@
    const compactEnabled = Boolean(labels.compact && labels.expandFull)
    const [density, setDensity] = useState<RibbonDensity>(() =>
      compactEnabled
-       ? readRibbonDensity(storageKey)
+-      ? readRibbonDensity(storageKey)
 -      : readRibbonCollapsed(storageKey)
++      ? readRibbonDensity(storageKey, options?.defaultCollapsed ? 'collapsed' : 'full')
 +      : readRibbonCollapsed(storageKey, options?.defaultCollapsed)
          ? 'collapsed'
          : 'full',
@@ -42,10 +61,11 @@
  import { platformShortcuts } from '@genoffice/i18n'
  import {
    Dropdown,
-@@ -141,6 +141,209 @@
+@@ -194,7 +194,210 @@
+ /// lights / caption buttons — the ribbon must not reserve space for them.
  const IN_TAB = new URLSearchParams(window.location.search).get('mode') === 'tab'
  const IS_MAC = navigator.platform.toLowerCase().includes('mac')
- 
++
 +/**
 + * [TeamGrid] Narrow windows (a tablet, a component inside another app, a
 + * phone). Below COMPACT_TABS_QUERY the tab row uses short labels, and tabs
@@ -170,7 +190,7 @@
 +  appGroupChartActions: '🗑',
 +  appChangeChartType: '📊',
 +}
-+
+ 
 +/**
 + * [TeamGrid] Folds the band's groups that do not fit into dropdown buttons,
 + * from the right; the first group stays. Expanded widths are cached per tab
@@ -252,19 +272,25 @@
  /// Univer's formula bar keeps its expanded state in React component state
  /// with no command behind it; the fold arrow is the only way in.
  function toggleFormulaBarExpand(): void {
-@@ -414,10 +617,25 @@
+@@ -546,13 +749,28 @@
  }: ExcelShellProps): React.JSX.Element {
    const { t } = useI18n()
    const [activeTab, setActiveTab] = useState<RibbonTab>('Home')
 -  const collapse = useRibbonCollapse('ai-sheets-ribbon-collapsed', {
 -    collapse: t('appRibbonCollapse'),
 -    expand: t('appRibbonExpand'),
+-    // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (docs parity, see #362)
+-    compact: t('appRibbonCompact'),
+-    expandFull: t('appRibbonExpand'),
 -  })
 +  const collapse = useRibbonCollapse(
 +    'ai-sheets-ribbon-collapsed',
 +    {
 +      collapse: t('appRibbonCollapse'),
 +      expand: t('appRibbonExpand'),
++      // ⌥⌘K / Ctrl+Alt+K: the icon-only middle density (docs parity, see #362)
++      compact: t('appRibbonCompact'),
++      expandFull: t('appRibbonExpand'),
 +    },
 +    // [TeamGrid] a phone or a low window starts with only the tab row, until the user decides
 +    { defaultCollapsed: window.matchMedia('(max-width: 640px), (max-height: 600px)').matches },
@@ -282,10 +308,10 @@
    // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
    const [isCopilotOpen, setIsCopilotOpen] = useState(() =>
      aiPanelInitiallyOpen('ai-sheets-show-ai'),
-@@ -589,6 +807,101 @@
-   const visibleTabs: readonly RibbonTab[] = selectedChart
-     ? [...ribbonTabs, 'Chart Design']
-     : ribbonTabs
+@@ -830,6 +1048,101 @@
+     ...(selectedVisualKind === 'shape' ? (['Shape Format'] as const) : []),
+     ...(selectedVisualKind === 'image' ? (['Picture Format'] as const) : []),
+   ]
 +
 +  // [TeamGrid] Tab row overflow: the tabs that fit stay in the row (the
 +  // selected one always), the rest go into "More". Widths are cached per label
@@ -384,7 +410,7 @@
    const saveAsTitle = `${t('appSaveAs')} (${platformShortcuts('⇧⌘S')})`
  
    return (
-@@ -597,11 +910,15 @@
+@@ -838,11 +1151,15 @@
        inert={openingWorkbook}
        aria-busy={openingWorkbook}
      >
@@ -402,13 +428,13 @@
          >
            <button
              type="button"
-@@ -656,25 +973,70 @@
+@@ -897,25 +1214,70 @@
              />
            </label>
            <span className="qa-sep" aria-hidden="true" />
 -          {visibleTabs.map((tab) => (
 -            <button
--              className={`${collapse.tabClass(tab === activeTab)} ${tab === 'Chart Design' ? 'contextual' : ''}`}
+-              className={`${collapse.tabClass(tab === activeTab)} ${CONTEXTUAL_TABS.includes(tab) ? 'contextual' : ''}`}
 -              data-tip={collapse.tabTip(tab === activeTab)}
 -              key={tab}
 -              onClick={() => {
@@ -423,7 +449,7 @@
 +            .filter((tab) => !overflowTabs.includes(tab))
 +            .map((tab) => (
 +              <button
-+                className={`${tabClass(tab)} ${tab === 'Chart Design' ? 'contextual' : ''}`}
++                className={`${tabClass(tab)} ${CONTEXTUAL_TABS.includes(tab) ? 'contextual' : ''}`}
 +                data-tip={phone ? undefined : collapse.tabTip(tab === activeTab)}
 +                data-tabkey={tab}
 +                key={tab}
@@ -486,7 +512,7 @@
          <Ribbon
            activeTab={activeTab}
            selectionFormat={selectionFormat}
-@@ -707,6 +1069,8 @@
+@@ -951,6 +1313,8 @@
            aiOpen={isCopilotOpen}
            onAiToggle={() => setIsCopilotOpen((open) => !open)}
          />
@@ -495,7 +521,7 @@
        </header>
  
        {/* AI panel docks on the left, full height under the ribbon (unified with docs) */}
-@@ -3602,6 +3966,14 @@
+@@ -4363,6 +4727,14 @@
        }}
      />
    )
@@ -510,7 +536,7 @@
  }
  
  function RibbonGroup({
-@@ -3612,8 +3984,51 @@
+@@ -4373,8 +4745,51 @@
    readonly children: React.ReactNode
  }): React.JSX.Element {
    // No visible group captions — the label stays for assistive tech.

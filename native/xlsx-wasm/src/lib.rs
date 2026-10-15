@@ -101,6 +101,24 @@ impl XlsxEngine {
         to_json(self.sessions.read_formula_cells(session_id, sheet_id))
     }
 
+    /// Sidecar `find_cells` result for a `findWorkbookCells` request (JSON).
+    #[wasm_bindgen(js_name = findCells)]
+    pub fn find_cells(&mut self, request: &str) -> Result<String, JsValue> {
+        let request: xlsx_sidecar::find::FindCellsRequest = serde_json::from_str(request)
+            .map_err(|error| to_js_error(SidecarError::InvalidRequest(error.to_string())))?;
+        to_json(self.sessions.find_cells(&request, &std::sync::atomic::AtomicBool::new(false)))
+    }
+
+    /// Sidecar `read_row_outline` result: the sheet's row outline levels.
+    #[wasm_bindgen(js_name = readRowOutline)]
+    pub fn read_row_outline(
+        &mut self,
+        #[wasm_bindgen(js_name = sessionId)] session_id: &str,
+        #[wasm_bindgen(js_name = sheetId)] sheet_id: &str,
+    ) -> Result<String, JsValue> {
+        to_json(self.sessions.read_row_outline(session_id, sheet_id))
+    }
+
     /// Sidecar `read_media` result: `{ mediaType, base64 }` for a visual or
     /// cell-image id.
     #[wasm_bindgen(js_name = readMedia)]

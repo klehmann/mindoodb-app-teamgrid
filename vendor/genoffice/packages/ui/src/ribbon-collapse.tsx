@@ -52,14 +52,14 @@ export function writeRibbonCollapsed(storageKey: string, collapsed: boolean): vo
  * Reads the persisted density, honouring the legacy `'1'`/`'0'` values written
  * by the two-state version so an existing collapsed ribbon stays collapsed.
  */
-export function readRibbonDensity(storageKey: string): RibbonDensity {
+export function readRibbonDensity(storageKey: string, fallback: RibbonDensity = 'full'): RibbonDensity {
   try {
     const raw = localStorage.getItem(storageKey)
     if (raw === 'collapsed' || raw === 'compact') return raw
     if (raw === '1') return 'collapsed'
-    return 'full'
+    return raw == null ? fallback : 'full'
   } catch {
-    return 'full'
+    return fallback
   }
 }
 
@@ -126,7 +126,7 @@ export function useRibbonCollapse(
   const compactEnabled = Boolean(labels.compact && labels.expandFull)
   const [density, setDensity] = useState<RibbonDensity>(() =>
     compactEnabled
-      ? readRibbonDensity(storageKey)
+      ? readRibbonDensity(storageKey, options?.defaultCollapsed ? 'collapsed' : 'full')
       : readRibbonCollapsed(storageKey, options?.defaultCollapsed)
         ? 'collapsed'
         : 'full',

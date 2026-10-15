@@ -11,6 +11,10 @@ default = ["native"]
 # import (calamine). The browser (wasm32) build of the read path omits them.
 native = ["dep:calamine", "dep:ironcalc"]
 
+# Run indexing and recalc inline instead of on threads, as WebAssembly builds
+# without threads must; lets that path be tested on any machine.
+single-thread = []
+
 [[bin]]
 name = "xlsx-sidecar"
 path = "src/main.rs"

@@ -22,6 +22,12 @@ export async function createWasmEngine(): Promise<XlsxEngine> {
     async readFormulaCells({ sessionId, sheetId }) {
       return JSON.parse(engine.readFormulaCells(sessionId, sheetId))
     },
+    async findCells(request) {
+      return JSON.parse(engine.findCells(JSON.stringify(request)))
+    },
+    async readRowOutline({ sessionId, sheetId }) {
+      return JSON.parse(engine.readRowOutline(sessionId, sheetId))
+    },
     async readMedia({ sessionId, visualId }) {
       return JSON.parse(engine.readMedia(sessionId, visualId))
     },
