@@ -15,7 +15,7 @@
     "build": "tsc --noEmit && vite build",
     "build:local": "LOCAL_MINDOODB=1 vite build",
     "build:wasm": "cd native/xlsx-wasm && PATH=$HOME/.cargo/bin:$PATH RUSTUP_TOOLCHAIN=1.90.0 wasm-pack build --target web --release && rm -f pkg/.gitignore",
-    "build:wasm:node": "cd native/xlsx-wasm && PATH=$HOME/.cargo/bin:$PATH RUSTUP_TOOLCHAIN=1.90.0 wasm-pack build --target nodejs --release --out-dir pkg-node",
+    "build:wasm:node": "cd native/xlsx-wasm && PATH=$HOME/.cargo/bin:$PATH RUSTUP_TOOLCHAIN=1.90.0 wasm-pack build --target nodejs --release --out-dir pkg-node && rm -f pkg-node/.gitignore",
     "sync-genoffice": "node scripts/sync-genoffice.mjs",
     "deploy": "npm run build && wrangler deploy",
     "preview": "npm run build && wrangler dev",

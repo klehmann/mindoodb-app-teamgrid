@@ -14,6 +14,9 @@ import type { HavenConnection } from '../haven/connection'
 type Doc = A.Doc<Record<string, unknown>>
 
 function hydrate(value: unknown): unknown {
+  // As MindooDB (BaseMindooDB.hydrateTypedValues): Automerge stores integers as
+  // int64, clamps larger ones and reads 2^53 − 1 and beyond as BigInt.
+  if (typeof value === 'number' && Number.isInteger(value) && Math.abs(value) >= Number.MAX_SAFE_INTEGER) return new A.Float64(value)
   if (Array.isArray(value)) return value.map(hydrate)
   if (value && typeof value === 'object') {
     const record = value as Record<string, unknown>
@@ -23,7 +26,34 @@ function hydrate(value: unknown): unknown {
   return value
 }
 
+/** Nested Float64 leaves as null: Automerge would write them as maps of a clamped integer. */
+function withoutNestedFloats(value: unknown, depth = 0): unknown {
+  if (value instanceof A.Float64) return depth > 0 ? null : value
+  if (value instanceof A.ImmutableString) return value
+  if (Array.isArray(value)) return value.map((entry) => withoutNestedFloats(entry, depth + 1))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, withoutNestedFloats(entry, depth + 1)]))
+  }
+  return value
+}
+
+function restoreNestedFloats(target: any, value: unknown): void {
+  if (!target || typeof target !== 'object' || !value || typeof value !== 'object' || value instanceof A.Float64 || value instanceof A.ImmutableString) return
+  const entries: [string | number, unknown][] = Array.isArray(value) ? value.map((entry, index) => [index, entry]) : Object.entries(value)
+  for (const [key, entry] of entries) {
+    if (entry instanceof A.Float64) target[key] = new A.Float64(entry.value)
+    else restoreNestedFloats(target[key], entry)
+  }
+}
+
+/** Assigns a hydrated value as MindooDB does (BaseMindooDB.assignHydrated). */
+function assign(container: Record<string | number, unknown>, key: string | number, value: unknown) {
+  container[key] = withoutNestedFloats(value)
+  restoreNestedFloats(container[key], value)
+}
+
 function plain(value: unknown): unknown {
+  if (typeof value === 'bigint') return Number(value)
   if (value instanceof A.ImmutableString) return value.toString()
   if (Array.isArray(value)) return value.map(plain)
   if (value && typeof value === 'object') {
@@ -45,7 +75,7 @@ function parentOf(root: Record<string, unknown>, path: (string | number)[], crea
 }
 
 function applyPatch(doc: Record<string, unknown>, patch: MindooDBAppJsonPatch) {
-  for (const { path, value } of patch.set ?? []) parentOf(doc, path, true)![path.at(-1)!] = hydrate(value)
+  for (const { path, value } of patch.set ?? []) assign(parentOf(doc, path, true)!, path.at(-1)!, hydrate(value))
   for (const { path } of patch.unset ?? []) {
     const parent = parentOf(doc, path, false)
     if (parent) delete parent[path.at(-1)!]
@@ -56,7 +86,13 @@ function applyPatch(doc: Record<string, unknown>, patch: MindooDBAppJsonPatch) {
   for (const { path, index, values } of patch.listInsert ?? []) {
     const parent = parentOf(doc, path, true)!
     if (parent[path.at(-1)!] == null) parent[path.at(-1)!] = []
-    ;(parent[path.at(-1)!] as unknown[]).splice(index, 0, ...(hydrate(values) as unknown[]))
+    const list = parent[path.at(-1)!] as unknown[]
+    const hydrated = hydrate(values) as unknown[]
+    list.splice(index, 0, ...(withoutNestedFloats(hydrated) as unknown[]))
+    hydrated.forEach((value, offset) => {
+      if (value instanceof A.Float64) list[index + offset] = new A.Float64(value.value)
+      else restoreNestedFloats(list[index + offset], value)
+    })
   }
 }
 
@@ -120,10 +156,12 @@ export class AutomergeTestHost {
           const id = input.id ?? `doc${++this.counter}`
           if (!this.docs.has(id)) {
             // Like MindooDB, equal caller ids start from a shared seed.
-            const seed = A.from<Record<string, unknown>>(hydrate(input.set ?? {}) as Record<string, unknown>, {
+            const values = hydrate(input.set ?? {}) as Record<string, unknown>
+            const seed = A.from<Record<string, unknown>>(withoutNestedFloats(values) as Record<string, unknown>, {
               actor: input.id ? '00'.repeat(16) : this.actor,
             })
-            this.docs.set(id, A.clone(seed, { actor: this.actor }))
+            const restored = A.change(seed, (doc) => restoreNestedFloats(doc, values))
+            this.docs.set(id, A.clone(restored, { actor: this.actor }))
             this.changed(id)
           }
           return this.snapshot(id)

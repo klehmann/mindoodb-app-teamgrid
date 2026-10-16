@@ -14,6 +14,7 @@ import type {
   WorkbookSaveRequest,
   WorkbookStructuralOp,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
+import { applyArrayFormulas } from '../xlsx/array-formulas'
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import { injectPivots, type PivotParts } from '../xlsx/pivot-parts'
 import { applyTabColors, applyVeryHidden } from '../xlsx/tab-colors'
@@ -63,6 +64,13 @@ export function emptySaveRequest(sessionId: string): WorkbookSaveRequest {
     workbookProtectionState: null,
     protectedRangeStates: [],
   } as unknown as WorkbookSaveRequest
+}
+
+/** A1 address of 0-based coordinates. */
+function cellAddress(row: number, column: number): string {
+  let letters = ''
+  for (let n = column + 1; n > 0; n = Math.floor((n - 1) / 26)) letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters
+  return `${letters}${row + 1}`
 }
 
 /** Live axes of every sheet, for rendering formulas. */
@@ -133,11 +141,14 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
   const lookup = createAxesLookup(axes)
   const content = emptySaveRequest('export')
   const visualOrder = new Map<string, VisualId[]>()
+  const arrays = new Map<string, Map<string, string>>()
   for (const sheet of sheets) {
     const fileSheetId = fileIds.get(sheet.name)
     if (!fileSheetId) throw new Error(`Export lost sheet ${sheet.name}.`)
     const home = lookup.bySheetId(sheet.id)!
-    appendSheet(content, workbook, sheet, fileSheetId, home, lookup)
+    const sheetArrays = new Map<string, string>()
+    appendSheet(content, workbook, sheet, fileSheetId, home, lookup, sheetArrays)
+    if (sheetArrays.size > 0) arrays.set(sheet.name, sheetArrays)
     const written: VisualId[] = []
     for (const id of new Set(sheet.visualOrder ?? [])) {
       const visual = sheet.visualsById?.[id]
@@ -158,7 +169,14 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     return [{ name: name.name, formula, ...(sheetIndex === undefined ? {} : { sheetIndex }) }]
   })
   const names = new Map([...fileIds].map(([name, id]) => [id, name]))
+  // The gateway refuses new tables in a save with row/column operations on their sheet
+  // (row heights and column widths count), so tables get a save of their own.
+  const tables = emptySaveRequest('export')
+  tables.tableAdditions.push(...content.tableAdditions.splice(0))
   bytes = new Uint8Array((await saveWorkbookInBrowser(bytes, names, content)).bytes)
+  if (tables.tableAdditions.length > 0) {
+    bytes = new Uint8Array((await saveWorkbookInBrowser(bytes, names, tables)).bytes)
+  }
 
   // Pass 3: defined names (the gateway takes them only in a save without structural changes).
   if (definedNames.length > 0) {
@@ -166,6 +184,7 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     request.definedNamesState = { names: definedNames, preserveNames: [] } as WorkbookSaveRequest['definedNamesState']
     bytes = new Uint8Array((await saveWorkbookInBrowser(bytes, names, request)).bytes)
   }
+  bytes = new Uint8Array(await applyArrayFormulas(bytes, arrays))
   bytes = new Uint8Array(await applyTabColors(
     bytes,
     new Map(sheets.filter((sheet) => sheet.tabColor).map((sheet) => [sheet.name, sheet.tabColor!])),
@@ -249,6 +268,7 @@ function appendSheet(
   sheetId: string,
   home: SheetAxes,
   lookup: ReturnType<typeof createAxesLookup>,
+  arrays: Map<string, string>,
 ): void {
   const rowIndex = new Map(home.rowIds.map((id, index) => [id, index]))
   const columnIndex = new Map(home.columnIds.map((id, index) => [id, index]))
@@ -288,6 +308,13 @@ function appendSheet(
     // the first calculation), and readers without a formula engine see it.
     if (formula !== undefined && cell.value !== undefined && cell.value !== null) {
       request.formulaValues.push({ sheetId, row, column, value: cell.value })
+    }
+    const endRow = cell.arrayEnd ? rowIndex.get(cell.arrayEnd.rowId) : undefined
+    const endColumn = cell.arrayEnd ? columnIndex.get(cell.arrayEnd.columnId) : undefined
+    if (formula !== undefined && endRow !== undefined && endColumn !== undefined && endRow >= row && endColumn >= column) {
+      const start = cellAddress(row, column)
+      const end = cellAddress(endRow, endColumn)
+      arrays.set(start, start === end ? start : `${start}:${end}`)
     }
   }
 

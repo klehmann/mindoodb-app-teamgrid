@@ -50,6 +50,18 @@ export class TeamGridHost {
    * `streaming`: too large to load whole, so formulas keep Excel's stored results.
    */
   async importWorkbook(title: string, bytes: Uint8Array): Promise<{ sheets: SheetInfo[]; streaming: boolean }> {
+    try {
+      return await this.importOnce(title, bytes)
+    } catch (error) {
+      // The mock Haven's File handed through postMessage is now and then unreadable
+      // (NotReadableError) in long runs; a fresh mock Haven imports the same bytes.
+      if (!String(error).includes('could not be read')) throw error
+      await this.open()
+      return this.importOnce(title, bytes)
+    }
+  }
+
+  private async importOnce(title: string, bytes: Uint8Array): Promise<{ sheets: SheetInfo[]; streaming: boolean }> {
     const fileRef = await this.page.evaluate(
       ([name, base64]) =>
         window.__havenTestHost!.agent.importFile({
@@ -61,6 +73,20 @@ export class TeamGridHost {
     )
     const context = await this.call<{ sheets: SheetInfo[]; streaming?: boolean }>('workbook_create', { title, fileRef })
     return { sheets: context.sheets, streaming: context.streaming === true }
+  }
+
+  /** The open workbook as TeamGrid exports it (`workbook_export`). */
+  async exportXlsx(): Promise<Uint8Array> {
+    const { fileRef } = await this.call<{ fileRef: string }>('workbook_export', { format: 'xlsx' })
+    const base64 = await this.page.evaluate((ref) => {
+      const file = window.__havenTestHost!.agent.getFile(ref)
+      if (!file) throw new Error(`No file ${ref}`)
+      const data = new Uint8Array(file.data as ArrayLike<number>)
+      let binary = ''
+      for (let i = 0; i < data.length; i += 0x8000) binary += String.fromCharCode(...data.subarray(i, i + 0x8000))
+      return btoa(binary)
+    }, fileRef)
+    return new Uint8Array(Buffer.from(base64, 'base64'))
   }
 
   /** Cells of one sheet, 100 per `read_cells` call (the tool's limit). */

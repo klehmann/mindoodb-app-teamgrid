@@ -60,6 +60,11 @@ export interface TeamgridAgentDeps {
   open(workbookId: string): Promise<void>
   /** Creates a workbook (blank, from a template or from xlsx bytes), opens it and returns its id. */
   create(request: { title: string; templateId?: string; xlsx?: Uint8Array }): Promise<string>
+  /**
+   * Resolves once the formula engine finished a run that started after `since` (ms), or none
+   * started soon after it: cells that just streamed in are calculated asynchronously.
+   */
+  calculated?(since: number): Promise<void>
   /** Writes pending edits to MindooDB; resolves once the editor shows the saved state with formulas recalculated. */
   save(): Promise<void>
   /** The open workbook as xlsx, after saving pending edits. */
@@ -71,6 +76,8 @@ export interface TeamgridAgentDeps {
 }
 
 const PREFIX = 'teamgrid'
+/** An ensureRangeLoaded that takes longer than this streamed cells into the grid. */
+const STREAMED_MS = 5
 const NEXT_OPEN = `call ${PREFIX}_workbooks_list, then ${PREFIX}_workbook_open`
 const NEXT_EXPORT = 'pass the fileRef to haven_files_export to save the file into the exchange folder'
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -383,20 +390,30 @@ export function createTeamgridAgentTools(deps: TeamgridAgentDeps): MindooDBAppAg
         fail('NOT_FOUND', `No sheet ${sheetId}.`, `call ${PREFIX}_get_context`)
       }
       // A large imported workbook streams into the grid by viewport; cells outside it read as empty.
+      const since = Date.now()
+      let streamed = false
       for (const block of blocksOf(addresses)) {
+        const started = Date.now()
         if ((await skill.ensureRangeLoaded?.(block, sheetId)) === false) {
           fail('INVALID_STATE', 'The requested cells could not be fully loaded; retry after workbook indexing completes.')
         }
+        // Answered at once when the cells are in the grid already; else they streamed in.
+        if (Date.now() - started > STREAMED_MS) streamed = true
       }
-      const read = skill.readCells(addresses, sheetId) as Record<
-        string,
-        { value: unknown; formula?: string; rawValue?: unknown }
-      >
+      type Read = Record<string, { value: unknown; formula?: string; rawValue?: unknown }>
+      const valueOf = (cell: Read[string] | undefined) =>
+        cell?.rawValue !== undefined ? cell.rawValue : (cell?.value ?? null)
+      let read = skill.readCells(addresses, sheetId) as Read
+      // Formulas over cells that just streamed in are calculated (again) a moment later.
+      if (deps.calculated && (streamed || addresses.some((a) => read[a]?.formula && valueOf(read[a]) === null))) {
+        await deps.calculated(since)
+        read = skill.readCells(addresses, sheetId) as Read
+      }
       const cells: Record<string, { value: unknown; text?: unknown; formula?: string }> = {}
       for (const address of addresses) {
         const cell = read[address]
         // GenOffice's lazy reader gives the rendered text as `value` and the model value as `rawValue`.
-        const value = cell?.rawValue !== undefined ? cell.rawValue : (cell?.value ?? null)
+        const value = valueOf(cell)
         cells[address] = {
           value,
           ...(cell && cell.value !== value && cell.value !== null ? { text: cell.value } : {}),

@@ -62,7 +62,7 @@ const test = base.extend<object, { host: TeamGridHost }>({
 
 test.describe.configure({ mode: 'parallel' })
 
-for (const entry of corpus.cases) {
+for (const entry of corpus.cases.filter((c) => c.axes.includes('values'))) {
   test(`values ${entry.id} ${entry.tags.map((tag) => `@${tag}`).join(' ')}`, async ({ host }) => {
     test.fixme(!!entry.skip, entry.skip)
     const bytes = new Uint8Array(readFileSync(join(corpusDir, `${entry.id}.xlsx`)))
@@ -131,6 +131,10 @@ for (const entry of corpus.cases) {
     expect(result.error, 'import and read').toBeUndefined()
     const known = baseline[entry.id]
     if (!known) return
+    if (entry.unstable) {
+      test.info().annotations.push({ type: 'unstable', description: entry.unstable })
+      return
+    }
     const accepted = new Set(known)
     const regressions = result.mismatches.filter((m) => !accepted.has(m.ref))
     expect(

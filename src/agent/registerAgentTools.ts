@@ -22,6 +22,9 @@ const SETTLE_TIMEOUT_MS = 10_000
  */
 const QUIET_MS = 2_500
 
+/** The same for a run triggered by cells a read streamed in. */
+const CALCULATION_QUIET_MS = 1_000
+
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 interface FormulaEvents {
@@ -37,7 +40,10 @@ export function editorSkill(): SheetsSkillDeps | null {
 
 export function registerTeamgridAgentTools(
   session: MindooDBAppSession,
-  host: Omit<TeamgridAgentDeps, 'skill' | 'takeFile' | 'provideFile'>,
+  host: Omit<TeamgridAgentDeps, 'skill' | 'takeFile' | 'provideFile'> & {
+    /** The editor shows the file it was last given (not the previous or a blank workbook). */
+    editorReady(): boolean
+  },
 ): () => void {
   const agent = session.agent
   if (!agent) {
@@ -69,19 +75,21 @@ export function registerTeamgridAgentTools(
    * engine finished a run that started after `since` (or none started), so the
    * agent's next read sees formula results, its own edits included.
    */
-  async function settle(since: number): Promise<void> {
+  async function settle(since: number, quietMs = QUIET_MS): Promise<void> {
     for (;;) {
       const elapsed = Date.now() - since
       if (elapsed > SETTLE_TIMEOUT_MS) return
-      const ready = editorSkill()?.getActiveSheetInfo().mode !== 'none'
+      const ready = host.editorReady()
       const ran = lastCalculationStart >= since && lastCalculationEnd >= lastCalculationStart
-      if (ready && !calculating && (ran || elapsed > QUIET_MS)) return
+      if (ready && !calculating && (ran || elapsed > quietMs)) return
       await delay(25)
     }
   }
 
   const tools = createTeamgridAgentTools({
     ...host,
+    // Cells streamed in by a read start their run right away; no reopen to wait for.
+    calculated: (since) => settle(since, CALCULATION_QUIET_MS),
     async save() {
       const since = Date.now()
       await host.save()

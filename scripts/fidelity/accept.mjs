@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * `pnpm fidelity:accept`: the last run's differences (fidelity-report/values) become the
- * baseline (e2e/fidelity/values-baseline.json); from then on a workbook fails when another
- * cell starts to differ from Excel. Workbooks that failed to import keep their entry.
+ * `pnpm fidelity:accept`: the last run's differences become the baselines: formula
+ * results (fidelity-report/values → e2e/fidelity/values-baseline.json; a workbook then
+ * fails when another cell starts to differ from Excel) and the round trip
+ * (fidelity-report/roundtrip → e2e/fidelity/roundtrip-baseline.json; a workbook then
+ * fails when a kind of difference grows). Workbooks that failed keep their entry.
  *
  *   node scripts/fidelity/accept.mjs [--case <id>]... [--tag <tag>]...
  */
@@ -28,3 +30,19 @@ for (const file of existsSync(dataDir) ? readdirSync(dataDir) : []) {
 }
 writeFileSync(baselinePath, JSON.stringify(sortKeys(baseline), null, 1) + '\n')
 console.log(`Accepted ${accepted} workbooks into ${baselinePath}`)
+
+const roundtripPath = join(fidelityDir, 'roundtrip-baseline.json')
+const roundtripDir = join(reportDir, 'roundtrip')
+const roundtrip = existsSync(roundtripPath) ? JSON.parse(readFileSync(roundtripPath, 'utf8')) : {}
+let acceptedRoundtrip = 0
+for (const file of existsSync(roundtripDir) ? readdirSync(roundtripDir) : []) {
+  if (!file.endsWith('.json')) continue
+  const result = JSON.parse(readFileSync(join(roundtripDir, file), 'utf8'))
+  if (args.cases.length && !args.cases.includes(result.id)) continue
+  if (args.tags.length && !result.tags.some((t) => args.tags.includes(t))) continue
+  if (result.error) continue
+  roundtrip[result.id] = sortKeys(result.counts)
+  acceptedRoundtrip++
+}
+writeFileSync(roundtripPath, JSON.stringify(sortKeys(roundtrip), null, 1) + '\n')
+console.log(`Accepted ${acceptedRoundtrip} round trips into ${roundtripPath}`)

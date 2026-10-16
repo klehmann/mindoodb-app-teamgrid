@@ -22,6 +22,16 @@ import { readConditionalFormats, readDataValidations } from './rules'
 import { attachNotesAndLinks, readAutoFilter, readPageSetup, readProtectedRanges } from './sheet-features'
 import { canonicalJson, styleFields } from './styles'
 
+/** The last cell of an array formula's `ref` (`A1:C3`, or `A1` for one cell), by ids. */
+function arrayEndOf(ref: string, rowIds: readonly RowId[], columnIds: readonly ColumnId[]): Cell['arrayEnd'] {
+  const end = /([A-Z]{1,3})(\d+)$/.exec(ref.toUpperCase().replace(/\$/g, ''))
+  if (!end) return undefined
+  const column = [...end[1]!].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1
+  const rowId = rowIds[Number(end[2]) - 1]
+  const columnId = columnIds[column]
+  return rowId && columnId ? { rowId, columnId } : undefined
+}
+
 export interface BuildSheetInput {
   sheet: SidecarSheet
   /** Previous stored state, or a skeleton with ids for a new sheet. */
@@ -119,6 +129,8 @@ export function buildWorksheet(input: BuildSheetInput): Worksheet {
       cell.formula = unchanged ? before.formula! : formula
       const value = unchanged ? before.value : record.value
       if (value !== null && value !== undefined) cell.value = value
+      const arrayEnd = record.arrayRef ? arrayEndOf(record.arrayRef, rowIds, columnIds) : undefined
+      if (arrayEnd) cell.arrayEnd = arrayEnd
     } else if (record.value !== null) {
       cell.value = record.value
     }

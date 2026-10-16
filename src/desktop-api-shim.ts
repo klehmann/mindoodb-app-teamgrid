@@ -23,6 +23,8 @@ import {
   type HavenConnection,
 } from './haven/connection'
 import { installFillSeries } from './fill-series'
+import { installExcelFunctions } from './formulas/excel-functions'
+import { installImplicitIntersection } from './formulas/implicit-intersection'
 import { activeWorkbook, installUniverAccess } from './univer-access'
 import { installFileMenu, type FileAction } from './haven/file-menu'
 import { hideBanner, showBanner } from './haven/banner'
@@ -165,8 +167,29 @@ let historicalOf: string | null = null
 /** Haven's time travel: everything is read-only as of this time (ms). */
 let timeTravelDate: number | null = null
 
+/** The file the editor was last given (open, reopen after a save). */
+let activeFile: WorkbookFile | null = null
+/** Masters of legacy array (CSE) formulas in the open file, `sheetId:row:column`; they keep their arrays. */
+const arrayFormulaCells = new Set<string>()
+
+function rememberArrayFormulas(sheetId: string, cells: ReadonlyArray<{ row: number; column: number; arrayRef?: string }> | undefined) {
+  for (const cell of cells ?? []) if (cell.arrayRef) arrayFormulaCells.add(`${sheetId}:${cell.row}:${cell.column}`)
+}
+
+/**
+ * Whether the editor shows `activeFile` yet: it keeps showing the previous
+ * workbook (or its blank start-up one) until the new file's first range loaded.
+ */
+function editorShowsActiveFile(): boolean {
+  const info = activeFile ? editorSkill()?.getActiveSheetInfo() : undefined
+  if (!info || info.mode !== 'lazy' || info.sheets.length !== activeFile!.sheets.length) return false
+  return activeFile!.sheets.every((sheet, index) => info.sheets[index]?.id === sheet.id && info.sheets[index]?.name === sheet.name)
+}
+
 function opened(file: WorkbookFile, revisionOf: string | null = null): WorkbookFile {
+  if (activeSessionId !== file.sessionId) arrayFormulaCells.clear()
   activeSessionId = file.sessionId
+  activeFile = file
   historicalOf = revisionOf
   if (revisionOf) {
     const strings = historyStrings(welcomeLanguage)
@@ -296,8 +319,7 @@ async function openForAgent(id: string, timeoutMs = 30_000): Promise<void> {
       devHooks.menu('open')
     }
     const shown = activeSessionId && activeSessionId !== before ? storedDocumentOf(activeSessionId) : undefined
-    const info = shown ? editorSkill()?.getActiveSheetInfo() : undefined
-    if (info && info.mode !== 'none' && info.sheets.length > 0) return
+    if (shown && editorShowsActiveFile()) return
   }
   throw new Error('The workbook did not open in time.')
 }
@@ -452,8 +474,16 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
       if (!file) return null
       return opened(await openWorkbookBytes(new Uint8Array(await file.arrayBuffer()), file.name, language))
     },
-    readWorkbookRange: async (request) => (await loadXlsxEngine()).readRange(request) as never,
-    readWorkbookFormulas: async (request) => (await loadXlsxEngine()).readFormulaCells(request) as never,
+    async readWorkbookRange(request) {
+      const result = (await (await loadXlsxEngine()).readRange(request)) as { cells?: Array<{ row: number; column: number; arrayRef?: string }> }
+      rememberArrayFormulas(request.sheetId, result.cells)
+      return result as never
+    },
+    async readWorkbookFormulas(request) {
+      const result = (await (await loadXlsxEngine()).readFormulaCells(request)) as { cells?: Array<{ row: number; column: number; arrayRef?: string }> }
+      rememberArrayFormulas(request.sheetId, result.cells)
+      return result as never
+    },
     findWorkbookCells: async (request) => (await loadXlsxEngine()).findCells(request) as never,
     readWorkbookRowOutline: async (request) => (await loadXlsxEngine()).readRowOutline(request) as never,
     // Threaded comments are signed with the Haven user's name.
@@ -494,6 +524,8 @@ export async function installDesktopApiShim(): Promise<void> {
   language = toLang(haven?.context.locale ?? navigator.language)
   welcomeLanguage = (haven?.context.locale ?? navigator.language).slice(0, 2).toLowerCase()
   installFillSeries(() => welcomeLanguage)
+  installExcelFunctions()
+  installImplicitIntersection((sheetId, row, column) => arrayFormulaCells.has(`${sheetId}:${row}:${column}`))
   installUniverAccess()
   const api = new Proxy(createApi(haven), {
     get(target, property) {
@@ -538,6 +570,7 @@ export async function installDesktopApiShim(): Promise<void> {
     )
     showTimeTravelBanner()
     registerTeamgridAgentTools(connected.session, {
+      editorReady: editorShowsActiveFile,
       databaseId: () => connected.databaseId,
       canCreate: () => connected.canWrite && !timeTravelDate,
       openWorkbook() {

@@ -1,5 +1,5 @@
 {
-  "$comment": "Excel-authored workbooks for the fidelity tests. scripts/fidelity/fetch-corpus.mjs downloads each file from its source at the pinned commit into corpus/<id>.xlsx. The formulas keep the results Excel computed, which the value tests compare TeamGrid against. Tags group the report (see e2e/fidelity/README.md).",
+  "$comment": "Excel-authored workbooks for the fidelity tests. scripts/fidelity/fetch-corpus.mjs downloads each file from its source at the pinned commit into corpus/<id>.xlsx. IronCalc workbooks keep the results Excel computed (values axis); rust_xlsxwriter files are one Excel feature each, made in Excel (round-trip axis). Tags group the report (see e2e/fidelity/README.md).",
   "sources": {
     "ironcalc": {
       "repo": "ironcalc/IronCalc",
@@ -7,6 +7,13 @@
       "dir": "xlsx/tests/calc_tests",
       "license": "MIT OR Apache-2.0",
       "licenseFile": "LICENSE-MIT"
+    },
+    "rust_xlsxwriter": {
+      "repo": "jmcnamara/rust_xlsxwriter",
+      "commit": "902609b2e0fbc3cfa20fec5b464328479e29dbef",
+      "dir": "tests/input",
+      "license": "MIT OR Apache-2.0",
+      "licenseFile": "LICENSE_MIT"
     }
   },
   "cases": [
@@ -16,6 +23,10 @@
       "file": "MATH_AND_TRIGONOMETRY/ABS.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -24,6 +35,10 @@
       "file": "FINANCIAL/ACCRINT.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -32,6 +47,10 @@
       "file": "FINANCIAL/ACCRINT_ACCRINTM.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -40,7 +59,12 @@
       "file": "FINANCIAL/accrint_cases.xlsx",
       "tags": [
         "financial"
-      ]
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
+      ],
+      "unstable": "ACCRINT results depend on which workbooks the page opened before (calc_method read as FALSE); not understood yet"
     },
     {
       "id": "ironcalc-accrint-extended",
@@ -48,6 +72,10 @@
       "file": "FINANCIAL/ACCRINT_extended.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -56,6 +84,10 @@
       "file": "FINANCIAL/ACCRINTM.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -64,6 +96,10 @@
       "file": "LOOKUP_AND_REFERENCE/ADDRESS.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -72,6 +108,10 @@
       "file": "LOGICAL/AND_OR_XOR.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -80,6 +120,10 @@
       "file": "MATH_AND_TRIGONOMETRY/ARABIC_ROMAN.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -88,6 +132,10 @@
       "file": "arithmetic.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -96,6 +144,10 @@
       "file": "array_in_scalar_repro.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -104,6 +156,10 @@
       "file": "TEXT/ARRAYTOTEXT.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -112,6 +168,10 @@
       "file": "MATH_AND_TRIGONOMETRY/ATAN2_POWER.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -120,6 +180,10 @@
       "file": "STATISTICAL/AVEDEV.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -128,6 +192,10 @@
       "file": "STATISTICAL/AVERAGE.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -136,6 +204,10 @@
       "file": "MATH_AND_TRIGONOMETRY/BASE.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -144,6 +216,10 @@
       "file": "ENGINEERING/BESSEL.xlsx",
       "tags": [
         "engineering"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -152,6 +228,10 @@
       "file": "STATISTICAL/BETA_GAMMA.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -160,6 +240,10 @@
       "file": "STATISTICAL/BETADIST_BETAINV.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -169,7 +253,10 @@
       "tags": [
         "statistical"
       ],
-      "skip": "TeamGrid stops responding after the import (found 2026-10-15)"
+      "axes": [
+        "values",
+        "roundtrip"
+      ]
     },
     {
       "id": "ironcalc-bits",
@@ -177,6 +264,10 @@
       "file": "ENGINEERING/BITs.xlsx",
       "tags": [
         "engineering"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -185,6 +276,10 @@
       "file": "LOGICAL/BYCOL_BYROW.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -193,6 +288,10 @@
       "file": "INFORMATION/CELL.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -201,6 +300,10 @@
       "file": "TEXT/CHAR.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -209,6 +312,10 @@
       "file": "STATISTICAL/CHISQ.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -217,6 +324,10 @@
       "file": "STATISTICAL/CHISQ_TEST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -225,6 +336,10 @@
       "file": "LOOKUP_AND_REFERENCE/CHOOSE.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -233,6 +348,10 @@
       "file": "LOOKUP_AND_REFERENCE/CHOOSECOLS_CHOOSEROWS.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -241,6 +360,10 @@
       "file": "MATH_AND_TRIGONOMETRY/COMBIN_COMBINA.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -249,6 +372,10 @@
       "file": "ENGINEERING/COMPLEXs.xlsx",
       "tags": [
         "engineering"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -257,6 +384,10 @@
       "file": "TEXT/CONCAT.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -265,6 +396,10 @@
       "file": "TEXT/CONCATENATE.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -273,6 +408,10 @@
       "file": "STATISTICAL/CONFIDENCE.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -281,6 +420,10 @@
       "file": "consume_string.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -289,6 +432,10 @@
       "file": "ENGINEERING/CONVERT.xlsx",
       "tags": [
         "engineering"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -297,6 +444,10 @@
       "file": "STATISTICAL/CORREL_SLOPE_INTERCEPT_RSQ_STEYX.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -305,6 +456,10 @@
       "file": "STATISTICAL/COUNT.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -313,6 +468,10 @@
       "file": "STATISTICAL/COUNTIF.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -321,6 +480,10 @@
       "file": "STATISTICAL/COUNTIFS.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -329,6 +492,10 @@
       "file": "FINANCIAL/COUPDAYS.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -337,6 +504,10 @@
       "file": "STATISTICAL/COVARIANCE.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -345,6 +516,10 @@
       "file": "FINANCIAL/CUMPRINC_CUMIPMT.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -353,6 +528,10 @@
       "file": "DATE_AND_TIME/DATE.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -361,6 +540,10 @@
       "file": "DATE_AND_TIME/DATE_DAY_MONTH_YEAR.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -369,6 +552,10 @@
       "file": "DATE_AND_TIME/DATEVALUE.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -377,6 +564,10 @@
       "file": "DATE_AND_TIME/DATEVALUE_issue_1379.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -385,6 +576,10 @@
       "file": "DATE_AND_TIME/DATEVALUE_issue_1380.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -393,6 +588,10 @@
       "file": "DATABASE/DAVERAGE.xlsx",
       "tags": [
         "database"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -401,6 +600,10 @@
       "file": "DATE_AND_TIME/DAY_MONTH_YEAR.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -409,6 +612,10 @@
       "file": "DATE_AND_TIME/DAYS_DAYS360.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -417,6 +624,10 @@
       "file": "FINANCIAL/DB_DDB.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -425,6 +636,10 @@
       "file": "DATABASE/DCOUNT_DCOUNTA_DGET_DPRODUCT.xlsx",
       "tags": [
         "database"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -433,6 +648,10 @@
       "file": "defined_names.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -441,6 +660,10 @@
       "file": "defined_names_for_unit_test.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -449,6 +672,10 @@
       "file": "MATH_AND_TRIGONOMETRY/DEGREES_RADIANS.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -457,6 +684,10 @@
       "file": "STATISTICAL/DEVSQ.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -465,6 +696,10 @@
       "file": "FINANCIAL/DISC.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -473,6 +708,10 @@
       "file": "DATABASE/DMIN_DMAX_DAVERAGE_DSUM.xlsx",
       "tags": [
         "database"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -481,6 +720,10 @@
       "file": "TEXT/DOLLARs.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -489,6 +732,10 @@
       "file": "LOOKUP_AND_REFERENCE/DROP_TAKE.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -497,6 +744,10 @@
       "file": "DATABASE/DVAR_DVARP_DSTDEV_DSTDEVP.xlsx",
       "tags": [
         "database"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -505,6 +756,10 @@
       "file": "DATE_AND_TIME/EDATE.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -513,6 +768,10 @@
       "file": "DATE_AND_TIME/EOMONTH.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -521,6 +780,10 @@
       "file": "DATE_AND_TIME/EOMONTH_issue_1388.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -529,6 +792,10 @@
       "file": "ENGINEERING/ERFs.xlsx",
       "tags": [
         "engineering"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -537,6 +804,10 @@
       "file": "INFORMATION/error_broadcast.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -545,6 +816,10 @@
       "file": "INFORMATION/ERROR.TYPE.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -553,6 +828,10 @@
       "file": "escape_strings.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -561,6 +840,10 @@
       "file": "MATH_AND_TRIGONOMETRY/EVEN_ODD.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -569,6 +852,10 @@
       "file": "TEXT/EXACT.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -577,6 +864,10 @@
       "file": "MATH_AND_TRIGONOMETRY/EXP_SIGN.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -585,6 +876,10 @@
       "file": "LOOKUP_AND_REFERENCE/EXPAND.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -593,6 +888,10 @@
       "file": "STATISTICAL/EXPON_DIST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -601,6 +900,10 @@
       "file": "STATISTICAL/EXPONDIST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -609,6 +912,10 @@
       "file": "STATISTICAL/F_DIST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -617,6 +924,10 @@
       "file": "STATISTICAL/F_TEST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -625,6 +936,10 @@
       "file": "MATH_AND_TRIGONOMETRY/FACT_DOUBLEFACT.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -633,6 +948,10 @@
       "file": "LOOKUP_AND_REFERENCE/FILTER_ERRORS.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -641,6 +960,10 @@
       "file": "TEXT/FIND_SEARCH.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -649,6 +972,10 @@
       "file": "STATISTICAL/FISHER.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -657,6 +984,10 @@
       "file": "STATISTICAL/FISHER_FISHERINV.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -665,6 +996,10 @@
       "file": "MATH_AND_TRIGONOMETRY/FLOOR_CEILING.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -673,6 +1008,10 @@
       "file": "INFORMATION/FORMULATEXT.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -681,6 +1020,10 @@
       "file": "STATISTICAL/FREQUENCY.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -689,6 +1032,10 @@
       "file": "FINANCIAL/FV.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -697,6 +1044,10 @@
       "file": "FINANCIAL/FVSCHEDULE.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -705,6 +1056,10 @@
       "file": "STATISTICAL/GAMMA.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -713,6 +1068,10 @@
       "file": "STATISTICAL/GAMMALN_GAMMALNPRECISE.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -721,6 +1080,10 @@
       "file": "STATISTICAL/GAUSS.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -729,6 +1092,10 @@
       "file": "MATH_AND_TRIGONOMETRY/GCD_LCM.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -737,6 +1104,10 @@
       "file": "STATISTICAL/GEOMEAN.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -745,6 +1116,10 @@
       "file": "ENGINEERING/GESTEP_DELTA.xlsx",
       "tags": [
         "engineering"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -753,6 +1128,10 @@
       "file": "LOOKUP_AND_REFERENCE/HSTACK_VSTACK.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -761,6 +1140,10 @@
       "file": "LOOKUP_AND_REFERENCE/HVLOOKUP.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -769,6 +1152,10 @@
       "file": "STATISTICAL/HYPERGEOM_DIST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -777,6 +1164,10 @@
       "file": "LOGICAL/IF_ARRAY.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -785,6 +1176,10 @@
       "file": "LOGICAL/IFERROR.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -793,6 +1188,10 @@
       "file": "LOGICAL/IFNA.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -801,6 +1200,10 @@
       "file": "LOGICAL/IFS.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -809,6 +1212,10 @@
       "file": "LOOKUP_AND_REFERENCE/INDEX.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -817,7 +1224,12 @@
       "file": "LOOKUP_AND_REFERENCE/INDIRECT.xlsx",
       "tags": [
         "lookup-and-reference"
-      ]
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
+      ],
+      "skipRoundtrip": "Too large to load whole (a reference near the last row): opening the stored copy takes longer than the test allows"
     },
     {
       "id": "ironcalc-intrate",
@@ -825,6 +1237,10 @@
       "file": "FINANCIAL/INTRATE.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -833,6 +1249,10 @@
       "file": "FINANCIAL/IPMT_PPMT.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -841,6 +1261,10 @@
       "file": "FINANCIAL/IRR.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -849,6 +1273,10 @@
       "file": "INFORMATION/IS_INFORMATION.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -857,6 +1285,10 @@
       "file": "INFORMATION/ISOMITTED.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -865,6 +1297,10 @@
       "file": "FINANCIAL/ISPMT.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -873,6 +1309,10 @@
       "file": "INFORMATION/ISREF.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -881,6 +1321,10 @@
       "file": "INFORMATION/ISREF_ISFORMULA_ISODD_ISEVEN.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -889,6 +1333,10 @@
       "file": "issue_341.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -897,6 +1345,10 @@
       "file": "LOGICAL/LAMBDA.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -905,6 +1357,10 @@
       "file": "MATH_AND_TRIGONOMETRY/LCM_GCD.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -913,6 +1369,10 @@
       "file": "LOGICAL/LET.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -921,6 +1381,10 @@
       "file": "STATISTICAL/LINEST_LOGEST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -929,6 +1393,10 @@
       "file": "MATH_AND_TRIGONOMETRY/LOG_LOG10_LN.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -937,6 +1405,10 @@
       "file": "logical.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -945,6 +1417,10 @@
       "file": "STATISTICAL/LOGNORM.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -953,6 +1429,10 @@
       "file": "LOGICAL/MAKEARRAY.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -961,6 +1441,10 @@
       "file": "LOGICAL/MAP_REDUCE.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -969,6 +1453,10 @@
       "file": "LOOKUP_AND_REFERENCE/MATCH.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -977,6 +1465,10 @@
       "file": "LOOKUP_AND_REFERENCE/MATCH_LOOKUP_arrays.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -985,6 +1477,10 @@
       "file": "MATH_AND_TRIGONOMETRY/MAX_MIN.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -993,6 +1489,10 @@
       "file": "STATISTICAL/MEADIAN_KURT_SKEW_HARMEAN.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1001,6 +1501,10 @@
       "file": "TEXT/MID_LEFT_RIGHT_arrays.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1009,6 +1513,10 @@
       "file": "STATISTICAL/MIN_MAX.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1017,6 +1525,10 @@
       "file": "MATH_AND_TRIGONOMETRY/MIN_MAX_extras.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1025,6 +1537,10 @@
       "file": "STATISTICAL/MINA_MAXA.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1033,6 +1549,10 @@
       "file": "TEXT/MINUS_MINUS.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1041,6 +1561,10 @@
       "file": "FINANCIAL/MIRR.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1049,6 +1573,10 @@
       "file": "MATH_AND_TRIGONOMETRY/MMULT.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1057,6 +1585,10 @@
       "file": "MATH_AND_TRIGONOMETRY/MOD_QUOTIENT.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1065,6 +1597,10 @@
       "file": "STATISTICAL/MODE.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1073,6 +1609,10 @@
       "file": "MATH_AND_TRIGONOMETRY/MROUND_TRUNC_INT.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1081,6 +1621,10 @@
       "file": "MATH_AND_TRIGONOMETRY/MULTINOMIAL.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1089,6 +1633,10 @@
       "file": "MATH_AND_TRIGONOMETRY/MUNIT_MDETERM_MINVERSE.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1097,6 +1645,10 @@
       "file": "INFORMATION/N.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1105,6 +1657,10 @@
       "file": "DATE_AND_TIME/NETWORKDAYS_NETWORKDAYS.INTL.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1113,6 +1669,10 @@
       "file": "FINANCIAL/NOMINAL_EFFECT.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1121,6 +1681,10 @@
       "file": "STATISTICAL/NORM_DIST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1129,6 +1693,10 @@
       "file": "DATE_AND_TIME/NOW_TODAY.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1137,6 +1705,10 @@
       "file": "FINANCIAL/NPER.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1145,6 +1717,10 @@
       "file": "FINANCIAL/NPV.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1153,6 +1729,10 @@
       "file": "ENGINEERING/NUMBER_SYSTEMS.xlsx",
       "tags": [
         "engineering"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1161,6 +1741,10 @@
       "file": "FINANCIAL/PDURATION.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1169,6 +1753,10 @@
       "file": "STATISTICAL/PEARSON.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1177,6 +1765,10 @@
       "file": "percentage.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1185,6 +1777,10 @@
       "file": "STATISTICAL/PERCENTIL_QUARTIL.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1193,6 +1789,10 @@
       "file": "STATISTICAL/PERMUT_PERMUTATIONA.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1201,6 +1801,10 @@
       "file": "STATISTICAL/PHI.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1209,6 +1813,10 @@
       "file": "FINANCIAL/PMT.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1217,6 +1825,10 @@
       "file": "STATISTICAL/POISSON.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1225,6 +1837,10 @@
       "file": "MATH_AND_TRIGONOMETRY/POWER.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1233,6 +1849,10 @@
       "file": "FINANCIAL/PRICE_YIELD.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1241,6 +1861,10 @@
       "file": "STATISTICAL/PROB.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1249,6 +1873,10 @@
       "file": "MATH_AND_TRIGONOMETRY/PRODUCT.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1257,6 +1885,10 @@
       "file": "MATH_AND_TRIGONOMETRY/PRODUCT_SUM.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1265,6 +1897,10 @@
       "file": "TEXT/PROPER.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1273,6 +1909,10 @@
       "file": "FINANCIAL/PV.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1281,6 +1921,10 @@
       "file": "quotes.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1289,6 +1933,10 @@
       "file": "range_operator.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1297,6 +1945,10 @@
       "file": "STATISTICAL/RANK_EQ_RANK_AVG.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1305,6 +1957,10 @@
       "file": "FINANCIAL/RATE.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1313,6 +1969,10 @@
       "file": "TEXT/REGEX.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1321,6 +1981,10 @@
       "file": "TEXT/REPT.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1329,6 +1993,10 @@
       "file": "MATH_AND_TRIGONOMETRY/ROUND.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1337,6 +2005,10 @@
       "file": "LOOKUP_AND_REFERENCE/ROW_COLUM.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1345,6 +2017,10 @@
       "file": "FINANCIAL/RRI.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1353,6 +2029,10 @@
       "file": "LOGICAL/SCAN.xlsx",
       "tags": [
         "logical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1361,6 +2041,10 @@
       "file": "MATH_AND_TRIGONOMETRY/SEQUENCE.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1369,6 +2053,10 @@
       "file": "MATH_AND_TRIGONOMETRY/SERIESSUM.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1377,6 +2065,10 @@
       "file": "INFORMATION/SHEET_SHEETS.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1385,6 +2077,10 @@
       "file": "simple_arrays.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1393,6 +2089,10 @@
       "file": "simple_functions.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1401,6 +2101,10 @@
       "file": "FINANCIAL/SLN_SYD.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1409,6 +2113,10 @@
       "file": "STATISTICAL/SMALL_LARGE.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1417,6 +2125,10 @@
       "file": "LOOKUP_AND_REFERENCE/SORT.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1425,6 +2137,10 @@
       "file": "spill_operator.xlsx",
       "tags": [
         "general"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1433,6 +2149,10 @@
       "file": "MATH_AND_TRIGONOMETRY/SQRT_SQRTPI.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1441,6 +2161,10 @@
       "file": "STATISTICAL/STANDARIZE.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1449,6 +2173,10 @@
       "file": "STATISTICAL/STDEV.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1457,6 +2185,10 @@
       "file": "TEXT/STRING_HANDLING.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1465,6 +2197,10 @@
       "file": "TEXT/SUBSTITUTE.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1473,6 +2209,10 @@
       "file": "MATH_AND_TRIGONOMETRY/SUMIF_array.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1481,6 +2221,10 @@
       "file": "MATH_AND_TRIGONOMETRY/SUMIF_AVERAGE_IF.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1489,6 +2233,10 @@
       "file": "MATH_AND_TRIGONOMETRY/SUMIFS.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1497,6 +2245,10 @@
       "file": "MATH_AND_TRIGONOMETRY/SUMPRODUCT.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1505,6 +2257,10 @@
       "file": "MATH_AND_TRIGONOMETRY/SUMSQ.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1513,6 +2269,10 @@
       "file": "MATH_AND_TRIGONOMETRY/SUMX2MY2_SUMX2PY2_SUMXMY2.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1521,6 +2281,10 @@
       "file": "STATISTICAL/T_DIST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1529,6 +2293,10 @@
       "file": "STATISTICAL/T_TEST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1537,6 +2305,10 @@
       "file": "TEXT/T_VALUE_VALUETOTEXT.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1545,6 +2317,10 @@
       "file": "FINANCIAL/TBILLs.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1553,6 +2329,10 @@
       "file": "TEXT/TEXT.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1561,6 +2341,10 @@
       "file": "TEXT/TEXTBEFORE_TEXTAFTER.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1569,6 +2353,10 @@
       "file": "TEXT/TEXTJOIN.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1577,6 +2365,10 @@
       "file": "TEXT/TEXTSPLIT.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1585,6 +2377,10 @@
       "file": "DATE_AND_TIME/TIME_HOUR_MINUTE_SECOND.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1593,6 +2389,10 @@
       "file": "DATE_AND_TIME/TIMEVALUE.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1601,6 +2401,10 @@
       "file": "DATE_AND_TIME/TIMEVALUE_issue_1402.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1609,6 +2413,10 @@
       "file": "LOOKUP_AND_REFERENCE/TOCOL.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1617,6 +2425,10 @@
       "file": "LOOKUP_AND_REFERENCE/TRANSPOSE.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1625,6 +2437,10 @@
       "file": "STATISTICAL/TREND_GROWTH.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1633,6 +2449,10 @@
       "file": "MATH_AND_TRIGONOMETRY/TRIGONOMETRIC.xlsx",
       "tags": [
         "math-and-trigonometry"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1641,6 +2461,10 @@
       "file": "STATISTICAL/TRIMMEAN.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1649,6 +2473,10 @@
       "file": "LOOKUP_AND_REFERENCE/TRIMRANGE.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1657,6 +2485,10 @@
       "file": "INFORMATION/TYPE.xlsx",
       "tags": [
         "information"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1665,6 +2497,10 @@
       "file": "TEXT/UNICODE.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1673,6 +2509,10 @@
       "file": "TEXT/UPPER_LOWER.xlsx",
       "tags": [
         "text"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1681,6 +2521,10 @@
       "file": "STATISTICAL/VARIANCE.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1689,6 +2533,10 @@
       "file": "DATE_AND_TIME/WEEKDAY_WEEKNUM_ISOWEEKNUM.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1697,6 +2545,10 @@
       "file": "DATE_AND_TIME/WEEKDAY_WEEKNUM_ISOWEEKNUM_issue_1502.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1705,6 +2557,10 @@
       "file": "STATISTICAL/WEIBULL_DIST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1714,7 +2570,10 @@
       "tags": [
         "date-and-time"
       ],
-      "skip": "TeamGrid stops responding after the import (found 2026-10-15)"
+      "axes": [
+        "values",
+        "roundtrip"
+      ]
     },
     {
       "id": "ironcalc-wrapcols-rows",
@@ -1722,6 +2581,10 @@
       "file": "LOOKUP_AND_REFERENCE/WRAPCOLS_ROWS.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1730,6 +2593,10 @@
       "file": "FINANCIAL/XIRR.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1738,6 +2605,10 @@
       "file": "LOOKUP_AND_REFERENCE/XLOOKUP.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1746,6 +2617,10 @@
       "file": "LOOKUP_AND_REFERENCE/XMATCH.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1754,6 +2629,10 @@
       "file": "LOOKUP_AND_REFERENCE/XMATCH_arrays.xlsx",
       "tags": [
         "lookup-and-reference"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1762,6 +2641,10 @@
       "file": "FINANCIAL/XNPV.xlsx",
       "tags": [
         "financial"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1770,6 +2653,10 @@
       "file": "DATE_AND_TIME/YEARFRAC_DATEDIF.xlsx",
       "tags": [
         "date-and-time"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
       ]
     },
     {
@@ -1778,6 +2665,3736 @@
       "file": "STATISTICAL/Z_TEST.xlsx",
       "tags": [
         "statistical"
+      ],
+      "axes": [
+        "values",
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-array-formula01",
+      "source": "rust_xlsxwriter",
+      "file": "array_formula01.xlsx",
+      "tags": [
+        "array-formula"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-array-formula02",
+      "source": "rust_xlsxwriter",
+      "file": "array_formula02.xlsx",
+      "tags": [
+        "array-formula"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-array-formula03",
+      "source": "rust_xlsxwriter",
+      "file": "array_formula03.xlsx",
+      "tags": [
+        "array-formula"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-array-formula04",
+      "source": "rust_xlsxwriter",
+      "file": "array_formula04.xlsx",
+      "tags": [
+        "array-formula"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofilter00",
+      "source": "rust_xlsxwriter",
+      "file": "autofilter00.xlsx",
+      "tags": [
+        "autofilter"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofilter01",
+      "source": "rust_xlsxwriter",
+      "file": "autofilter01.xlsx",
+      "tags": [
+        "autofilter"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofilter02",
+      "source": "rust_xlsxwriter",
+      "file": "autofilter02.xlsx",
+      "tags": [
+        "autofilter"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofilter03",
+      "source": "rust_xlsxwriter",
+      "file": "autofilter03.xlsx",
+      "tags": [
+        "autofilter"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofit-with-format01",
+      "source": "rust_xlsxwriter",
+      "file": "autofit_with_format01.xlsx",
+      "tags": [
+        "autofit-with-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofit-with-format02",
+      "source": "rust_xlsxwriter",
+      "file": "autofit_with_format02.xlsx",
+      "tags": [
+        "autofit-with-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofit-with-format03",
+      "source": "rust_xlsxwriter",
+      "file": "autofit_with_format03.xlsx",
+      "tags": [
+        "autofit-with-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofit-with-format04",
+      "source": "rust_xlsxwriter",
+      "file": "autofit_with_format04.xlsx",
+      "tags": [
+        "autofit-with-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofit01",
+      "source": "rust_xlsxwriter",
+      "file": "autofit01.xlsx",
+      "tags": [
+        "autofit"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofit02",
+      "source": "rust_xlsxwriter",
+      "file": "autofit02.xlsx",
+      "tags": [
+        "autofit"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofit03",
+      "source": "rust_xlsxwriter",
+      "file": "autofit03.xlsx",
+      "tags": [
+        "autofit"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-autofit04",
+      "source": "rust_xlsxwriter",
+      "file": "autofit04.xlsx",
+      "tags": [
+        "autofit"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-background01",
+      "source": "rust_xlsxwriter",
+      "file": "background01.xlsx",
+      "tags": [
+        "background"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-background02",
+      "source": "rust_xlsxwriter",
+      "file": "background02.xlsx",
+      "tags": [
+        "background"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-background03",
+      "source": "rust_xlsxwriter",
+      "file": "background03.xlsx",
+      "tags": [
+        "background"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-background04",
+      "source": "rust_xlsxwriter",
+      "file": "background04.xlsx",
+      "tags": [
+        "background"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-button01",
+      "source": "rust_xlsxwriter",
+      "file": "button01.xlsx",
+      "tags": [
+        "button"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-button02",
+      "source": "rust_xlsxwriter",
+      "file": "button02.xlsx",
+      "tags": [
+        "button"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-button03",
+      "source": "rust_xlsxwriter",
+      "file": "button03.xlsx",
+      "tags": [
+        "button"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-button04",
+      "source": "rust_xlsxwriter",
+      "file": "button04.xlsx",
+      "tags": [
+        "button"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-area01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_area01.xlsx",
+      "tags": [
+        "chart",
+        "chart-area"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-area02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_area02.xlsx",
+      "tags": [
+        "chart",
+        "chart-area"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-area03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_area03.xlsx",
+      "tags": [
+        "chart",
+        "chart-area"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-area04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_area04.xlsx",
+      "tags": [
+        "chart",
+        "chart-area"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-axis01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_axis01.xlsx",
+      "tags": [
+        "chart",
+        "chart-axis"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-axis02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_axis02.xlsx",
+      "tags": [
+        "chart",
+        "chart-axis"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-axis03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_axis03.xlsx",
+      "tags": [
+        "chart",
+        "chart-axis"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-axis04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_axis04.xlsx",
+      "tags": [
+        "chart",
+        "chart-axis"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-bar01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_bar01.xlsx",
+      "tags": [
+        "chart",
+        "chart-bar"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-bar02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_bar02.xlsx",
+      "tags": [
+        "chart",
+        "chart-bar"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-bar03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_bar03.xlsx",
+      "tags": [
+        "chart",
+        "chart-bar"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-bar04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_bar04.xlsx",
+      "tags": [
+        "chart",
+        "chart-bar"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-blank01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_blank01.xlsx",
+      "tags": [
+        "chart",
+        "chart-blank"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-blank02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_blank02.xlsx",
+      "tags": [
+        "chart",
+        "chart-blank"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-blank03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_blank03.xlsx",
+      "tags": [
+        "chart",
+        "chart-blank"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-blank04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_blank04.xlsx",
+      "tags": [
+        "chart",
+        "chart-blank"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-chartarea01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_chartarea01.xlsx",
+      "tags": [
+        "chart",
+        "chart-chartarea"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-chartarea02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_chartarea02.xlsx",
+      "tags": [
+        "chart",
+        "chart-chartarea"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-chartarea03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_chartarea03.xlsx",
+      "tags": [
+        "chart",
+        "chart-chartarea"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-chartarea04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_chartarea04.xlsx",
+      "tags": [
+        "chart",
+        "chart-chartarea"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-clustered01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_clustered01.xlsx",
+      "tags": [
+        "chart",
+        "chart-clustered"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-column01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_column01.xlsx",
+      "tags": [
+        "chart",
+        "chart-column"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-column02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_column02.xlsx",
+      "tags": [
+        "chart",
+        "chart-column"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-column03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_column03.xlsx",
+      "tags": [
+        "chart",
+        "chart-column"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-column04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_column04.xlsx",
+      "tags": [
+        "chart",
+        "chart-column"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-combined01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_combined01.xlsx",
+      "tags": [
+        "chart",
+        "chart-combined"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-combined02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_combined02.xlsx",
+      "tags": [
+        "chart",
+        "chart-combined"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-combined03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_combined03.xlsx",
+      "tags": [
+        "chart",
+        "chart-combined"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-combined04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_combined04.xlsx",
+      "tags": [
+        "chart",
+        "chart-combined"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-crossing01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_crossing01.xlsx",
+      "tags": [
+        "chart",
+        "chart-crossing"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-crossing02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_crossing02.xlsx",
+      "tags": [
+        "chart",
+        "chart-crossing"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-crossing03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_crossing03.xlsx",
+      "tags": [
+        "chart",
+        "chart-crossing"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-crossing04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_crossing04.xlsx",
+      "tags": [
+        "chart",
+        "chart-crossing"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-data-labels01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_data_labels01.xlsx",
+      "tags": [
+        "chart",
+        "chart-data-labels"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-data-labels02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_data_labels02.xlsx",
+      "tags": [
+        "chart",
+        "chart-data-labels"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-data-labels03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_data_labels03.xlsx",
+      "tags": [
+        "chart",
+        "chart-data-labels"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-data-labels04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_data_labels04.xlsx",
+      "tags": [
+        "chart",
+        "chart-data-labels"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-date01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_date01.xlsx",
+      "tags": [
+        "chart",
+        "chart-date"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-date02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_date02.xlsx",
+      "tags": [
+        "chart",
+        "chart-date"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-date03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_date03.xlsx",
+      "tags": [
+        "chart",
+        "chart-date"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-date04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_date04.xlsx",
+      "tags": [
+        "chart",
+        "chart-date"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-display-units01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_display_units01.xlsx",
+      "tags": [
+        "chart",
+        "chart-display-units"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-display-units02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_display_units02.xlsx",
+      "tags": [
+        "chart",
+        "chart-display-units"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-display-units03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_display_units03.xlsx",
+      "tags": [
+        "chart",
+        "chart-display-units"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-display-units04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_display_units04.xlsx",
+      "tags": [
+        "chart",
+        "chart-display-units"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-doughnut01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_doughnut01.xlsx",
+      "tags": [
+        "chart",
+        "chart-doughnut"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-doughnut02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_doughnut02.xlsx",
+      "tags": [
+        "chart",
+        "chart-doughnut"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-doughnut03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_doughnut03.xlsx",
+      "tags": [
+        "chart",
+        "chart-doughnut"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-doughnut04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_doughnut04.xlsx",
+      "tags": [
+        "chart",
+        "chart-doughnut"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-drop-lines01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_drop_lines01.xlsx",
+      "tags": [
+        "chart",
+        "chart-drop-lines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-drop-lines02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_drop_lines02.xlsx",
+      "tags": [
+        "chart",
+        "chart-drop-lines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-drop-lines03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_drop_lines03.xlsx",
+      "tags": [
+        "chart",
+        "chart-drop-lines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-drop-lines04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_drop_lines04.xlsx",
+      "tags": [
+        "chart",
+        "chart-drop-lines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-errorbars01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_errorbars01.xlsx",
+      "tags": [
+        "chart",
+        "chart-errorbars"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-errorbars02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_errorbars02.xlsx",
+      "tags": [
+        "chart",
+        "chart-errorbars"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-errorbars03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_errorbars03.xlsx",
+      "tags": [
+        "chart",
+        "chart-errorbars"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-errorbars04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_errorbars04.xlsx",
+      "tags": [
+        "chart",
+        "chart-errorbars"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-font01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_font01.xlsx",
+      "tags": [
+        "chart",
+        "chart-font"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-font02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_font02.xlsx",
+      "tags": [
+        "chart",
+        "chart-font"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-font03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_font03.xlsx",
+      "tags": [
+        "chart",
+        "chart-font"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-font04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_font04.xlsx",
+      "tags": [
+        "chart",
+        "chart-font"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-format01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_format01.xlsx",
+      "tags": [
+        "chart",
+        "chart-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-format02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_format02.xlsx",
+      "tags": [
+        "chart",
+        "chart-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-format03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_format03.xlsx",
+      "tags": [
+        "chart",
+        "chart-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-format04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_format04.xlsx",
+      "tags": [
+        "chart",
+        "chart-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gap01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gap01.xlsx",
+      "tags": [
+        "chart",
+        "chart-gap"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gap02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gap02.xlsx",
+      "tags": [
+        "chart",
+        "chart-gap"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gap03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gap03.xlsx",
+      "tags": [
+        "chart",
+        "chart-gap"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gap04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gap04.xlsx",
+      "tags": [
+        "chart",
+        "chart-gap"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gradient01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gradient01.xlsx",
+      "tags": [
+        "chart",
+        "chart-gradient"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gradient02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gradient02.xlsx",
+      "tags": [
+        "chart",
+        "chart-gradient"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gradient03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gradient03.xlsx",
+      "tags": [
+        "chart",
+        "chart-gradient"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gradient04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gradient04.xlsx",
+      "tags": [
+        "chart",
+        "chart-gradient"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gridlines01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gridlines01.xlsx",
+      "tags": [
+        "chart",
+        "chart-gridlines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gridlines02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gridlines02.xlsx",
+      "tags": [
+        "chart",
+        "chart-gridlines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gridlines03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gridlines03.xlsx",
+      "tags": [
+        "chart",
+        "chart-gridlines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-gridlines04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_gridlines04.xlsx",
+      "tags": [
+        "chart",
+        "chart-gridlines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-high-low-lines01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_high_low_lines01.xlsx",
+      "tags": [
+        "chart",
+        "chart-high-low-lines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-high-low-lines02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_high_low_lines02.xlsx",
+      "tags": [
+        "chart",
+        "chart-high-low-lines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-layout01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_layout01.xlsx",
+      "tags": [
+        "chart",
+        "chart-layout"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-layout02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_layout02.xlsx",
+      "tags": [
+        "chart",
+        "chart-layout"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-layout03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_layout03.xlsx",
+      "tags": [
+        "chart",
+        "chart-layout"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-layout04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_layout04.xlsx",
+      "tags": [
+        "chart",
+        "chart-layout"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-legend01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_legend01.xlsx",
+      "tags": [
+        "chart",
+        "chart-legend"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-legend03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_legend03.xlsx",
+      "tags": [
+        "chart",
+        "chart-legend"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-legend04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_legend04.xlsx",
+      "tags": [
+        "chart",
+        "chart-legend"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-legend05",
+      "source": "rust_xlsxwriter",
+      "file": "chart_legend05.xlsx",
+      "tags": [
+        "chart",
+        "chart-legend"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-line01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_line01.xlsx",
+      "tags": [
+        "chart",
+        "chart-line"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-line02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_line02.xlsx",
+      "tags": [
+        "chart",
+        "chart-line"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-line03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_line03.xlsx",
+      "tags": [
+        "chart",
+        "chart-line"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-line04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_line04.xlsx",
+      "tags": [
+        "chart",
+        "chart-line"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-name01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_name01.xlsx",
+      "tags": [
+        "chart",
+        "chart-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-name02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_name02.xlsx",
+      "tags": [
+        "chart",
+        "chart-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-name03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_name03.xlsx",
+      "tags": [
+        "chart",
+        "chart-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-pattern01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_pattern01.xlsx",
+      "tags": [
+        "chart",
+        "chart-pattern"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-pattern02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_pattern02.xlsx",
+      "tags": [
+        "chart",
+        "chart-pattern"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-pattern03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_pattern03.xlsx",
+      "tags": [
+        "chart",
+        "chart-pattern"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-pattern04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_pattern04.xlsx",
+      "tags": [
+        "chart",
+        "chart-pattern"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-pie01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_pie01.xlsx",
+      "tags": [
+        "chart",
+        "chart-pie"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-pie02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_pie02.xlsx",
+      "tags": [
+        "chart",
+        "chart-pie"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-pie03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_pie03.xlsx",
+      "tags": [
+        "chart",
+        "chart-pie"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-pie04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_pie04.xlsx",
+      "tags": [
+        "chart",
+        "chart-pie"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-points01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_points01.xlsx",
+      "tags": [
+        "chart",
+        "chart-points"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-points02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_points02.xlsx",
+      "tags": [
+        "chart",
+        "chart-points"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-points03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_points03.xlsx",
+      "tags": [
+        "chart",
+        "chart-points"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-points04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_points04.xlsx",
+      "tags": [
+        "chart",
+        "chart-points"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-radar01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_radar01.xlsx",
+      "tags": [
+        "chart",
+        "chart-radar"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-radar02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_radar02.xlsx",
+      "tags": [
+        "chart",
+        "chart-radar"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-radar03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_radar03.xlsx",
+      "tags": [
+        "chart",
+        "chart-radar"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-scatter01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_scatter01.xlsx",
+      "tags": [
+        "chart",
+        "chart-scatter"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-scatter02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_scatter02.xlsx",
+      "tags": [
+        "chart",
+        "chart-scatter"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-scatter03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_scatter03.xlsx",
+      "tags": [
+        "chart",
+        "chart-scatter"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-scatter04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_scatter04.xlsx",
+      "tags": [
+        "chart",
+        "chart-scatter"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-size01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_size01.xlsx",
+      "tags": [
+        "chart",
+        "chart-size"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-size02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_size02.xlsx",
+      "tags": [
+        "chart",
+        "chart-size"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-sparse01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_sparse01.xlsx",
+      "tags": [
+        "chart",
+        "chart-sparse"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-stock01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_stock01.xlsx",
+      "tags": [
+        "chart",
+        "chart-stock"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-stock02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_stock02.xlsx",
+      "tags": [
+        "chart",
+        "chart-stock"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-stock03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_stock03.xlsx",
+      "tags": [
+        "chart",
+        "chart-stock"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-str01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_str01.xlsx",
+      "tags": [
+        "chart",
+        "chart-str"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-str02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_str02.xlsx",
+      "tags": [
+        "chart",
+        "chart-str"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-table01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_table01.xlsx",
+      "tags": [
+        "chart",
+        "chart-table"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-table02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_table02.xlsx",
+      "tags": [
+        "chart",
+        "chart-table"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-table03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_table03.xlsx",
+      "tags": [
+        "chart",
+        "chart-table"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-theme01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_theme01.xlsx",
+      "tags": [
+        "chart",
+        "chart-theme"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-theme02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_theme02.xlsx",
+      "tags": [
+        "chart",
+        "chart-theme"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-theme03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_theme03.xlsx",
+      "tags": [
+        "chart",
+        "chart-theme"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-theme04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_theme04.xlsx",
+      "tags": [
+        "chart",
+        "chart-theme"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-title01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_title01.xlsx",
+      "tags": [
+        "chart",
+        "chart-title"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-title02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_title02.xlsx",
+      "tags": [
+        "chart",
+        "chart-title"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-title03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_title03.xlsx",
+      "tags": [
+        "chart",
+        "chart-title"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-title04",
+      "source": "rust_xlsxwriter",
+      "file": "chart_title04.xlsx",
+      "tags": [
+        "chart",
+        "chart-title"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-up-down-bars01",
+      "source": "rust_xlsxwriter",
+      "file": "chart_up_down_bars01.xlsx",
+      "tags": [
+        "chart",
+        "chart-up-down-bars"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-up-down-bars02",
+      "source": "rust_xlsxwriter",
+      "file": "chart_up_down_bars02.xlsx",
+      "tags": [
+        "chart",
+        "chart-up-down-bars"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chart-up-down-bars03",
+      "source": "rust_xlsxwriter",
+      "file": "chart_up_down_bars03.xlsx",
+      "tags": [
+        "chart",
+        "chart-up-down-bars"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chartsheet01",
+      "source": "rust_xlsxwriter",
+      "file": "chartsheet01.xlsx",
+      "tags": [
+        "chart",
+        "chartsheet"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chartsheet02",
+      "source": "rust_xlsxwriter",
+      "file": "chartsheet02.xlsx",
+      "tags": [
+        "chart",
+        "chartsheet"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chartsheet03",
+      "source": "rust_xlsxwriter",
+      "file": "chartsheet03.xlsx",
+      "tags": [
+        "chart",
+        "chartsheet"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-chartsheet04",
+      "source": "rust_xlsxwriter",
+      "file": "chartsheet04.xlsx",
+      "tags": [
+        "chart",
+        "chartsheet"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-checkbox01",
+      "source": "rust_xlsxwriter",
+      "file": "checkbox01.xlsx",
+      "tags": [
+        "checkbox"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-checkbox02",
+      "source": "rust_xlsxwriter",
+      "file": "checkbox02.xlsx",
+      "tags": [
+        "checkbox"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-checkbox03",
+      "source": "rust_xlsxwriter",
+      "file": "checkbox03.xlsx",
+      "tags": [
+        "checkbox"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-checkbox04",
+      "source": "rust_xlsxwriter",
+      "file": "checkbox04.xlsx",
+      "tags": [
+        "checkbox"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-comment01",
+      "source": "rust_xlsxwriter",
+      "file": "comment01.xlsx",
+      "tags": [
+        "comment"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-comment02",
+      "source": "rust_xlsxwriter",
+      "file": "comment02.xlsx",
+      "tags": [
+        "comment"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-comment03",
+      "source": "rust_xlsxwriter",
+      "file": "comment03.xlsx",
+      "tags": [
+        "comment"
+      ],
+      "axes": [
+        "roundtrip"
+      ],
+      "skipRoundtrip": "A note in the last cell (XFD1048576): TeamGrid builds the whole grid, which takes about 30 s, and drops that note"
+    },
+    {
+      "id": "rxw-comment04",
+      "source": "rust_xlsxwriter",
+      "file": "comment04.xlsx",
+      "tags": [
+        "comment"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-cond-format01",
+      "source": "rust_xlsxwriter",
+      "file": "cond_format01.xlsx",
+      "tags": [
+        "cond-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-cond-format02",
+      "source": "rust_xlsxwriter",
+      "file": "cond_format02.xlsx",
+      "tags": [
+        "cond-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-cond-format03",
+      "source": "rust_xlsxwriter",
+      "file": "cond_format03.xlsx",
+      "tags": [
+        "cond-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-cond-format04",
+      "source": "rust_xlsxwriter",
+      "file": "cond_format04.xlsx",
+      "tags": [
+        "cond-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-data-validation01",
+      "source": "rust_xlsxwriter",
+      "file": "data_validation01.xlsx",
+      "tags": [
+        "data-validation"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-data-validation02",
+      "source": "rust_xlsxwriter",
+      "file": "data_validation02.xlsx",
+      "tags": [
+        "data-validation"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-data-validation03",
+      "source": "rust_xlsxwriter",
+      "file": "data_validation03.xlsx",
+      "tags": [
+        "data-validation"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-decimal01",
+      "source": "rust_xlsxwriter",
+      "file": "decimal01.xlsx",
+      "tags": [
+        "decimal"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-default-format01",
+      "source": "rust_xlsxwriter",
+      "file": "default_format01.xlsx",
+      "tags": [
+        "default-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-default-format02",
+      "source": "rust_xlsxwriter",
+      "file": "default_format02.xlsx",
+      "tags": [
+        "default-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-default-format03",
+      "source": "rust_xlsxwriter",
+      "file": "default_format03.xlsx",
+      "tags": [
+        "default-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-default-format04",
+      "source": "rust_xlsxwriter",
+      "file": "default_format04.xlsx",
+      "tags": [
+        "default-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-default-row01",
+      "source": "rust_xlsxwriter",
+      "file": "default_row01.xlsx",
+      "tags": [
+        "default-row"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-default-row02",
+      "source": "rust_xlsxwriter",
+      "file": "default_row02.xlsx",
+      "tags": [
+        "default-row"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-default-row03",
+      "source": "rust_xlsxwriter",
+      "file": "default_row03.xlsx",
+      "tags": [
+        "default-row"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-default-row04",
+      "source": "rust_xlsxwriter",
+      "file": "default_row04.xlsx",
+      "tags": [
+        "default-row"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-defined-name01",
+      "source": "rust_xlsxwriter",
+      "file": "defined_name01.xlsx",
+      "tags": [
+        "defined-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-defined-name02",
+      "source": "rust_xlsxwriter",
+      "file": "defined_name02.xlsx",
+      "tags": [
+        "defined-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-defined-name03",
+      "source": "rust_xlsxwriter",
+      "file": "defined_name03.xlsx",
+      "tags": [
+        "defined-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-defined-name04",
+      "source": "rust_xlsxwriter",
+      "file": "defined_name04.xlsx",
+      "tags": [
+        "defined-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-dynamic-array01",
+      "source": "rust_xlsxwriter",
+      "file": "dynamic_array01.xlsx",
+      "tags": [
+        "dynamic-array"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-dynamic-array02",
+      "source": "rust_xlsxwriter",
+      "file": "dynamic_array02.xlsx",
+      "tags": [
+        "dynamic-array"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-dynamic-array03",
+      "source": "rust_xlsxwriter",
+      "file": "dynamic_array03.xlsx",
+      "tags": [
+        "dynamic-array"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-dynamic-array04",
+      "source": "rust_xlsxwriter",
+      "file": "dynamic_array04.xlsx",
+      "tags": [
+        "dynamic-array"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-embed-image01",
+      "source": "rust_xlsxwriter",
+      "file": "embed_image01.xlsx",
+      "tags": [
+        "embed-image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-embed-image02",
+      "source": "rust_xlsxwriter",
+      "file": "embed_image02.xlsx",
+      "tags": [
+        "embed-image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-embed-image03",
+      "source": "rust_xlsxwriter",
+      "file": "embed_image03.xlsx",
+      "tags": [
+        "embed-image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-embed-image04",
+      "source": "rust_xlsxwriter",
+      "file": "embed_image04.xlsx",
+      "tags": [
+        "embed-image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-escapes01",
+      "source": "rust_xlsxwriter",
+      "file": "escapes01.xlsx",
+      "tags": [
+        "escapes"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-escapes02",
+      "source": "rust_xlsxwriter",
+      "file": "escapes02.xlsx",
+      "tags": [
+        "escapes"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-escapes03",
+      "source": "rust_xlsxwriter",
+      "file": "escapes03.xlsx",
+      "tags": [
+        "escapes"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-escapes04",
+      "source": "rust_xlsxwriter",
+      "file": "escapes04.xlsx",
+      "tags": [
+        "escapes"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-firstsheet01",
+      "source": "rust_xlsxwriter",
+      "file": "firstsheet01.xlsx",
+      "tags": [
+        "firstsheet"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-format01",
+      "source": "rust_xlsxwriter",
+      "file": "format01.xlsx",
+      "tags": [
+        "format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-format02",
+      "source": "rust_xlsxwriter",
+      "file": "format02.xlsx",
+      "tags": [
+        "format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-format03",
+      "source": "rust_xlsxwriter",
+      "file": "format03.xlsx",
+      "tags": [
+        "format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-format05",
+      "source": "rust_xlsxwriter",
+      "file": "format05.xlsx",
+      "tags": [
+        "format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-formula-results01",
+      "source": "rust_xlsxwriter",
+      "file": "formula_results01.xlsx",
+      "tags": [
+        "formula-results"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-gridlines01",
+      "source": "rust_xlsxwriter",
+      "file": "gridlines01.xlsx",
+      "tags": [
+        "gridlines"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-header-image01",
+      "source": "rust_xlsxwriter",
+      "file": "header_image01.xlsx",
+      "tags": [
+        "header-image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-header-image02",
+      "source": "rust_xlsxwriter",
+      "file": "header_image02.xlsx",
+      "tags": [
+        "header-image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-header-image03",
+      "source": "rust_xlsxwriter",
+      "file": "header_image03.xlsx",
+      "tags": [
+        "header-image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-header-image04",
+      "source": "rust_xlsxwriter",
+      "file": "header_image04.xlsx",
+      "tags": [
+        "header-image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-hide01",
+      "source": "rust_xlsxwriter",
+      "file": "hide01.xlsx",
+      "tags": [
+        "hide"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-hide02",
+      "source": "rust_xlsxwriter",
+      "file": "hide02.xlsx",
+      "tags": [
+        "hide"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-hyperlink01",
+      "source": "rust_xlsxwriter",
+      "file": "hyperlink01.xlsx",
+      "tags": [
+        "hyperlink"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-hyperlink02",
+      "source": "rust_xlsxwriter",
+      "file": "hyperlink02.xlsx",
+      "tags": [
+        "hyperlink"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-hyperlink03",
+      "source": "rust_xlsxwriter",
+      "file": "hyperlink03.xlsx",
+      "tags": [
+        "hyperlink"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-hyperlink04",
+      "source": "rust_xlsxwriter",
+      "file": "hyperlink04.xlsx",
+      "tags": [
+        "hyperlink"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-ignore-error01",
+      "source": "rust_xlsxwriter",
+      "file": "ignore_error01.xlsx",
+      "tags": [
+        "ignore-error"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-ignore-error02",
+      "source": "rust_xlsxwriter",
+      "file": "ignore_error02.xlsx",
+      "tags": [
+        "ignore-error"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-ignore-error03",
+      "source": "rust_xlsxwriter",
+      "file": "ignore_error03.xlsx",
+      "tags": [
+        "ignore-error"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-ignore-error04",
+      "source": "rust_xlsxwriter",
+      "file": "ignore_error04.xlsx",
+      "tags": [
+        "ignore-error"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-image-scale01",
+      "source": "rust_xlsxwriter",
+      "file": "image_scale01.xlsx",
+      "tags": [
+        "image-scale"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-image-scale02",
+      "source": "rust_xlsxwriter",
+      "file": "image_scale02.xlsx",
+      "tags": [
+        "image-scale"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-image-scale03",
+      "source": "rust_xlsxwriter",
+      "file": "image_scale03.xlsx",
+      "tags": [
+        "image-scale"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-image-scale04",
+      "source": "rust_xlsxwriter",
+      "file": "image_scale04.xlsx",
+      "tags": [
+        "image-scale"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-image01",
+      "source": "rust_xlsxwriter",
+      "file": "image01.xlsx",
+      "tags": [
+        "image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-image02",
+      "source": "rust_xlsxwriter",
+      "file": "image02.xlsx",
+      "tags": [
+        "image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-image03",
+      "source": "rust_xlsxwriter",
+      "file": "image03.xlsx",
+      "tags": [
+        "image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-image04",
+      "source": "rust_xlsxwriter",
+      "file": "image04.xlsx",
+      "tags": [
+        "image"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-landscape01",
+      "source": "rust_xlsxwriter",
+      "file": "landscape01.xlsx",
+      "tags": [
+        "landscape"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-merge-cells01",
+      "source": "rust_xlsxwriter",
+      "file": "merge_cells01.xlsx",
+      "tags": [
+        "merge-cells"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-merge-range01",
+      "source": "rust_xlsxwriter",
+      "file": "merge_range01.xlsx",
+      "tags": [
+        "merge-range"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-merge-range02",
+      "source": "rust_xlsxwriter",
+      "file": "merge_range02.xlsx",
+      "tags": [
+        "merge-range"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-merge-range03",
+      "source": "rust_xlsxwriter",
+      "file": "merge_range03.xlsx",
+      "tags": [
+        "merge-range"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-merge-range04",
+      "source": "rust_xlsxwriter",
+      "file": "merge_range04.xlsx",
+      "tags": [
+        "merge-range"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-object-position01",
+      "source": "rust_xlsxwriter",
+      "file": "object_position01.xlsx",
+      "tags": [
+        "object-position"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-object-position02",
+      "source": "rust_xlsxwriter",
+      "file": "object_position02.xlsx",
+      "tags": [
+        "object-position"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-object-position03",
+      "source": "rust_xlsxwriter",
+      "file": "object_position03.xlsx",
+      "tags": [
+        "object-position"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-object-position06",
+      "source": "rust_xlsxwriter",
+      "file": "object_position06.xlsx",
+      "tags": [
+        "object-position"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-outline01",
+      "source": "rust_xlsxwriter",
+      "file": "outline01.xlsx",
+      "tags": [
+        "outline"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-outline02",
+      "source": "rust_xlsxwriter",
+      "file": "outline02.xlsx",
+      "tags": [
+        "outline"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-outline03",
+      "source": "rust_xlsxwriter",
+      "file": "outline03.xlsx",
+      "tags": [
+        "outline"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-outline04",
+      "source": "rust_xlsxwriter",
+      "file": "outline04.xlsx",
+      "tags": [
+        "outline"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-overlay01",
+      "source": "rust_xlsxwriter",
+      "file": "overlay01.xlsx",
+      "tags": [
+        "overlay"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-overlay02",
+      "source": "rust_xlsxwriter",
+      "file": "overlay02.xlsx",
+      "tags": [
+        "overlay"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-overlay03",
+      "source": "rust_xlsxwriter",
+      "file": "overlay03.xlsx",
+      "tags": [
+        "overlay"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-overlay04",
+      "source": "rust_xlsxwriter",
+      "file": "overlay04.xlsx",
+      "tags": [
+        "overlay"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-page-breaks01",
+      "source": "rust_xlsxwriter",
+      "file": "page_breaks01.xlsx",
+      "tags": [
+        "page-breaks"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-page-breaks02",
+      "source": "rust_xlsxwriter",
+      "file": "page_breaks02.xlsx",
+      "tags": [
+        "page-breaks"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-page-breaks03",
+      "source": "rust_xlsxwriter",
+      "file": "page_breaks03.xlsx",
+      "tags": [
+        "page-breaks"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-page-breaks04",
+      "source": "rust_xlsxwriter",
+      "file": "page_breaks04.xlsx",
+      "tags": [
+        "page-breaks"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-page-view01",
+      "source": "rust_xlsxwriter",
+      "file": "page_view01.xlsx",
+      "tags": [
+        "page-view"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-page-view02",
+      "source": "rust_xlsxwriter",
+      "file": "page_view02.xlsx",
+      "tags": [
+        "page-view"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-page-view03",
+      "source": "rust_xlsxwriter",
+      "file": "page_view03.xlsx",
+      "tags": [
+        "page-view"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-print-across01",
+      "source": "rust_xlsxwriter",
+      "file": "print_across01.xlsx",
+      "tags": [
+        "print-across"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-print-area01",
+      "source": "rust_xlsxwriter",
+      "file": "print_area01.xlsx",
+      "tags": [
+        "print-area"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-print-area02",
+      "source": "rust_xlsxwriter",
+      "file": "print_area02.xlsx",
+      "tags": [
+        "print-area"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-print-area03",
+      "source": "rust_xlsxwriter",
+      "file": "print_area03.xlsx",
+      "tags": [
+        "print-area"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-print-area04",
+      "source": "rust_xlsxwriter",
+      "file": "print_area04.xlsx",
+      "tags": [
+        "print-area"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-print-options01",
+      "source": "rust_xlsxwriter",
+      "file": "print_options01.xlsx",
+      "tags": [
+        "print-options"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-print-options02",
+      "source": "rust_xlsxwriter",
+      "file": "print_options02.xlsx",
+      "tags": [
+        "print-options"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-print-options03",
+      "source": "rust_xlsxwriter",
+      "file": "print_options03.xlsx",
+      "tags": [
+        "print-options"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-print-options04",
+      "source": "rust_xlsxwriter",
+      "file": "print_options04.xlsx",
+      "tags": [
+        "print-options"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-properties01",
+      "source": "rust_xlsxwriter",
+      "file": "properties01.xlsx",
+      "tags": [
+        "properties"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-properties02",
+      "source": "rust_xlsxwriter",
+      "file": "properties02.xlsx",
+      "tags": [
+        "properties"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-properties03",
+      "source": "rust_xlsxwriter",
+      "file": "properties03.xlsx",
+      "tags": [
+        "properties"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-properties04",
+      "source": "rust_xlsxwriter",
+      "file": "properties04.xlsx",
+      "tags": [
+        "properties"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-protect01",
+      "source": "rust_xlsxwriter",
+      "file": "protect01.xlsx",
+      "tags": [
+        "protect"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-protect02",
+      "source": "rust_xlsxwriter",
+      "file": "protect02.xlsx",
+      "tags": [
+        "protect"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-protect03",
+      "source": "rust_xlsxwriter",
+      "file": "protect03.xlsx",
+      "tags": [
+        "protect"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-protect04",
+      "source": "rust_xlsxwriter",
+      "file": "protect04.xlsx",
+      "tags": [
+        "protect"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-quote-name01",
+      "source": "rust_xlsxwriter",
+      "file": "quote_name01.xlsx",
+      "tags": [
+        "quote-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-quote-name02",
+      "source": "rust_xlsxwriter",
+      "file": "quote_name02.xlsx",
+      "tags": [
+        "quote-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-quote-name03",
+      "source": "rust_xlsxwriter",
+      "file": "quote_name03.xlsx",
+      "tags": [
+        "quote-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-quote-name04",
+      "source": "rust_xlsxwriter",
+      "file": "quote_name04.xlsx",
+      "tags": [
+        "quote-name"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-repeat01",
+      "source": "rust_xlsxwriter",
+      "file": "repeat01.xlsx",
+      "tags": [
+        "repeat"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-repeat02",
+      "source": "rust_xlsxwriter",
+      "file": "repeat02.xlsx",
+      "tags": [
+        "repeat"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-repeat03",
+      "source": "rust_xlsxwriter",
+      "file": "repeat03.xlsx",
+      "tags": [
+        "repeat"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-repeat04",
+      "source": "rust_xlsxwriter",
+      "file": "repeat04.xlsx",
+      "tags": [
+        "repeat"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-rich-string01",
+      "source": "rust_xlsxwriter",
+      "file": "rich_string01.xlsx",
+      "tags": [
+        "rich-string"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-rich-string02",
+      "source": "rust_xlsxwriter",
+      "file": "rich_string02.xlsx",
+      "tags": [
+        "rich-string"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-rich-string03",
+      "source": "rust_xlsxwriter",
+      "file": "rich_string03.xlsx",
+      "tags": [
+        "rich-string"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-rich-string04",
+      "source": "rust_xlsxwriter",
+      "file": "rich_string04.xlsx",
+      "tags": [
+        "rich-string"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-row-col-format01",
+      "source": "rust_xlsxwriter",
+      "file": "row_col_format01.xlsx",
+      "tags": [
+        "row-col-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-row-col-format02",
+      "source": "rust_xlsxwriter",
+      "file": "row_col_format02.xlsx",
+      "tags": [
+        "row-col-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-row-col-format03",
+      "source": "rust_xlsxwriter",
+      "file": "row_col_format03.xlsx",
+      "tags": [
+        "row-col-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-row-col-format04",
+      "source": "rust_xlsxwriter",
+      "file": "row_col_format04.xlsx",
+      "tags": [
+        "row-col-format"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-selection01",
+      "source": "rust_xlsxwriter",
+      "file": "selection01.xlsx",
+      "tags": [
+        "selection"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-selection02",
+      "source": "rust_xlsxwriter",
+      "file": "selection02.xlsx",
+      "tags": [
+        "selection"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-set-row01",
+      "source": "rust_xlsxwriter",
+      "file": "set_row01.xlsx",
+      "tags": [
+        "set-row"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-set-row02",
+      "source": "rust_xlsxwriter",
+      "file": "set_row02.xlsx",
+      "tags": [
+        "set-row"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-set-row03",
+      "source": "rust_xlsxwriter",
+      "file": "set_row03.xlsx",
+      "tags": [
+        "set-row"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-shared-strings01",
+      "source": "rust_xlsxwriter",
+      "file": "shared_strings01.xlsx",
+      "tags": [
+        "shared-strings"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-shared-strings02",
+      "source": "rust_xlsxwriter",
+      "file": "shared_strings02.xlsx",
+      "tags": [
+        "shared-strings"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-simple03",
+      "source": "rust_xlsxwriter",
+      "file": "simple03.xlsx",
+      "tags": [
+        "simple"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-styles01",
+      "source": "rust_xlsxwriter",
+      "file": "styles01.xlsx",
+      "tags": [
+        "styles"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-styles02",
+      "source": "rust_xlsxwriter",
+      "file": "styles02.xlsx",
+      "tags": [
+        "styles"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-tab-color01",
+      "source": "rust_xlsxwriter",
+      "file": "tab_color01.xlsx",
+      "tags": [
+        "tab-color"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-tab-color02",
+      "source": "rust_xlsxwriter",
+      "file": "tab_color02.xlsx",
+      "tags": [
+        "tab-color"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-tab-color03",
+      "source": "rust_xlsxwriter",
+      "file": "tab_color03.xlsx",
+      "tags": [
+        "tab-color"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-table01",
+      "source": "rust_xlsxwriter",
+      "file": "table01.xlsx",
+      "tags": [
+        "table"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-table02",
+      "source": "rust_xlsxwriter",
+      "file": "table02.xlsx",
+      "tags": [
+        "table"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-table03",
+      "source": "rust_xlsxwriter",
+      "file": "table03.xlsx",
+      "tags": [
+        "table"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-table04",
+      "source": "rust_xlsxwriter",
+      "file": "table04.xlsx",
+      "tags": [
+        "table"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-textbox01",
+      "source": "rust_xlsxwriter",
+      "file": "textbox01.xlsx",
+      "tags": [
+        "textbox"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-textbox02",
+      "source": "rust_xlsxwriter",
+      "file": "textbox02.xlsx",
+      "tags": [
+        "textbox"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-textbox03",
+      "source": "rust_xlsxwriter",
+      "file": "textbox03.xlsx",
+      "tags": [
+        "textbox"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-textbox04",
+      "source": "rust_xlsxwriter",
+      "file": "textbox04.xlsx",
+      "tags": [
+        "textbox"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-theme-color01",
+      "source": "rust_xlsxwriter",
+      "file": "theme_color01.xlsx",
+      "tags": [
+        "theme-color"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-theme-color02",
+      "source": "rust_xlsxwriter",
+      "file": "theme_color02.xlsx",
+      "tags": [
+        "theme-color"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-theme-color03",
+      "source": "rust_xlsxwriter",
+      "file": "theme_color03.xlsx",
+      "tags": [
+        "theme-color"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-theme-color04",
+      "source": "rust_xlsxwriter",
+      "file": "theme_color04.xlsx",
+      "tags": [
+        "theme-color"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-theme01",
+      "source": "rust_xlsxwriter",
+      "file": "theme01.xlsx",
+      "tags": [
+        "theme"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-theme02",
+      "source": "rust_xlsxwriter",
+      "file": "theme02.xlsx",
+      "tags": [
+        "theme"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-theme03",
+      "source": "rust_xlsxwriter",
+      "file": "theme03.xlsx",
+      "tags": [
+        "theme"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-theme04",
+      "source": "rust_xlsxwriter",
+      "file": "theme04.xlsx",
+      "tags": [
+        "theme"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-top-left-cell01",
+      "source": "rust_xlsxwriter",
+      "file": "top_left_cell01.xlsx",
+      "tags": [
+        "top-left-cell"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-top-left-cell02",
+      "source": "rust_xlsxwriter",
+      "file": "top_left_cell02.xlsx",
+      "tags": [
+        "top-left-cell"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-top-left-cell03",
+      "source": "rust_xlsxwriter",
+      "file": "top_left_cell03.xlsx",
+      "tags": [
+        "top-left-cell"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-vml01",
+      "source": "rust_xlsxwriter",
+      "file": "vml01.xlsx",
+      "tags": [
+        "vml"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-vml02",
+      "source": "rust_xlsxwriter",
+      "file": "vml02.xlsx",
+      "tags": [
+        "vml"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-vml03",
+      "source": "rust_xlsxwriter",
+      "file": "vml03.xlsx",
+      "tags": [
+        "vml"
+      ],
+      "axes": [
+        "roundtrip"
+      ]
+    },
+    {
+      "id": "rxw-vml04",
+      "source": "rust_xlsxwriter",
+      "file": "vml04.xlsx",
+      "tags": [
+        "vml"
+      ],
+      "axes": [
+        "roundtrip"
       ]
     }
   ]
