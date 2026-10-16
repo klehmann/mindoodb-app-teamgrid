@@ -37,6 +37,7 @@ import type { WorkbookStyleEdit } from '@genoffice/xlsx-gateway/shared/edit-sche
 
 import type { StoredSparklineGroup, StoredTable } from './objects'
 import type { StoredPivot } from './pivots'
+import type { DocumentProperties } from '../xlsx/doc-props'
 import type { StoredRule } from './rules'
 import type { StoredTableStyle } from '../xlsx/table-parts'
 
@@ -337,6 +338,8 @@ export interface Workbook {
   slicers?: { attachment: string }
   /** The VBA project of an .xlsm and its code names (src/xlsx/macros.ts), sheets by id. */
   macros?: { attachment: string }
+  /** Document properties of the imported file (title, author, company, …; src/xlsx/doc-props.ts). */
+  properties?: DocumentProperties
   /** Legacy style registry, read once and dropped by the next save. */
   stylesById?: Record<StyleId, StoredStyle>
 }

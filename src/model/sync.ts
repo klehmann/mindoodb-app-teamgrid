@@ -40,6 +40,7 @@ import { addTableExtras, isBuiltInTableStyle } from './objects'
 import type { ExtractedChart } from '../xlsx/chart-parts'
 import type { ExternalLinkPart } from '../xlsx/external-links'
 import type { SlicerParts } from '../xlsx/slicer-parts'
+import type { DocumentProperties } from '../xlsx/doc-props'
 import type { MacroParts } from '../xlsx/macros'
 import type { ExtractedTableParts, StoredTableStyle } from '../xlsx/table-parts'
 import { featureExtent } from './sheet-features'
@@ -341,6 +342,8 @@ export interface SyncInput {
   slicers?: SlicerParts | null
   /** The saved file's VBA project (macros.ts); null = none, omitted = keep the stored one. */
   macros?: MacroParts | null
+  /** The imported file's document properties; omitted = keep the stored ones (a save never changes them). */
+  properties?: DocumentProperties | null
 }
 
 export interface SyncResult {
@@ -397,7 +400,7 @@ export function writesFor(stored: StoredWorkbook, next: Workbook, changedSheetId
   return { ...diffWorkbook(stored, next, createdChunks), newImages: [] }
 }
 
-export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts, charts, externalLinks, slicers, macros }: SyncInput): SyncResult {
+export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead, visuals, pivots = [], tableParts, charts, externalLinks, slicers, macros, properties }: SyncInput): SyncResult {
   const workbook = stored.workbook
   // Visual anchors with their far corner in the cell it falls into.
   const sizesBySheet = new Map(fileRead.sheets.map((sheet) => [sheet.meta.id, sheetSizes(sheet)]))
@@ -609,6 +612,11 @@ export function syncWorkbook({ stored, storedIdByFileId, request, read: fileRead
       newImages.push({ attachment, mediaType: 'application/json', fileVisualId: '', bytes: new TextEncoder().encode(json) })
     }
     next.macros = { attachment }
+  }
+  if (properties === undefined) {
+    if (workbook.properties) next.properties = workbook.properties
+  } else if (properties) {
+    next.properties = properties
   }
   if (externalLinks === undefined) {
     if (workbook.externalLinks) next.externalLinks = workbook.externalLinks

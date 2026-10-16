@@ -31,6 +31,7 @@ import { extractTableParts } from './table-parts'
 import { extractCharts } from './chart-parts'
 import { extractExternalLinks } from './external-links'
 import { extractSlicers } from './slicer-parts'
+import { extractDocProps } from './doc-props'
 import { extractMacros } from './macros'
 import { loadRuleConverters } from '../model/rules'
 import { readWholeWorkbook } from '../model/sidecar-read'
@@ -160,6 +161,7 @@ export async function importXlsxAsDocument(haven: HavenConnection, bytes: Uint8A
       externalLinks: await extractExternalLinks(bytes),
       slicers: (await extractSlicers(bytes)) ?? null,
       macros: (await extractMacros(bytes)) ?? null,
+      properties: (await extractDocProps(bytes)) ?? null,
     })
     await readNewImages(engine, opened.sessionId, writes)
     return await createWorkbook(haven, subject, next, writes)

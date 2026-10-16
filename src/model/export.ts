@@ -15,6 +15,7 @@ import type {
   WorkbookStructuralOp,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import { applyArrayFormulas } from '../xlsx/array-formulas'
+import { applyDocProps } from '../xlsx/doc-props'
 import { saveWorkbookInBrowser } from '../xlsx/browser-save'
 import { injectPivots, type PivotParts } from '../xlsx/pivot-parts'
 import { applyTabColors, applyVeryHidden } from '../xlsx/tab-colors'
@@ -197,6 +198,7 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
   }
   bytes = new Uint8Array(await applyCustomTableStyles(bytes, Object.values(workbook.tableStylesById ?? {}), customStyles))
   bytes = new Uint8Array(await applyVeryHidden(bytes, new Set(sheets.filter((sheet) => sheet.veryHidden).map((sheet) => sheet.name))))
+  bytes = new Uint8Array(await applyDocProps(bytes, workbook.properties ?? {}, new Date()))
   if (options.loadImage) {
     const loadImage = options.loadImage
     const loadJson = async <T>(attachment: string): Promise<T | undefined> => {
