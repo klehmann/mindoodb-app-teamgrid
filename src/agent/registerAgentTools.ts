@@ -68,6 +68,14 @@ export function registerTeamgridAgentTools(
       lastCalculationEnd = Date.now()
     })
   }
+  // A function that throws aborts the engine's run (a rejected promise), and the end is
+  // never reported: without this, every read after it waited SETTLE_TIMEOUT_MS.
+  const onRejection = () => {
+    if (!calculating) return
+    calculating = false
+    lastCalculationEnd = Date.now()
+  }
+  window.addEventListener('unhandledrejection', onRejection)
 
   /**
    * Univer recalculates asynchronously after opening a workbook, and a save
@@ -150,6 +158,7 @@ export function registerTeamgridAgentTools(
   return () => {
     disposed = true
     clearInterval(timer)
+    window.removeEventListener('unhandledrejection', onRejection)
     void agent.registerTools([]).catch(() => undefined)
   }
 }
