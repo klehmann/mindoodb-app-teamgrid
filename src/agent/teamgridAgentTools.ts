@@ -76,6 +76,8 @@ export interface TeamgridAgentDeps {
 }
 
 const PREFIX = 'teamgrid'
+/** An ensureRangeLoaded that takes longer than this streamed cells into the grid. */
+const STREAMED_MS = 5
 const NEXT_OPEN = `call ${PREFIX}_workbooks_list, then ${PREFIX}_workbook_open`
 const NEXT_EXPORT = 'pass the fileRef to haven_files_export to save the file into the exchange folder'
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -389,17 +391,21 @@ export function createTeamgridAgentTools(deps: TeamgridAgentDeps): MindooDBAppAg
       }
       // A large imported workbook streams into the grid by viewport; cells outside it read as empty.
       const since = Date.now()
+      let streamed = false
       for (const block of blocksOf(addresses)) {
+        const started = Date.now()
         if ((await skill.ensureRangeLoaded?.(block, sheetId)) === false) {
           fail('INVALID_STATE', 'The requested cells could not be fully loaded; retry after workbook indexing completes.')
         }
+        // Answered at once when the cells are in the grid already; else they streamed in.
+        if (Date.now() - started > STREAMED_MS) streamed = true
       }
       type Read = Record<string, { value: unknown; formula?: string; rawValue?: unknown }>
       const valueOf = (cell: Read[string] | undefined) =>
         cell?.rawValue !== undefined ? cell.rawValue : (cell?.value ?? null)
       let read = skill.readCells(addresses, sheetId) as Read
-      // Formulas of cells that just streamed in are calculated a moment later.
-      if (deps.calculated && addresses.some((a) => read[a]?.formula && valueOf(read[a]) === null)) {
+      // Formulas over cells that just streamed in are calculated (again) a moment later.
+      if (deps.calculated && (streamed || addresses.some((a) => read[a]?.formula && valueOf(read[a]) === null))) {
         await deps.calculated(since)
         read = skill.readCells(addresses, sheetId) as Read
       }

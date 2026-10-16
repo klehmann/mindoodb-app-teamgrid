@@ -32,6 +32,8 @@ export function readNumber(text: string): number | undefined {
   const body = percent ? trimmed.slice(0, -1) : trimmed
   if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(body)) return undefined
   const value = Number(body)
+  // 1e400 is no number to Excel (it compares as text)
+  if (!Number.isFinite(value)) return undefined
   return percent ? value / 100 : value
 }
 
