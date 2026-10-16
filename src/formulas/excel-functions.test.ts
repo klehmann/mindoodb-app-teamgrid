@@ -82,6 +82,18 @@ describe('other corrections', () => {
     expect(run('ISO.CEILING', n(4.3), n(2))).toBe(6)
     expect(run('ISO.CEILING', n(-4.3), n(2))).toBe(-4)
   })
+
+  it('OFFSET truncates fractional offsets and sizes like Excel', () => {
+    // The reference is S8 (row 7, column 18, 0-based); the area OFFSET builds comes back as is.
+    const offset = executor('OFFSET') as unknown as {
+      createReferenceObject(reference: unknown, range: unknown): unknown
+      _handleSingleObject(...values: unknown[]): unknown
+    }
+    offset.createReferenceObject = (_reference, range) => range
+    const s8 = { getRangePosition: () => ({ startRow: 7, startColumn: 18, endRow: 18, endColumn: 23 }) }
+    expect(offset._handleSingleObject(s8, n(3.5), n(7.2), n(14.9), n(2.3))).toEqual({ startRow: 10, startColumn: 25, endRow: 23, endColumn: 26 })
+    expect(offset._handleSingleObject(s8, n(-2.3), n(-2.8), n(3), n(0.9))).toEqual({ startRow: 5, startColumn: 16, endRow: 7, endColumn: 16 })
+  })
 })
 
 describe('COUNTIF criteria', async () => {

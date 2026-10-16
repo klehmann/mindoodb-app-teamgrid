@@ -14,6 +14,7 @@ import {
   functionCompatibility,
   functionDate,
   functionFinancial,
+  functionLookup,
   functionMath,
   functionStatistical,
   IFunctionService,
@@ -32,7 +33,7 @@ interface SingleObjectFunction extends BaseFunction {
 }
 type SingleObjectExecutor = new (name: string) => SingleObjectFunction
 
-const GROUPS = [functionCompatibility, functionDate, functionFinancial, functionMath, functionStatistical] as unknown as Array<Array<[Executor, string]>>
+const GROUPS = [functionCompatibility, functionDate, functionFinancial, functionLookup, functionMath, functionStatistical] as unknown as Array<Array<[Executor, string]>>
 
 /** Univer's executor class for a function name. */
 function univerExecutor(name: string): Executor {
@@ -283,8 +284,30 @@ function createEdate(): BaseFunction {
   })('EDATE')
 }
 
+/**
+ * OFFSET: Univer adds fractional offsets and sizes to the row and column numbers as they
+ * are, and the reference with fractional rows (OFFSET(S8:X19, 3.5, 7.2, 14.9, 2.3)) makes
+ * building its array throw, which aborts the whole calculation run: every later result
+ * of the workbook stays empty and the engine never reports the run as finished. Excel
+ * truncates offsets and sizes toward zero, and a size between 0 and 1 counts as 1.
+ */
+function createOffset(): BaseFunction {
+  const Base = univerExecutor('OFFSET') as unknown as SingleObjectExecutor
+  const whole = (value: BaseValueObject, size: boolean): BaseValueObject => {
+    const number = plainNumber(value)
+    if (number === undefined || !Number.isFinite(number) || Number.isInteger(number)) return value
+    const truncated = Math.trunc(number)
+    return NumberValueObject.create(size && truncated === 0 ? Math.sign(number) : truncated)
+  }
+  return new (class extends Base {
+    override _handleSingleObject(reference: BaseValueObject, rows: BaseValueObject, columns: BaseValueObject, height: BaseValueObject, width: BaseValueObject) {
+      return super._handleSingleObject(reference, whole(rows, false), whole(columns, false), whole(height, true), whole(width, true))
+    }
+  })('OFFSET')
+}
+
 export function createExcelFunctionExecutors(): BaseFunction[] {
-  return [createBinomDist(), createBinomInv('BINOM.INV'), createBinomInv('CRITBINOM'), createNegbinomDist(), createWorkdayIntl(), createWorkday(), createAccrint(), createCountif(), createIsoCeiling(), createEdate()]
+  return [createBinomDist(), createBinomInv('BINOM.INV'), createBinomInv('CRITBINOM'), createNegbinomDist(), createWorkdayIntl(), createWorkday(), createAccrint(), createCountif(), createIsoCeiling(), createEdate(), createOffset()]
 }
 
 /** Registers the corrected executors on every Univer the editor creates (patches/sheets-univer-hook.patch). */
