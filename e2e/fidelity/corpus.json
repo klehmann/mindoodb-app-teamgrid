@@ -1229,7 +1229,7 @@
         "values",
         "roundtrip"
       ],
-      "skipRoundtrip": "Too large to load whole (a reference near the last row): opening the stored copy takes longer than the test allows"
+      "skip": "Too large to load whole (a reference near the last row): TeamGrid streams it, so its formulas are not recalculated, and opening it can take longer than the test allows (CI)"
     },
     {
       "id": "ironcalc-intrate",

@@ -42,6 +42,9 @@ export interface ValuesResult {
   error?: string
 }
 
+const LATE_RESULT_ATTEMPTS = 3
+const LATE_RESULT_PAUSE_MS = 1_500
+
 const baseline: Record<string, string[]> = existsSync(valuesBaselinePath)
   ? JSON.parse(readFileSync(valuesBaselinePath, 'utf8'))
   : {}
@@ -88,6 +91,14 @@ for (const entry of corpus.cases.filter((c) => c.axes.includes('values'))) {
           sheetId,
           sheet.cells.map((cell) => cell.address),
         )
+        // On a slow machine (CI) results can land after the engine looked idle: read
+        // formula cells that are still empty once more after a pause, up to a few times.
+        for (let attempt = 0; attempt < LATE_RESULT_ATTEMPTS; attempt++) {
+          const late = sheet.cells.filter((cell) => cell.value !== null && cell.value !== '' && (read[cell.address]?.value ?? null) === null)
+          if (late.length === 0) break
+          await host.page.waitForTimeout(LATE_RESULT_PAUSE_MS)
+          Object.assign(read, await host.readCells(sheetId, late.map((cell) => cell.address)))
+        }
         for (const cell of sheet.cells) {
           const got = read[cell.address]
           const functions = functionsOf(cell.formula)
