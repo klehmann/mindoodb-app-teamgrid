@@ -13,12 +13,14 @@ import {
   ErrorValueObject,
   functionCompatibility,
   functionDate,
+  functionFinancial,
   functionMath,
   functionStatistical,
   IFunctionService,
   NumberValueObject,
 } from '@univerjs/engine-formula'
 
+import { criteriaMatcher, type CriteriaCell } from './criteria'
 import { binomialCdf, binomialInverse, binomialPdf, negativeBinomialCdf, negativeBinomialPdf } from './distributions'
 import { addMonths, MAX_DATE_SERIAL } from './dates'
 
@@ -30,7 +32,7 @@ interface SingleObjectFunction extends BaseFunction {
 }
 type SingleObjectExecutor = new (name: string) => SingleObjectFunction
 
-const GROUPS = [functionCompatibility, functionDate, functionMath, functionStatistical] as unknown as Array<Array<[Executor, string]>>
+const GROUPS = [functionCompatibility, functionDate, functionFinancial, functionMath, functionStatistical] as unknown as Array<Array<[Executor, string]>>
 
 /** Univer's executor class for a function name. */
 function univerExecutor(name: string): Executor {
@@ -180,6 +182,71 @@ function createWorkday(): BaseFunction {
   })('WORKDAY')
 }
 
+/**
+ * ACCRINT: Univer reads calc_method straight from the argument, which for a cell
+ * reference is a 1×1 array (giving 0, FALSE): the accrued interest then always counted
+ * from the first interest date. Single values are handed over instead.
+ */
+function createAccrint(): BaseFunction {
+  const Base = univerExecutor('ACCRINT')
+  return new (class extends Base {
+    override calculate(...args: BaseValueObject[]): CalcResult {
+      return super.calculate(...args.map((arg) => (arg ? single(arg) : arg)))
+    }
+  })('ACCRINT')
+}
+
+/** A cell value as the criteria matcher sees it. */
+function criteriaCell(value: BaseValueObject | null | undefined | void): CriteriaCell {
+  if (!value || value.isNull()) return { kind: 'empty' }
+  if (value.isError()) return { kind: 'error', value: String(value.getValue()) }
+  if (value.isBoolean()) return { kind: 'boolean', value: Boolean(value.getValue()) }
+  if (value.isNumber()) return { kind: 'number', value: Number(value.getValue()) }
+  return { kind: 'text', value: String(value.getValue() ?? '') }
+}
+
+interface RangeReference extends BaseValueObject {
+  getRangePosition(): { startRow: number; endRow: number; startColumn: number; endColumn: number }
+  toArrayValueObject(): ArrayValueObject
+  isColumn(): boolean
+  isRow(): boolean
+}
+
+/** Excel's grid, which whole-column and whole-row references span (Univer's sheet is smaller). */
+const EXCEL_ROWS = 1_048_576
+const EXCEL_COLUMNS = 16_384
+
+/**
+ * COUNTIF: Univer leaves out empty cells for `<>x` (and the rows of a whole-column range
+ * past the data), coerces number-like text for `<>`, counts `<=` with an empty operand
+ * and differs on error criteria. Counted here with Excel's criteria (criteria.ts);
+ * criteria written as dates stay with Univer.
+ */
+function createCountif(): BaseFunction {
+  const Base = univerExecutor('COUNTIF') as unknown as SingleObjectExecutor
+  return new (class extends Base {
+    override _handleSingleObject(range: BaseValueObject, criteria: BaseValueObject) {
+      const matcher = criteriaMatcher(criteriaCell(single(criteria)))
+      if (!matcher || !range.isReferenceObject()) return super._handleSingleObject(range, criteria)
+      const reference = range as unknown as RangeReference
+      const { startRow, endRow, startColumn, endColumn } = reference.getRangePosition()
+      const rows = reference.isColumn() ? EXCEL_ROWS : endRow - startRow + 1
+      const columns = reference.isRow() ? EXCEL_COLUMNS : endColumn - startColumn + 1
+      const total = rows * columns
+      const array = reference.toArrayValueObject()
+      let count = 0
+      let seen = 0
+      array.iterator((value) => {
+        seen++
+        if (matcher(criteriaCell(value))) count++
+      })
+      // Cells of the range past the sheet's data are empty.
+      if (total > seen && matcher({ kind: 'empty' })) count += total - seen
+      return num(count)
+    }
+  })('COUNTIF')
+}
+
 /** ISO.CEILING: Univer knows the name but has no executor (#NAME?); Excel computes it as CEILING.PRECISE. */
 function createIsoCeiling(): BaseFunction {
   return new (univerExecutor('CEILING.PRECISE'))('ISO.CEILING')
@@ -217,7 +284,7 @@ function createEdate(): BaseFunction {
 }
 
 export function createExcelFunctionExecutors(): BaseFunction[] {
-  return [createBinomDist(), createBinomInv('BINOM.INV'), createBinomInv('CRITBINOM'), createNegbinomDist(), createWorkdayIntl(), createWorkday(), createIsoCeiling(), createEdate()]
+  return [createBinomDist(), createBinomInv('BINOM.INV'), createBinomInv('CRITBINOM'), createNegbinomDist(), createWorkdayIntl(), createWorkday(), createAccrint(), createCountif(), createIsoCeiling(), createEdate()]
 }
 
 /** Registers the corrected executors on every Univer the editor creates (patches/sheets-univer-hook.patch). */

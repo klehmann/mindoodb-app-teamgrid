@@ -70,8 +70,49 @@ describe('other corrections', () => {
     expect(run('WORKDAY', n(45667), n(10))).toBe(45681)
   })
 
+  it('ACCRINT takes calc_method from a cell (a 1×1 array)', async () => {
+    const { ArrayValueObject } = await import('@univerjs/engine-formula')
+    const cell = (value: boolean) => ArrayValueObject.create({ calculateValueList: [[b(value)]], rowCount: 1, columnCount: 1, unitId: '', sheetId: '', row: 0, column: 0 })
+    const args = [n(43435), n(44531), n(43983), n(0.1), n(1000), n(1), n(0)]
+    expect(run('ACCRINT', ...args, cell(true))).toBeCloseTo(150, 9)
+    expect(run('ACCRINT', ...args, cell(false))).toBeCloseTo(-50, 9)
+  })
+
   it('ISO.CEILING exists and computes like CEILING.PRECISE', () => {
     expect(run('ISO.CEILING', n(4.3), n(2))).toBe(6)
     expect(run('ISO.CEILING', n(-4.3), n(2))).toBe(-4)
+  })
+})
+
+describe('COUNTIF criteria', async () => {
+  const { criteriaMatcher, readNumber } = await import('./criteria')
+  const cells = [
+    { kind: 'number', value: 23 },
+    { kind: 'text', value: '23' },
+    { kind: 'boolean', value: true },
+    { kind: 'number', value: 1 },
+    { kind: 'text', value: 'Mr. Brown' },
+    { kind: 'error', value: '#N/A' },
+    { kind: 'text', value: '' },
+    { kind: 'empty' },
+  ] as const
+  const count = (criterion: Parameters<typeof criteriaMatcher>[0]) => cells.filter(criteriaMatcher(criterion)!).length
+  const text = (value: string) => ({ kind: 'text', value }) as const
+
+  it('follows Excel on IronCalc countif.xlsx cases', () => {
+    expect(count({ kind: 'number', value: 23 })).toBe(2)
+    expect(count(text('=23'))).toBe(2)
+    expect(count(text('<>23'))).toBe(7)
+    expect(count(text('<23'))).toBe(1)
+    expect(count(text('<>*brown'))).toBe(7)
+    expect(count(text('=*BROWN'))).toBe(1)
+    expect(count(text('#N/A'))).toBe(1)
+    expect(count(text(''))).toBe(2)
+    expect(count(text('<>'))).toBe(7)
+    expect(count(text('<='))).toBe(0)
+    expect(count({ kind: 'empty' })).toBe(0)
+    expect(count(text('TRUE'))).toBe(1)
+    expect(readNumber('50%')).toBe(0.5)
+    expect(criteriaMatcher(text('>1/1/2020'))).toBeUndefined()
   })
 })
