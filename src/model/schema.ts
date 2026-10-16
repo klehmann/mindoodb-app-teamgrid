@@ -110,6 +110,12 @@ export interface Cell extends StyleFields, LegacyStyleRef {
   note?: { author: string; text: string; thread?: NoteThread }
   /** Hyperlink target: a URL, or `#Sheet!A1` inside the workbook. */
   link?: string
+  /**
+   * A legacy array (CSE) formula, or an Excel 365 one stored as an array, fills the
+   * range from this cell to here (`<f t="array" ref>`); by ids, so it moves with
+   * inserted and deleted rows and columns.
+   */
+  arrayEnd?: { rowId: RowId; columnId: ColumnId }
 }
 
 /** A threaded (modern) comment on a note: who started it, its replies; the root text is the note's. */

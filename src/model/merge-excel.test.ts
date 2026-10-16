@@ -174,7 +174,7 @@ const value = (request: WorkbookSaveRequest, sheetId: string, address: string, c
   )
 }
 
-describe.skipIf(!nodeEngineAvailable)('concurrent edits of Excel workbooks', () => {
+describe.skipIf(!nodeEngineAvailable)('concurrent edits of Excel workbooks', { timeout: 60_000 }, () => {
   it('shifts a new formula with a row someone else inserted above it (IronCalc EDATE)', async () => {
     const engine = createNodeEngine()
     const host = new AutomergeTestHost()
@@ -223,6 +223,31 @@ describe.skipIf(!nodeEngineAvailable)('concurrent edits of Excel workbooks', () 
     expect(cells.get('A3')).toBe('v:s:B changed this')
     expect(cells.get('A1')).toBeUndefined()
     expect([...cells.values()].filter((v) => v.includes('changed'))).toHaveLength(1)
+  })
+
+  it('keeps array formulas and moves them with a row someone else inserted (Excel array_formula01, IronCalc MMULT)', async () => {
+    const engine = createNodeEngine()
+    for (const name of ['rxw-array-formula01', 'ironcalc-mmult']) {
+      const host = new AutomergeTestHost()
+      const id = await importExcel(host, engine, corpus(name))
+      const before = (await opened(host, engine, id)).sheets[0]!
+      const arrays = [...before.cells].filter(([, content]) => content.startsWith('f:{=}'))
+      expect(arrays.length, name).toBeGreaterThan(0)
+      const merged = await concurrently(
+        host,
+        engine,
+        id,
+        (session, request) => insert(session, request, 'rows', 1),
+        (session, request) => value(request, session.file.sheets[0]!.id, 'Z1', 'B was here'),
+      )
+      const after = merged.sheets[0]!.cells
+      const down = (ref: string) => ref.replace(/([A-Z]+)(\d+)/g, (_, column: string, row: string) => `${column}${Number(row) + 1}`)
+      for (const [address, content] of arrays) {
+        const [, ref, formula] = /^f:\{=\}([^:]+(?::[A-Z]+\d+)?):(.*)$/.exec(content)!
+        expect(after.get(down(address)), `${name} ${address}`).toBe(`f:{=}${down(ref!)}:${down(formula!)}`)
+      }
+      expect(after.get('Z2')).toBe('v:s:B was here')
+    }
   })
 
   it('keeps a table when one person widens a column and the other writes into the table (Excel table01)', async () => {

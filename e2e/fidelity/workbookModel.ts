@@ -246,7 +246,9 @@ export async function readWorkbookModel(bytes: Uint8Array): Promise<WorkbookMode
               formula = master ? offsetFormulaRefs(master.formula, rowNumber - master.row, column - master.column) : ''
             }
           }
-          sheet.cells.set(address, `f:${normalizeFormula(formula)}`)
+          // Array (CSE) formulas keep their range: `{=SUM(A1:B1*A2:B2)}` over A1:A3
+          const array = typeof f === 'object' && f.t === 'array' ? `{=}${f.ref ?? address}:` : ''
+          sheet.cells.set(address, `f:${array}${normalizeFormula(formula)}`)
         } else {
           const v = value(c, shared)
           if (v) sheet.cells.set(address, `v:${v}`)
