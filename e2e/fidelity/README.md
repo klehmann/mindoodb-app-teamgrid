@@ -27,8 +27,7 @@ results without recalculating them; they are listed in the report and not compar
 corpus entry with `skip` (a known failure such as TeamGrid stopping to respond) is
 marked fixme.
 
-State on 2026-10-16: 67,639 of 71,592 formula cells match Excel (94.5 %); 90 of 220
-workbooks and 179 of 428 functions without differences. The round trip runs over 545
+State on 2026-10-16: 68,625 of 71,592 formula cells match Excel (95.9 %). The round trip runs over 545
 workbooks; every one loses its document properties (docProps), and formats, values,
 formulas, defined names and page breaks change in some (see the report).
 

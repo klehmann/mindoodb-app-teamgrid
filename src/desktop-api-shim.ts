@@ -24,6 +24,7 @@ import {
 } from './haven/connection'
 import { installFillSeries } from './fill-series'
 import { installExcelFunctions } from './formulas/excel-functions'
+import { installImplicitIntersection } from './formulas/implicit-intersection'
 import { activeWorkbook, installUniverAccess } from './univer-access'
 import { installFileMenu, type FileAction } from './haven/file-menu'
 import { hideBanner, showBanner } from './haven/banner'
@@ -168,6 +169,12 @@ let timeTravelDate: number | null = null
 
 /** The file the editor was last given (open, reopen after a save). */
 let activeFile: WorkbookFile | null = null
+/** Masters of legacy array (CSE) formulas in the open file, `sheetId:row:column`; they keep their arrays. */
+const arrayFormulaCells = new Set<string>()
+
+function rememberArrayFormulas(sheetId: string, cells: ReadonlyArray<{ row: number; column: number; arrayRef?: string }> | undefined) {
+  for (const cell of cells ?? []) if (cell.arrayRef) arrayFormulaCells.add(`${sheetId}:${cell.row}:${cell.column}`)
+}
 
 /**
  * Whether the editor shows `activeFile` yet: it keeps showing the previous
@@ -180,6 +187,7 @@ function editorShowsActiveFile(): boolean {
 }
 
 function opened(file: WorkbookFile, revisionOf: string | null = null): WorkbookFile {
+  if (activeSessionId !== file.sessionId) arrayFormulaCells.clear()
   activeSessionId = file.sessionId
   activeFile = file
   historicalOf = revisionOf
@@ -466,8 +474,16 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
       if (!file) return null
       return opened(await openWorkbookBytes(new Uint8Array(await file.arrayBuffer()), file.name, language))
     },
-    readWorkbookRange: async (request) => (await loadXlsxEngine()).readRange(request) as never,
-    readWorkbookFormulas: async (request) => (await loadXlsxEngine()).readFormulaCells(request) as never,
+    async readWorkbookRange(request) {
+      const result = (await (await loadXlsxEngine()).readRange(request)) as { cells?: Array<{ row: number; column: number; arrayRef?: string }> }
+      rememberArrayFormulas(request.sheetId, result.cells)
+      return result as never
+    },
+    async readWorkbookFormulas(request) {
+      const result = (await (await loadXlsxEngine()).readFormulaCells(request)) as { cells?: Array<{ row: number; column: number; arrayRef?: string }> }
+      rememberArrayFormulas(request.sheetId, result.cells)
+      return result as never
+    },
     findWorkbookCells: async (request) => (await loadXlsxEngine()).findCells(request) as never,
     readWorkbookRowOutline: async (request) => (await loadXlsxEngine()).readRowOutline(request) as never,
     // Threaded comments are signed with the Haven user's name.
@@ -509,6 +525,7 @@ export async function installDesktopApiShim(): Promise<void> {
   welcomeLanguage = (haven?.context.locale ?? navigator.language).slice(0, 2).toLowerCase()
   installFillSeries(() => welcomeLanguage)
   installExcelFunctions()
+  installImplicitIntersection((sheetId, row, column) => arrayFormulaCells.has(`${sheetId}:${row}:${column}`))
   installUniverAccess()
   const api = new Proxy(createApi(haven), {
     get(target, property) {
