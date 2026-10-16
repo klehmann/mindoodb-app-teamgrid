@@ -105,6 +105,7 @@
  },
  "ironcalc-choosecols-chooserows": {
   "formats": 92,
+  "formulas": 3,
   "parts": 2
  },
  "ironcalc-combin-combina": {
@@ -228,6 +229,7 @@
  },
  "ironcalc-drop-take": {
   "formats": 79,
+  "formulas": 7,
   "parts": 5
  },
  "ironcalc-dvar-dvarp-dstdev-dstdevp": {
@@ -277,6 +279,7 @@
  },
  "ironcalc-expand": {
   "formats": 41,
+  "formulas": 2,
   "parts": 2,
   "values": 12
  },
@@ -301,6 +304,7 @@
  },
  "ironcalc-filter-errors": {
   "formats": 29,
+  "formulas": 1,
   "parts": 5
  },
  "ironcalc-find-search": {
@@ -359,6 +363,7 @@
  },
  "ironcalc-hstack-vstack": {
   "formats": 67,
+  "formulas": 4,
   "parts": 2,
   "values": 3
  },
@@ -387,6 +392,7 @@
  },
  "ironcalc-index": {
   "formats": 20,
+  "formulas": 1,
   "parts": 2
  },
  "ironcalc-intrate": {
@@ -415,6 +421,7 @@
  },
  "ironcalc-isref": {
   "formats": 49,
+  "formulas": 2,
   "parts": 7
  },
  "ironcalc-isref-isformula-isodd-iseven": {
@@ -454,16 +461,19 @@
  },
  "ironcalc-makearray": {
   "formats": 9,
+  "formulas": 1,
   "parts": 2
  },
  "ironcalc-map-reduce": {
   "formats": 19,
+  "formulas": 1,
   "parts": 2
  },
  "ironcalc-match": {
   "parts": 3
  },
  "ironcalc-match-lookup-arrays": {
+  "formulas": 16,
   "parts": 4
  },
  "ironcalc-max-min": {
@@ -476,6 +486,7 @@
  },
  "ironcalc-mid-left-right-arrays": {
   "formats": 222,
+  "formulas": 2,
   "parts": 2,
   "values": 38
  },
@@ -492,6 +503,7 @@
  },
  "ironcalc-minus-minus": {
   "formats": 84,
+  "formulas": 1,
   "parts": 2,
   "values": 3
  },
@@ -654,6 +666,7 @@
  },
  "ironcalc-scan": {
   "formats": 18,
+  "formulas": 2,
   "parts": 2
  },
  "ironcalc-sequence": {
@@ -763,6 +776,7 @@
  },
  "ironcalc-textsplit": {
   "formats": 88,
+  "formulas": 11,
   "parts": 2,
   "values": 3
  },
@@ -780,6 +794,7 @@
  },
  "ironcalc-tocol": {
   "formats": 88,
+  "formulas": 5,
   "parts": 2,
   "values": 3
  },
@@ -813,6 +828,7 @@
  },
  "ironcalc-upper-lower": {
   "formats": 56,
+  "formulas": 4,
   "parts": 2
  },
  "ironcalc-variance": {
@@ -839,6 +855,7 @@
  },
  "ironcalc-wrapcols-rows": {
   "formats": 45,
+  "formulas": 4,
   "parts": 2,
   "values": 7
  },

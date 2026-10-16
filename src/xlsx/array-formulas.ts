@@ -28,7 +28,9 @@ export async function applyArrayFormulas(bytes: Uint8Array, arrays: ReadonlyMap<
     if (!cells || !path) continue
     const xml = await zip.file(path)?.async('text')
     if (!xml) continue
-    const next = xml.replace(/(<c\b[^>]*\br="([A-Z]+\d+)"[^>]*>)<f>/g, (whole, open: string, address: string) => {
+    // GenOffice marks a formula with a spilling function as a one-cell array (ref = its own
+    // address); the stored range wins there too.
+    const next = xml.replace(/(<c\b[^>]*\br="([A-Z]+\d+)"[^>]*>)<f(?: t="array" ref="[^"]*")?>/g, (whole, open: string, address: string) => {
       const ref = cells.get(address)
       return ref ? `${open}<f t="array" ref="${ref}">` : whole
     })

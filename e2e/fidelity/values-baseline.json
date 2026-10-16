@@ -1320,42 +1320,7 @@
   "Sheet1!C6"
  ],
  "ironcalc-erfs": [],
- "ironcalc-error-broadcast": [
-  "Sheet1!E14",
-  "Sheet1!E15",
-  "Sheet1!E24",
-  "Sheet1!E26",
-  "Sheet1!E27",
-  "Sheet1!E28",
-  "Sheet1!E29",
-  "Sheet1!E31",
-  "Sheet1!E32",
-  "Sheet1!E33",
-  "Sheet1!E35",
-  "Sheet1!E36",
-  "Sheet1!E40",
-  "Sheet1!E43",
-  "Sheet1!E44",
-  "Sheet1!E46",
-  "Sheet1!E47",
-  "Sheet1!E49",
-  "Sheet1!E50",
-  "Sheet1!E56",
-  "Sheet1!E57",
-  "Sheet1!E58",
-  "Sheet1!E63",
-  "Sheet1!E64",
-  "Sheet1!E65",
-  "Sheet1!E68",
-  "Sheet1!E69",
-  "Sheet1!E74",
-  "Sheet1!E75",
-  "Sheet1!E76",
-  "Sheet1!E80",
-  "Sheet1!E81",
-  "Sheet1!E82",
-  "Sheet1!E83"
- ],
+ "ironcalc-error-broadcast": [],
  "ironcalc-error-type": [
   "Sheet1!B14",
   "Sheet1!B8"
@@ -2452,16 +2417,9 @@
   "VLOOKUP!N14"
  ],
  "ironcalc-hypergeom-dist": [],
- "ironcalc-if-array": [
-  "Sheet1!A8",
-  "Sheet2!F1"
- ],
+ "ironcalc-if-array": [],
  "ironcalc-iferror": [
-  "Sheet1!C12",
-  "Sheet1!C27",
-  "Sheet1!C37",
-  "Sheet1!C44",
-  "Sheet1!C49"
+  "Sheet1!C12"
  ],
  "ironcalc-ifna": [
   "Sheet1!C8",
@@ -2520,10 +2478,7 @@
   "LCM_GCD!E36"
  ],
  "ironcalc-let": [],
- "ironcalc-linest-logest": [
-  "Sheet1!D5",
-  "Sheet1!G5"
- ],
+ "ironcalc-linest-logest": [],
  "ironcalc-log-log10-ln": [
   "LN!B15",
   "LN!B16",
@@ -2569,10 +2524,7 @@
   "Sheet1!G2",
   "Sheet1!H2"
  ],
- "ironcalc-mid-left-right-arrays": [
-  "Sheet2!A12",
-  "Sheet2!C17"
- ],
+ "ironcalc-mid-left-right-arrays": [],
  "ironcalc-min-max": [],
  "ironcalc-min-max-extras": [],
  "ironcalc-mina-maxa": [],
@@ -2583,11 +2535,6 @@
   "Sheet1!A13",
   "Sheet1!A14",
   "Sheet1!A15",
-  "Sheet1!A19",
-  "Sheet1!A26",
-  "Sheet1!A27",
-  "Sheet1!A33",
-  "Sheet1!A44",
   "Sheet1!A50",
   "Sheet1!A52",
   "Sheet1!A9",
@@ -2595,12 +2542,7 @@
   "Sheet1!C11",
   "Sheet1!C12",
   "Sheet1!C13",
-  "Sheet1!C33",
-  "Sheet1!C35",
-  "Sheet1!C37",
-  "Sheet1!C9",
-  "Sheet1!D27",
-  "Sheet1!H27"
+  "Sheet1!C9"
  ],
  "ironcalc-mirr": [
   "Sheet2!N15",
@@ -2621,6 +2563,7 @@
   "Two Parameters!E7"
  ],
  "ironcalc-mmult": [
+  "Sheet1!E28",
   "Sheet1!E30",
   "Sheet1!E32",
   "Sheet1!E40",
@@ -2709,8 +2652,7 @@
  ],
  "ironcalc-power": [
   "Sheet1!D3",
-  "Sheet1!F9",
-  "both_arguments_are_ranges!E1"
+  "Sheet1!F9"
  ],
  "ironcalc-price-yield": [
   "ODDFPRICE_ODDFYIELD!J2",
@@ -2771,9 +2713,7 @@
   "Sheet1!G17",
   "Sheet1!G20"
  ],
- "ironcalc-regex": [
-  "REGEXEXTRACT!A4"
- ],
+ "ironcalc-regex": [],
  "ironcalc-rept": [],
  "ironcalc-round": [
   "Sheet1!A40",
@@ -2842,9 +2782,7 @@
   "Sheet1!H7"
  ],
  "ironcalc-sheet-sheets": [],
- "ironcalc-simple-arrays": [
-  "Sheet1!C1"
- ],
+ "ironcalc-simple-arrays": [],
  "ironcalc-simple-functions": [
   "Implicit Intersection!H14"
  ],
@@ -2882,9 +2820,7 @@
   "Sheet1!P8"
  ],
  "ironcalc-substitute": [],
- "ironcalc-sumif-array": [
-  "Sheet1!G18"
- ],
+ "ironcalc-sumif-array": [],
  "ironcalc-sumif-average-if": [
   "Sheet1!E6",
   "Sheet1!J6",
@@ -3278,9 +3214,7 @@
  "ironcalc-xmatch": [
   "Sheet1!B14",
   "Sheet1!D6",
-  "Sheet1!D7",
-  "Sheet1!E6",
-  "Sheet1!E7"
+  "Sheet1!D7"
  ],
  "ironcalc-xmatch-arrays": [
   "Sheet1!B12"
