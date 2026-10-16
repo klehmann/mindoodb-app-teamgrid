@@ -132,6 +132,29 @@ export class AutomergeTestHost {
     return copy
   }
 
+  /**
+   * Paths of the strings a document stores as collaborative text (Automerge
+   * reads those as plain strings; atomic values as ImmutableStrings).
+   */
+  textPaths(id: string): string[] {
+    const paths: string[] = []
+    const walk = (value: unknown, path: string) => {
+      if (typeof value === 'string') paths.push(path)
+      else if (value instanceof A.ImmutableString || value instanceof A.Float64) return
+      else if (Array.isArray(value)) value.forEach((entry, index) => walk(entry, `${path}[${index}]`))
+      else if (value && typeof value === 'object') {
+        for (const [key, entry] of Object.entries(value)) walk(entry, path ? `${path}.${key}` : key)
+      }
+    }
+    walk(this.docs.get(id), '')
+    return paths
+  }
+
+  /** Ids of every document on this replica. */
+  documentIds(): string[] {
+    return [...this.docs.keys()]
+  }
+
   private snapshot(id: string): MindooDBAppDocument {
     const doc = this.docs.get(id)!
     return { id, data: plain(doc) as Record<string, unknown>, heads: A.getHeads(doc) }
