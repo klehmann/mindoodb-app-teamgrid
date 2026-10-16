@@ -42,6 +42,9 @@ function text(node: Node): string {
   return typeof node === 'object' ? String(node['#text'] ?? '') : String(node)
 }
 
+/** Characters XML cannot hold are written as _xHHHH_ (ECMA-376 ST_Xstring; "_x005F_" escapes the underscore). */
+const unescapeXstring = (value: string) => value.replace(/_x([0-9A-Fa-f]{4})_/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+
 async function xml(zip: JSZip, path: string): Promise<Record<string, any>> {
   const file = zip.file(path)
   if (!file) throw new Error(`The workbook has no ${path}`)
@@ -57,7 +60,7 @@ export async function readWorkbookCells(bytes: Uint8Array): Promise<WorkbookCell
   )
   const shared: string[] = zip.file('xl/sharedStrings.xml')
     ? ((await xml(zip, 'xl/sharedStrings.xml')).sst.si ?? []).map((si: { t?: Node; r?: Array<{ t?: Node }> }) =>
-        si.t !== undefined ? text(si.t) : (si.r ?? []).map((run) => text(run.t)).join(''),
+        unescapeXstring(si.t !== undefined ? text(si.t) : (si.r ?? []).map((run) => text(run.t)).join('')),
       )
     : []
   const app = zip.file('docProps/app.xml') ? await zip.file('docProps/app.xml')!.async('text') : ''
@@ -88,7 +91,8 @@ export async function readWorkbookCells(bytes: Uint8Array): Promise<WorkbookCell
         if (raw !== null) {
           if (c.t === 's') value = shared[Number(raw)] ?? ''
           else if (c.t === 'b') value = raw === '1'
-          else if (c.t !== 'str' && c.t !== 'e' && c.t !== 'inlineStr') value = Number(raw)
+          else if (c.t === 'str') value = unescapeXstring(raw)
+          else if (c.t !== 'e' && c.t !== 'inlineStr') value = Number(raw)
         } else if (c.t === 'str') {
           value = ''
         }

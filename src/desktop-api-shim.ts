@@ -23,6 +23,7 @@ import {
   type HavenConnection,
 } from './haven/connection'
 import { installFillSeries } from './fill-series'
+import { installTextValues } from './formulas/text-values'
 import { installExcelFunctions } from './formulas/excel-functions'
 import { installImplicitIntersection } from './formulas/implicit-intersection'
 import { activeWorkbook, installUniverAccess } from './univer-access'
@@ -525,6 +526,7 @@ export async function installDesktopApiShim(): Promise<void> {
   welcomeLanguage = (haven?.context.locale ?? navigator.language).slice(0, 2).toLowerCase()
   installFillSeries(() => welcomeLanguage)
   installExcelFunctions()
+  installTextValues()
   installImplicitIntersection((sheetId, row, column) => arrayFormulaCells.has(`${sheetId}:${row}:${column}`))
   installUniverAccess()
   const api = new Proxy(createApi(haven), {

@@ -13,12 +13,15 @@ import {
   ErrorValueObject,
   functionCompatibility,
   functionDate,
+  functionEngineering,
   functionFinancial,
   functionLookup,
   functionMath,
   functionStatistical,
+  functionText,
   IFunctionService,
   NumberValueObject,
+  StringValueObject,
 } from '@univerjs/engine-formula'
 
 import { criteriaMatcher, type CriteriaCell } from './criteria'
@@ -33,7 +36,7 @@ interface SingleObjectFunction extends BaseFunction {
 }
 type SingleObjectExecutor = new (name: string) => SingleObjectFunction
 
-const GROUPS = [functionCompatibility, functionDate, functionFinancial, functionLookup, functionMath, functionStatistical] as unknown as Array<Array<[Executor, string]>>
+const GROUPS = [functionCompatibility, functionDate, functionEngineering, functionFinancial, functionLookup, functionMath, functionStatistical, functionText] as unknown as Array<Array<[Executor, string]>>
 
 /** Univer's executor class for a function name. */
 function univerExecutor(name: string): Executor {
@@ -248,6 +251,52 @@ function createCountif(): BaseFunction {
   })('COUNTIF')
 }
 
+/**
+ * COUNTIFS: the same differences as COUNTIF, per criteria pair. Counted here when every
+ * criterion is one value Excel's rules cover and the ranges have one shape; the cells of
+ * whole-column (or whole-row) ranges past the sheet's data are empty.
+ */
+function createCountifs(): BaseFunction {
+  const Base = univerExecutor('COUNTIFS')
+  return new (class extends Base {
+    override calculate(...variants: BaseValueObject[]): CalcResult {
+      if (variants.length < 2 || variants.length % 2 !== 0) return super.calculate(...variants)
+      const pairs: Array<{ array: ArrayValueObject; matcher: (cell: CriteriaCell) => boolean }> = []
+      let rows = 0
+      let columns = 0
+      for (let index = 0; index < variants.length; index += 2) {
+        const range = variants[index]!
+        const given = variants[index + 1]!
+        const criterion = single(given.isReferenceObject() ? (given as unknown as RangeReference).toArrayValueObject() : given)
+        const matcher = criterion.isArray() ? undefined : criteriaMatcher(criteriaCell(criterion))
+        if (!matcher || !range.isReferenceObject()) return super.calculate(...variants)
+        const reference = range as unknown as RangeReference
+        const { startRow, endRow, startColumn, endColumn } = reference.getRangePosition()
+        const height = reference.isColumn() ? EXCEL_ROWS : endRow - startRow + 1
+        const width = reference.isRow() ? EXCEL_COLUMNS : endColumn - startColumn + 1
+        if (pairs.length && (height !== rows || width !== columns)) return ErrorValueObject.create(ErrorType.VALUE)
+        rows = height
+        columns = width
+        pairs.push({ array: reference.toArrayValueObject(), matcher })
+      }
+      // Rows and columns any range has data in; past them every cell is empty.
+      const dataRows = Math.min(rows, Math.max(...pairs.map((pair) => pair.array.getRowCount())))
+      const dataColumns = Math.min(columns, Math.max(...pairs.map((pair) => pair.array.getColumnCount())))
+      const at = (array: ArrayValueObject, row: number, column: number): CriteriaCell =>
+        row < array.getRowCount() && column < array.getColumnCount() ? criteriaCell(array.get(row, column)) : { kind: 'empty' }
+      let count = 0
+      for (let row = 0; row < dataRows; row++) {
+        for (let column = 0; column < dataColumns; column++) {
+          if (pairs.every((pair) => pair.matcher(at(pair.array, row, column)))) count++
+        }
+      }
+      const rest = rows * columns - dataRows * dataColumns
+      if (rest > 0 && pairs.every((pair) => pair.matcher({ kind: 'empty' }))) count += rest
+      return num(count)
+    }
+  })('COUNTIFS')
+}
+
 /** ISO.CEILING: Univer knows the name but has no executor (#NAME?); Excel computes it as CEILING.PRECISE. */
 function createIsoCeiling(): BaseFunction {
   return new (univerExecutor('CEILING.PRECISE'))('ISO.CEILING')
@@ -306,8 +355,59 @@ function createOffset(): BaseFunction {
   })('OFFSET')
 }
 
+/**
+ * COMPLEX: an empty suffix (a blank cell or "") means "i" in Excel, as an omitted one
+ * does; Univer answered #VALUE!, and every IM* function over the result failed with it.
+ */
+function createComplex(): BaseFunction {
+  const Base = univerExecutor('COMPLEX')
+  const blank = (value: BaseValueObject | undefined): boolean => {
+    if (!value) return false
+    if (value.isArray()) {
+      const array = value as ArrayValueObject
+      return array.getRowCount() === 1 && array.getColumnCount() === 1 && blank(array.get(0, 0) ?? undefined)
+    }
+    return value.isNull() || (value.isString() && value.getValue() === '')
+  }
+  return new (class extends Base {
+    override calculate(realNum: BaseValueObject, iNum: BaseValueObject, suffix?: BaseValueObject): CalcResult {
+      return super.calculate(realNum, iNum, blank(suffix) ? StringValueObject.create('i') : (suffix as BaseValueObject))
+    }
+  })('COMPLEX')
+}
+
+/**
+ * UNICODE of empty text: Excel answers #VALUE! (as CODE does in Univer too), Univer's
+ * character code of nothing (NaN) showed as an empty cell.
+ */
+function createUnicode(): BaseFunction {
+  const Base = univerExecutor('UNICODE') as unknown as SingleObjectExecutor
+  return new (class extends Base {
+    override _handleSingleObject(text: BaseValueObject) {
+      return text.isString() && text.getValue() === '' ? ErrorValueObject.create(ErrorType.VALUE) : super._handleSingleObject(text)
+    }
+  })('UNICODE')
+}
+
 export function createExcelFunctionExecutors(): BaseFunction[] {
-  return [createBinomDist(), createBinomInv('BINOM.INV'), createBinomInv('CRITBINOM'), createNegbinomDist(), createWorkdayIntl(), createWorkday(), createAccrint(), createCountif(), createIsoCeiling(), createEdate(), createOffset()]
+  return [createBinomDist(), createBinomInv('BINOM.INV'), createBinomInv('CRITBINOM'), createNegbinomDist(), createWorkdayIntl(), createWorkday(), createAccrint(), createCountif(), createCountifs(), createIsoCeiling(), createEdate(), createOffset(), createComplex(), createUnicode()]
+}
+
+/**
+ * An exception in an executor aborts the engine's whole run (every later result stays
+ * empty): one of ours answers #VALUE! instead and reports it.
+ */
+function guarded(executor: BaseFunction): BaseFunction {
+  const calculate = executor.calculate.bind(executor)
+  executor.calculate = (...variants: BaseValueObject[]) => {
+    try {
+      return calculate(...variants)
+    } catch (error) {
+      console.error(`[TeamGrid] ${executor.name} failed`, error)
+      return ErrorValueObject.create(ErrorType.VALUE)
+    }
+  }
+  return executor
 }
 
 /** Registers the corrected executors on every Univer the editor creates (patches/sheets-univer-hook.patch). */
@@ -317,7 +417,7 @@ export function installExcelFunctions(): void {
   hook.teamGridOnUniver = (univer) => {
     previous?.(univer)
     const functionService = univer.__getInjector().get(IFunctionService)
-    const ours = new Map(createExcelFunctionExecutors().map((executor) => [executor.name, executor]))
+    const ours = new Map(createExcelFunctionExecutors().map((executor) => [executor.name, guarded(executor)]))
     // The formula plugin registers Univer's own executors again while it starts, after
     // this hook ran: whoever registers one of these names gets ours.
     const register = functionService.registerExecutors.bind(functionService)
