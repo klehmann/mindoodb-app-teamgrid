@@ -54,8 +54,9 @@ export class TeamGridHost {
       return await this.importOnce(title, bytes)
     } catch (error) {
       // The mock Haven's File handed through postMessage is now and then unreadable
-      // (NotReadableError) in long runs; a fresh import of the same bytes works.
+      // (NotReadableError) in long runs; a fresh mock Haven imports the same bytes.
       if (!String(error).includes('could not be read')) throw error
+      await this.open()
       return this.importOnce(title, bytes)
     }
   }

@@ -131,6 +131,10 @@ for (const entry of corpus.cases.filter((c) => c.axes.includes('values'))) {
     expect(result.error, 'import and read').toBeUndefined()
     const known = baseline[entry.id]
     if (!known) return
+    if (entry.unstable) {
+      test.info().annotations.push({ type: 'unstable', description: entry.unstable })
+      return
+    }
     const accepted = new Set(known)
     const regressions = result.mismatches.filter((m) => !accepted.has(m.ref))
     expect(

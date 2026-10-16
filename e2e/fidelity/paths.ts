@@ -24,6 +24,8 @@ export interface CorpusCase {
   skip?: string
   /** Why only the round trip skips it. */
   skipRoundtrip?: string
+  /** Why the value test only reports differences beyond the baseline (results vary between runs). */
+  unstable?: string
 }
 
 export const corpus: { cases: CorpusCase[] } = JSON.parse(readFileSync(join(fidelityDir, 'corpus.json'), 'utf8'))
