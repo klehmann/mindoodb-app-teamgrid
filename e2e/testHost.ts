@@ -50,6 +50,17 @@ export class TeamGridHost {
    * `streaming`: too large to load whole, so formulas keep Excel's stored results.
    */
   async importWorkbook(title: string, bytes: Uint8Array): Promise<{ sheets: SheetInfo[]; streaming: boolean }> {
+    try {
+      return await this.importOnce(title, bytes)
+    } catch (error) {
+      // The mock Haven's File handed through postMessage is now and then unreadable
+      // (NotReadableError) in long runs; a fresh import of the same bytes works.
+      if (!String(error).includes('could not be read')) throw error
+      return this.importOnce(title, bytes)
+    }
+  }
+
+  private async importOnce(title: string, bytes: Uint8Array): Promise<{ sheets: SheetInfo[]; streaming: boolean }> {
     const fileRef = await this.page.evaluate(
       ([name, base64]) =>
         window.__havenTestHost!.agent.importFile({
