@@ -1,9 +1,10 @@
-import { BooleanValueObject, NumberValueObject, type BaseValueObject } from '@univerjs/engine-formula'
+import { BooleanValueObject, NullValueObject, NumberValueObject, StringValueObject, type BaseValueObject } from '@univerjs/engine-formula'
 import { describe, expect, it } from 'vitest'
 
 import { addMonths, dateToSerial, serialToDate } from './dates'
 import { binomialCdf, negativeBinomialCdf, regularizedBeta } from './distributions'
 import { createExcelFunctionExecutors } from './excel-functions'
+import { installTextValues } from './text-values'
 
 const executor = (name: string) => {
   const found = createExcelFunctionExecutors().find((e) => e.name === name)
@@ -128,3 +129,24 @@ describe('COUNTIF criteria', async () => {
     expect(criteriaMatcher(text('>1/1/2020'))).toBeUndefined()
   })
 })
+
+describe('text as Excel reads it', () => {
+  it('trims spaces around a number but not around a date', () => {
+    installTextValues()
+    const convert = (text: string) => StringValueObject.create(text).convertToNumberObjectValue().getValue()
+    expect(convert(' 10 ')).toBe(10)
+    expect(convert('2024-01-10')).toBe(45301)
+    expect(convert(' 2024-01-10 ')).toBe('#VALUE!')
+    expect(convert(' 14:30 ')).toBe('#VALUE!')
+    expect(convert(' €100 ')).toBe(100)
+    expect(convert(' 50% ')).toBe(0.5)
+    expect(convert('')).toBe('#VALUE!')
+  })
+
+  it('COMPLEX takes an empty suffix as "i"', () => {
+    expect(run('COMPLEX', n(1.23), n(9.5121), NullValueObject.create())).toBe('1.23+9.5121i')
+    expect(run('COMPLEX', n(1), n(-2), StringValueObject.create(''))).toBe('1-2i')
+    expect(run('COMPLEX', n(1), n(-2), StringValueObject.create('j'))).toBe('1-2j')
+  })
+})
+
