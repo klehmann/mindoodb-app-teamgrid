@@ -34,7 +34,7 @@ pnpm build:wasm        # rebuild native/xlsx-wasm/pkg after changing the Rust wr
                        # toolchain 1.90+ with wasm32-unknown-unknown, and wasm-pack
 pnpm typecheck
 pnpm test             # model tests, incl. concurrent offline edits
-pnpm build:wasm:node   # lets `pnpm test` also run the xlsx round trips (visuals)
+pnpm build:wasm:node   # the same for Node (pkg-node/, committed too), which `pnpm test` uses for the xlsx round trips
 pnpm sync-genoffice    # take a newer GenOffice checkout (../../genoffice by default)
 ```
 
