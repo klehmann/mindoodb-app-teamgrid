@@ -158,7 +158,14 @@ export async function workbookToXlsx(workbook: Workbook, engine: XlsxEngine, opt
     return [{ name: name.name, formula, ...(sheetIndex === undefined ? {} : { sheetIndex }) }]
   })
   const names = new Map([...fileIds].map(([name, id]) => [id, name]))
+  // The gateway refuses new tables in a save with row/column operations on their sheet
+  // (row heights and column widths count), so tables get a save of their own.
+  const tables = emptySaveRequest('export')
+  tables.tableAdditions.push(...content.tableAdditions.splice(0))
   bytes = new Uint8Array((await saveWorkbookInBrowser(bytes, names, content)).bytes)
+  if (tables.tableAdditions.length > 0) {
+    bytes = new Uint8Array((await saveWorkbookInBrowser(bytes, names, tables)).bytes)
+  }
 
   // Pass 3: defined names (the gateway takes them only in a save without structural changes).
   if (definedNames.length > 0) {

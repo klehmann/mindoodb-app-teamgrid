@@ -1,6 +1,8 @@
 // Notes, hyperlinks, the autoFilter, print settings and tab colors through the
 // real pipeline: GenOffice's gateway writes the xlsx, the WASM sidecar (Node
 // build) reads it back. Skipped without native/xlsx-wasm/pkg-node.
+import { readFileSync } from 'node:fs'
+
 import { describe, expect, it } from 'vitest'
 
 import { blankXlsxBuffer } from '@genoffice/xlsx-gateway/gateway/csv-import'
@@ -211,6 +213,18 @@ describe('tables and sparklines', () => {
     const back = (await read(engine, (await workbookToXlsx(next, engine)).bytes)).sheets[0]!
     expect(back.meta.tables).toEqual(source.sheets[0]!.meta.tables)
     expect(back.meta.sparklines).toEqual(source.sheets[0]!.meta.sparklines)
+  })
+
+  it.skipIf(!nodeEngineAvailable)('writes a table on a sheet with custom column widths', async () => {
+    // Excel's table01 test file (rust_xlsxwriter corpus): the export's row/column
+    // operations once shared a save with the table, which the gateway refuses, so every
+    // such workbook failed to open.
+    const engine = createNodeEngine()
+    const bytes = new Uint8Array(readFileSync(new URL('../../e2e/fidelity/corpus/rxw-table01.xlsx', import.meta.url)))
+    const source = await read(engine, bytes)
+    const { next } = syncWorkbook({ stored: emptyStoredWorkbook(), storedIdByFileId: new Map(), read: source, tableParts: await extractTableParts(bytes) })
+    const back = (await read(engine, (await workbookToXlsx(next, engine)).bytes)).sheets[0]!
+    expect(back.meta.tables?.map((table) => table.name)).toEqual(source.sheets[0]!.meta.tables?.map((table) => table.name))
   })
 })
 
