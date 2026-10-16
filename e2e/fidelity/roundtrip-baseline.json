@@ -1,0 +1,1876 @@
+{
+ "ironcalc-abs": {
+  "formats": 11,
+  "parts": 2
+ },
+ "ironcalc-accrint": {
+  "parts": 2
+ },
+ "ironcalc-accrint-accrintm": {
+  "formats": 105,
+  "parts": 2
+ },
+ "ironcalc-accrint-cases": {
+  "formats": 2408,
+  "parts": 2
+ },
+ "ironcalc-accrint-extended": {
+  "formats": 454,
+  "parts": 2
+ },
+ "ironcalc-accrintm": {
+  "formats": 50,
+  "parts": 2
+ },
+ "ironcalc-address": {
+  "formats": 70,
+  "parts": 3
+ },
+ "ironcalc-and-or-xor": {
+  "parts": 3
+ },
+ "ironcalc-arabic-roman": {
+  "parts": 3
+ },
+ "ironcalc-arithmetic": {
+  "parts": 3
+ },
+ "ironcalc-array-in-scalar-repro": {
+  "formats": 4,
+  "parts": 3,
+  "rows": 744
+ },
+ "ironcalc-arraytotext": {
+  "formats": 10,
+  "formulas": 2,
+  "parts": 2
+ },
+ "ironcalc-atan2-power": {
+  "formats": 45,
+  "parts": 2
+ },
+ "ironcalc-avedev": {
+  "formats": 8,
+  "parts": 2
+ },
+ "ironcalc-average": {
+  "parts": 3,
+  "values": 1
+ },
+ "ironcalc-base": {
+  "formats": 114,
+  "parts": 2
+ },
+ "ironcalc-bessel": {
+  "formats": 121,
+  "parts": 2
+ },
+ "ironcalc-beta-gamma": {
+  "formats": 97,
+  "parts": 2
+ },
+ "ironcalc-betadist-betainv": {
+  "columns": 3,
+  "parts": 3
+ },
+ "ironcalc-binom": {
+  "parts": 3,
+  "values": 1
+ },
+ "ironcalc-bits": {
+  "formats": 133,
+  "parts": 2
+ },
+ "ironcalc-bycol-byrow": {
+  "formats": 11,
+  "parts": 2
+ },
+ "ironcalc-cell": {
+  "parts": 3
+ },
+ "ironcalc-char": {
+  "formats": 514,
+  "parts": 2
+ },
+ "ironcalc-chisq": {
+  "formats": 24,
+  "parts": 2
+ },
+ "ironcalc-chisq-test": {
+  "formats": 9,
+  "parts": 2
+ },
+ "ironcalc-choose": {
+  "parts": 2
+ },
+ "ironcalc-choosecols-chooserows": {
+  "formats": 92,
+  "parts": 2
+ },
+ "ironcalc-combin-combina": {
+  "parts": 2
+ },
+ "ironcalc-complexs": {
+  "formats": 1036,
+  "parts": 2
+ },
+ "ironcalc-concat": {
+  "parts": 3
+ },
+ "ironcalc-concatenate": {
+  "formats": 50,
+  "parts": 2
+ },
+ "ironcalc-confidence": {
+  "parts": 4
+ },
+ "ironcalc-consume-string": {
+  "formats": 11,
+  "parts": 2
+ },
+ "ironcalc-convert": {
+  "formats": 502,
+  "parts": 2,
+  "values": 3
+ },
+ "ironcalc-correl-slope-intercept-rsq-steyx": {
+  "formats": 36,
+  "parts": 2
+ },
+ "ironcalc-count": {
+  "parts": 3,
+  "values": 1
+ },
+ "ironcalc-countif": {
+  "parts": 3,
+  "values": 8
+ },
+ "ironcalc-countifs": {
+  "parts": 3,
+  "values": 4
+ },
+ "ironcalc-coupdays": {
+  "formats": 250,
+  "parts": 2
+ },
+ "ironcalc-covariance": {
+  "parts": 4
+ },
+ "ironcalc-cumprinc-cumipmt": {
+  "formats": 150,
+  "parts": 2
+ },
+ "ironcalc-date": {
+  "columns": 1,
+  "formats": 223,
+  "parts": 4
+ },
+ "ironcalc-date-day-month-year": {
+  "parts": 3
+ },
+ "ironcalc-datevalue": {
+  "parts": 5
+ },
+ "ironcalc-datevalue-issue-1379": {
+  "parts": 4
+ },
+ "ironcalc-datevalue-issue-1380": {
+  "parts": 4
+ },
+ "ironcalc-daverage": {
+  "formats": 58,
+  "parts": 2
+ },
+ "ironcalc-day-month-year": {
+  "parts": 5
+ },
+ "ironcalc-days-days360": {
+  "formats": 5,
+  "parts": 4
+ },
+ "ironcalc-db-ddb": {
+  "formats": 224,
+  "parts": 2
+ },
+ "ironcalc-dcount-dcounta-dget-dproduct": {
+  "columns": 2,
+  "formats": 243,
+  "parts": 2,
+  "values": 6
+ },
+ "ironcalc-defined-names": {
+  "formats": 49,
+  "parts": 2
+ },
+ "ironcalc-defined-names-for-unit-test": {
+  "formats": 13,
+  "parts": 2
+ },
+ "ironcalc-degrees-radians": {
+  "parts": 2
+ },
+ "ironcalc-devsq": {
+  "formats": 11,
+  "parts": 2
+ },
+ "ironcalc-disc": {
+  "formats": 88,
+  "parts": 2
+ },
+ "ironcalc-dmin-dmax-daverage-dsum": {
+  "formats": 82,
+  "parts": 2,
+  "values": 2
+ },
+ "ironcalc-dollars": {
+  "formats": 36,
+  "parts": 2
+ },
+ "ironcalc-drop-take": {
+  "formats": 79,
+  "parts": 5
+ },
+ "ironcalc-dvar-dvarp-dstdev-dstdevp": {
+  "formats": 82,
+  "parts": 2,
+  "values": 2
+ },
+ "ironcalc-edate": {
+  "columns": 7,
+  "parts": 5
+ },
+ "ironcalc-eomonth": {
+  "formats": 50,
+  "parts": 4
+ },
+ "ironcalc-eomonth-issue-1388": {
+  "formats": 5,
+  "parts": 4
+ },
+ "ironcalc-erfs": {
+  "formats": 34,
+  "parts": 2
+ },
+ "ironcalc-error-broadcast": {
+  "formats": 323,
+  "parts": 5,
+  "values": 121
+ },
+ "ironcalc-error-type": {
+  "formats": 27,
+  "parts": 6,
+  "values": 6
+ },
+ "ironcalc-escape-strings": {
+  "parts": 2
+ },
+ "ironcalc-even-odd": {
+  "parts": 2,
+  "values": 1
+ },
+ "ironcalc-exact": {
+  "formats": 19,
+  "parts": 2
+ },
+ "ironcalc-exp-sign": {
+  "parts": 3
+ },
+ "ironcalc-expand": {
+  "formats": 41,
+  "parts": 2,
+  "values": 12
+ },
+ "ironcalc-expon-dist": {
+  "formats": 11,
+  "parts": 2
+ },
+ "ironcalc-expondist": {
+  "parts": 2
+ },
+ "ironcalc-f-dist": {
+  "formats": 24,
+  "parts": 2
+ },
+ "ironcalc-f-test": {
+  "formats": 22,
+  "parts": 2
+ },
+ "ironcalc-fact-doublefact": {
+  "formats": 23,
+  "parts": 2
+ },
+ "ironcalc-filter-errors": {
+  "formats": 29,
+  "parts": 5
+ },
+ "ironcalc-find-search": {
+  "parts": 2
+ },
+ "ironcalc-fisher": {
+  "formats": 18,
+  "parts": 2
+ },
+ "ironcalc-fisher-fisherinv": {
+  "parts": 2
+ },
+ "ironcalc-floor-ceiling": {
+  "parts": 3
+ },
+ "ironcalc-formulatext": {
+  "formats": 4,
+  "parts": 2
+ },
+ "ironcalc-frequency": {
+  "formats": 90,
+  "parts": 3
+ },
+ "ironcalc-fv": {
+  "formats": 105,
+  "parts": 2
+ },
+ "ironcalc-fvschedule": {
+  "formats": 11,
+  "parts": 2
+ },
+ "ironcalc-gamma": {
+  "parts": 2
+ },
+ "ironcalc-gammaln-gammalnprecise": {
+  "parts": 2
+ },
+ "ironcalc-gauss": {
+  "parts": 2
+ },
+ "ironcalc-gcd-lcm": {
+  "formats": 254,
+  "parts": 3,
+  "values": 2
+ },
+ "ironcalc-geomean": {
+  "columns": 34,
+  "formats": 116,
+  "parts": 1,
+  "rows": 1488,
+  "values": 1
+ },
+ "ironcalc-gestep-delta": {
+  "formats": 30,
+  "parts": 2
+ },
+ "ironcalc-hstack-vstack": {
+  "formats": 67,
+  "parts": 2,
+  "values": 3
+ },
+ "ironcalc-hvlookup": {
+  "parts": 2
+ },
+ "ironcalc-hypergeom-dist": {
+  "formats": 17,
+  "parts": 2
+ },
+ "ironcalc-if-array": {
+  "formats": 93,
+  "parts": 3,
+  "values": 8
+ },
+ "ironcalc-iferror": {
+  "formats": 65,
+  "parts": 5,
+  "values": 1
+ },
+ "ironcalc-ifna": {
+  "parts": 2
+ },
+ "ironcalc-ifs": {
+  "parts": 3
+ },
+ "ironcalc-index": {
+  "formats": 20,
+  "parts": 2
+ },
+ "ironcalc-intrate": {
+  "formats": 25,
+  "parts": 2
+ },
+ "ironcalc-ipmt-ppmt": {
+  "formats": 150,
+  "parts": 2
+ },
+ "ironcalc-irr": {
+  "formats": 414,
+  "parts": 2
+ },
+ "ironcalc-is-information": {
+  "parts": 3,
+  "values": 1
+ },
+ "ironcalc-isomitted": {
+  "formats": 6,
+  "parts": 3
+ },
+ "ironcalc-ispmt": {
+  "formats": 48,
+  "parts": 2
+ },
+ "ironcalc-isref": {
+  "formats": 49,
+  "parts": 7
+ },
+ "ironcalc-isref-isformula-isodd-iseven": {
+  "formats": 91,
+  "parts": 2
+ },
+ "ironcalc-issue-341": {
+  "formats": 7,
+  "parts": 2
+ },
+ "ironcalc-lambda": {
+  "formats": 20,
+  "parts": 3
+ },
+ "ironcalc-lcm-gcd": {
+  "parts": 3,
+  "values": 2
+ },
+ "ironcalc-let": {
+  "formats": 11,
+  "parts": 3
+ },
+ "ironcalc-linest-logest": {
+  "formats": 44,
+  "parts": 3
+ },
+ "ironcalc-log-log10-ln": {
+  "formats": 99,
+  "formulas": 1,
+  "parts": 2
+ },
+ "ironcalc-logical": {
+  "parts": 3
+ },
+ "ironcalc-lognorm": {
+  "parts": 2
+ },
+ "ironcalc-makearray": {
+  "formats": 9,
+  "parts": 2
+ },
+ "ironcalc-map-reduce": {
+  "formats": 19,
+  "parts": 2
+ },
+ "ironcalc-match": {
+  "parts": 3
+ },
+ "ironcalc-match-lookup-arrays": {
+  "parts": 4
+ },
+ "ironcalc-max-min": {
+  "formats": 119,
+  "parts": 7
+ },
+ "ironcalc-meadian-kurt-skew-harmean": {
+  "formats": 20,
+  "parts": 2
+ },
+ "ironcalc-mid-left-right-arrays": {
+  "formats": 222,
+  "parts": 2,
+  "values": 38
+ },
+ "ironcalc-min-max": {
+  "parts": 2
+ },
+ "ironcalc-min-max-extras": {
+  "formats": 46,
+  "parts": 5
+ },
+ "ironcalc-mina-maxa": {
+  "formats": 28,
+  "parts": 2
+ },
+ "ironcalc-minus-minus": {
+  "formats": 84,
+  "parts": 2,
+  "values": 3
+ },
+ "ironcalc-mirr": {
+  "formats": 811,
+  "parts": 2
+ },
+ "ironcalc-mmult": {
+  "formats": 21,
+  "parts": 4,
+  "values": 18
+ },
+ "ironcalc-mod-quotient": {
+  "parts": 2
+ },
+ "ironcalc-mode": {
+  "formats": 54,
+  "parts": 3
+ },
+ "ironcalc-mround-trunc-int": {
+  "parts": 2,
+  "values": 10
+ },
+ "ironcalc-multinomial": {
+  "formats": 28,
+  "parts": 2
+ },
+ "ironcalc-munit-mdeterm-minverse": {
+  "formats": 73,
+  "parts": 3
+ },
+ "ironcalc-n": {
+  "parts": 2
+ },
+ "ironcalc-networkdays-networkdays-intl": {
+  "formats": 5,
+  "formulas": 104,
+  "parts": 4,
+  "values": 2
+ },
+ "ironcalc-nominal-effect": {
+  "formats": 44,
+  "parts": 2
+ },
+ "ironcalc-norm-dist": {
+  "parts": 2
+ },
+ "ironcalc-now-today": {
+  "columns": 3,
+  "parts": 4
+ },
+ "ironcalc-nper": {
+  "formats": 105,
+  "parts": 2
+ },
+ "ironcalc-npv": {
+  "formats": 47,
+  "parts": 2
+ },
+ "ironcalc-number-systems": {
+  "formats": 297,
+  "parts": 2
+ },
+ "ironcalc-pduration": {
+  "formats": 51,
+  "parts": 2
+ },
+ "ironcalc-pearson": {
+  "formats": 11,
+  "parts": 2
+ },
+ "ironcalc-percentage": {
+  "parts": 2
+ },
+ "ironcalc-percentil-quartil": {
+  "formats": 116,
+  "parts": 2
+ },
+ "ironcalc-permut-permutationa": {
+  "formats": 70,
+  "parts": 2
+ },
+ "ironcalc-phi": {
+  "formats": 14,
+  "parts": 2
+ },
+ "ironcalc-pmt": {
+  "formats": 179,
+  "parts": 2
+ },
+ "ironcalc-poisson": {
+  "parts": 2
+ },
+ "ironcalc-power": {
+  "formats": 86,
+  "formulas": 2,
+  "parts": 4,
+  "values": 4
+ },
+ "ironcalc-price-yield": {
+  "formats": 534,
+  "parts": 2
+ },
+ "ironcalc-prob": {
+  "formats": 81,
+  "parts": 2
+ },
+ "ironcalc-product": {
+  "definedNames": 1,
+  "parts": 3
+ },
+ "ironcalc-product-sum": {
+  "formats": 125,
+  "parts": 2
+ },
+ "ironcalc-proper": {
+  "formats": 14,
+  "parts": 2
+ },
+ "ironcalc-pv": {
+  "formats": 105,
+  "parts": 2
+ },
+ "ironcalc-quotes": {
+  "formulas": 1,
+  "parts": 2
+ },
+ "ironcalc-range-operator": {
+  "formats": 31,
+  "parts": 2
+ },
+ "ironcalc-rank-eq-rank-avg": {
+  "formats": 34,
+  "parts": 2
+ },
+ "ironcalc-rate": {
+  "formats": 91,
+  "parts": 2
+ },
+ "ironcalc-regex": {
+  "formats": 10,
+  "formulas": 6,
+  "parts": 3
+ },
+ "ironcalc-rept": {
+  "formats": 32,
+  "parts": 2
+ },
+ "ironcalc-round": {
+  "parts": 3
+ },
+ "ironcalc-row-colum": {
+  "formats": 1,
+  "formulas": 2,
+  "parts": 5
+ },
+ "ironcalc-rri": {
+  "formats": 30,
+  "parts": 2
+ },
+ "ironcalc-scan": {
+  "formats": 18,
+  "parts": 2
+ },
+ "ironcalc-sequence": {
+  "formats": 70,
+  "parts": 5
+ },
+ "ironcalc-seriessum": {
+  "formats": 21,
+  "parts": 2
+ },
+ "ironcalc-sheet-sheets": {
+  "parts": 2
+ },
+ "ironcalc-simple-arrays": {
+  "formats": 3,
+  "parts": 3
+ },
+ "ironcalc-simple-functions": {
+  "parts": 3
+ },
+ "ironcalc-sln-syd": {
+  "formats": 81,
+  "parts": 2
+ },
+ "ironcalc-small-large": {
+  "formats": 45,
+  "parts": 2
+ },
+ "ironcalc-sort": {
+  "formats": 282,
+  "parts": 2,
+  "values": 20
+ },
+ "ironcalc-spill-operator": {
+  "formats": 30,
+  "parts": 3
+ },
+ "ironcalc-sqrt-sqrtpi": {
+  "formats": 12,
+  "parts": 2
+ },
+ "ironcalc-standarize": {
+  "formats": 19,
+  "parts": 2
+ },
+ "ironcalc-stdev": {
+  "formats": 13,
+  "parts": 2
+ },
+ "ironcalc-string-handling": {
+  "parts": 2
+ },
+ "ironcalc-substitute": {
+  "formats": 93,
+  "parts": 2
+ },
+ "ironcalc-sumif-array": {
+  "formats": 62,
+  "parts": 5
+ },
+ "ironcalc-sumif-average-if": {
+  "parts": 2
+ },
+ "ironcalc-sumifs": {
+  "parts": 3
+ },
+ "ironcalc-sumproduct": {
+  "formats": 14,
+  "parts": 2
+ },
+ "ironcalc-sumsq": {
+  "parts": 3,
+  "values": 2
+ },
+ "ironcalc-sumx2my2-sumx2py2-sumxmy2": {
+  "formats": 15,
+  "parts": 2
+ },
+ "ironcalc-t-dist": {
+  "parts": 4
+ },
+ "ironcalc-t-test": {
+  "formats": 41,
+  "parts": 2
+ },
+ "ironcalc-t-value-valuetotext": {
+  "formats": 24,
+  "formulas": 14,
+  "parts": 2
+ },
+ "ironcalc-tbills": {
+  "formats": 146,
+  "parts": 2
+ },
+ "ironcalc-text": {
+  "parts": 3,
+  "values": 2
+ },
+ "ironcalc-textbefore-textafter": {
+  "formats": 240,
+  "parts": 2,
+  "values": 4
+ },
+ "ironcalc-textjoin": {
+  "formats": 74,
+  "parts": 2
+ },
+ "ironcalc-textsplit": {
+  "formats": 88,
+  "parts": 2,
+  "values": 3
+ },
+ "ironcalc-time-hour-minute-second": {
+  "formats": 162,
+  "parts": 6
+ },
+ "ironcalc-timevalue": {
+  "parts": 5
+ },
+ "ironcalc-timevalue-issue-1402": {
+  "columns": 2,
+  "formats": 1,
+  "parts": 2
+ },
+ "ironcalc-tocol": {
+  "formats": 88,
+  "parts": 2,
+  "values": 3
+ },
+ "ironcalc-transpose": {
+  "formats": 32,
+  "parts": 3
+ },
+ "ironcalc-trend-growth": {
+  "formats": 56,
+  "parts": 3
+ },
+ "ironcalc-trigonometric": {
+  "parts": 5
+ },
+ "ironcalc-trimmean": {
+  "formats": 56,
+  "parts": 2
+ },
+ "ironcalc-trimrange": {
+  "formats": 27,
+  "formulas": 2,
+  "parts": 3
+ },
+ "ironcalc-type": {
+  "formats": 19,
+  "parts": 2
+ },
+ "ironcalc-unicode": {
+  "formats": 41,
+  "parts": 4
+ },
+ "ironcalc-upper-lower": {
+  "formats": 56,
+  "parts": 2
+ },
+ "ironcalc-variance": {
+  "formats": 11,
+  "parts": 2
+ },
+ "ironcalc-weekday-weeknum-isoweeknum": {
+  "formats": 102,
+  "parts": 2
+ },
+ "ironcalc-weekday-weeknum-isoweeknum-issue-1502": {
+  "formats": 8,
+  "parts": 2
+ },
+ "ironcalc-weibull-dist": {
+  "formats": 14,
+  "parts": 2
+ },
+ "ironcalc-workday-workday-intl": {
+  "columns": 3,
+  "formats": 1,
+  "formulas": 93,
+  "parts": 4
+ },
+ "ironcalc-wrapcols-rows": {
+  "formats": 45,
+  "parts": 2,
+  "values": 7
+ },
+ "ironcalc-xirr": {
+  "formats": 155,
+  "parts": 2
+ },
+ "ironcalc-xlookup": {
+  "parts": 2
+ },
+ "ironcalc-xmatch": {
+  "formats": 22,
+  "parts": 3
+ },
+ "ironcalc-xmatch-arrays": {
+  "formats": 37,
+  "parts": 3,
+  "values": 2
+ },
+ "ironcalc-xnpv": {
+  "formats": 145,
+  "parts": 2
+ },
+ "ironcalc-yearfrac-datedif": {
+  "formats": 6,
+  "parts": 5
+ },
+ "ironcalc-z-test": {
+  "formats": 22,
+  "parts": 2
+ },
+ "rxw-array-formula01": {
+  "parts": 2
+ },
+ "rxw-array-formula02": {
+  "parts": 2
+ },
+ "rxw-array-formula03": {
+  "parts": 2
+ },
+ "rxw-array-formula04": {
+  "parts": 2
+ },
+ "rxw-autofilter00": {
+  "parts": 2
+ },
+ "rxw-autofilter01": {
+  "parts": 2
+ },
+ "rxw-autofilter02": {
+  "parts": 2
+ },
+ "rxw-autofilter03": {
+  "parts": 2
+ },
+ "rxw-autofit-with-format01": {
+  "parts": 2
+ },
+ "rxw-autofit-with-format02": {
+  "parts": 2
+ },
+ "rxw-autofit-with-format03": {
+  "parts": 2
+ },
+ "rxw-autofit-with-format04": {
+  "parts": 2
+ },
+ "rxw-autofit01": {
+  "parts": 2
+ },
+ "rxw-autofit02": {
+  "parts": 2
+ },
+ "rxw-autofit03": {
+  "parts": 2
+ },
+ "rxw-autofit04": {
+  "parts": 2
+ },
+ "rxw-background01": {
+  "parts": 2
+ },
+ "rxw-background02": {
+  "parts": 3
+ },
+ "rxw-background03": {
+  "parts": 3
+ },
+ "rxw-background04": {
+  "parts": 3
+ },
+ "rxw-button01": {
+  "parts": 3
+ },
+ "rxw-button02": {
+  "parts": 3
+ },
+ "rxw-button03": {
+  "parts": 3
+ },
+ "rxw-button04": {
+  "parts": 3
+ },
+ "rxw-chart-area01": {
+  "parts": 2
+ },
+ "rxw-chart-area02": {
+  "parts": 2
+ },
+ "rxw-chart-area03": {
+  "parts": 2
+ },
+ "rxw-chart-area04": {
+  "parts": 2
+ },
+ "rxw-chart-axis01": {
+  "parts": 2
+ },
+ "rxw-chart-axis02": {
+  "parts": 2
+ },
+ "rxw-chart-axis03": {
+  "parts": 2
+ },
+ "rxw-chart-axis04": {
+  "parts": 2
+ },
+ "rxw-chart-bar01": {
+  "parts": 2
+ },
+ "rxw-chart-bar02": {
+  "parts": 2
+ },
+ "rxw-chart-bar03": {
+  "parts": 2
+ },
+ "rxw-chart-bar04": {
+  "parts": 2
+ },
+ "rxw-chart-blank01": {
+  "parts": 2
+ },
+ "rxw-chart-blank02": {
+  "parts": 2
+ },
+ "rxw-chart-blank03": {
+  "parts": 2
+ },
+ "rxw-chart-blank04": {
+  "parts": 2
+ },
+ "rxw-chart-chartarea01": {
+  "parts": 2
+ },
+ "rxw-chart-chartarea02": {
+  "parts": 2
+ },
+ "rxw-chart-chartarea03": {
+  "parts": 2
+ },
+ "rxw-chart-chartarea04": {
+  "parts": 2
+ },
+ "rxw-chart-clustered01": {
+  "parts": 2
+ },
+ "rxw-chart-column01": {
+  "parts": 2
+ },
+ "rxw-chart-column02": {
+  "parts": 2
+ },
+ "rxw-chart-column03": {
+  "parts": 2
+ },
+ "rxw-chart-column04": {
+  "parts": 2
+ },
+ "rxw-chart-combined01": {
+  "parts": 2
+ },
+ "rxw-chart-combined02": {
+  "parts": 2
+ },
+ "rxw-chart-combined03": {
+  "parts": 2
+ },
+ "rxw-chart-combined04": {
+  "parts": 2
+ },
+ "rxw-chart-crossing01": {
+  "parts": 2
+ },
+ "rxw-chart-crossing02": {
+  "parts": 2
+ },
+ "rxw-chart-crossing03": {
+  "parts": 2
+ },
+ "rxw-chart-crossing04": {
+  "parts": 2
+ },
+ "rxw-chart-data-labels01": {
+  "parts": 2
+ },
+ "rxw-chart-data-labels02": {
+  "parts": 2
+ },
+ "rxw-chart-data-labels03": {
+  "parts": 2
+ },
+ "rxw-chart-data-labels04": {
+  "parts": 2
+ },
+ "rxw-chart-date01": {
+  "parts": 2
+ },
+ "rxw-chart-date02": {
+  "parts": 2
+ },
+ "rxw-chart-date03": {
+  "parts": 2
+ },
+ "rxw-chart-date04": {
+  "parts": 2
+ },
+ "rxw-chart-display-units01": {
+  "parts": 2
+ },
+ "rxw-chart-display-units02": {
+  "parts": 2
+ },
+ "rxw-chart-display-units03": {
+  "parts": 2
+ },
+ "rxw-chart-display-units04": {
+  "parts": 2
+ },
+ "rxw-chart-doughnut01": {
+  "parts": 2
+ },
+ "rxw-chart-doughnut02": {
+  "parts": 2
+ },
+ "rxw-chart-doughnut03": {
+  "parts": 2
+ },
+ "rxw-chart-doughnut04": {
+  "parts": 2
+ },
+ "rxw-chart-drop-lines01": {
+  "parts": 2
+ },
+ "rxw-chart-drop-lines02": {
+  "parts": 2
+ },
+ "rxw-chart-drop-lines03": {
+  "parts": 2
+ },
+ "rxw-chart-drop-lines04": {
+  "parts": 2
+ },
+ "rxw-chart-errorbars01": {
+  "parts": 2
+ },
+ "rxw-chart-errorbars02": {
+  "parts": 2
+ },
+ "rxw-chart-errorbars03": {
+  "parts": 2
+ },
+ "rxw-chart-errorbars04": {
+  "parts": 2
+ },
+ "rxw-chart-font01": {
+  "parts": 2
+ },
+ "rxw-chart-font02": {
+  "parts": 2
+ },
+ "rxw-chart-font03": {
+  "parts": 2
+ },
+ "rxw-chart-font04": {
+  "parts": 2
+ },
+ "rxw-chart-format01": {
+  "parts": 2
+ },
+ "rxw-chart-format02": {
+  "parts": 2
+ },
+ "rxw-chart-format03": {
+  "parts": 2
+ },
+ "rxw-chart-format04": {
+  "parts": 2
+ },
+ "rxw-chart-gap01": {
+  "parts": 2
+ },
+ "rxw-chart-gap02": {
+  "parts": 2
+ },
+ "rxw-chart-gap03": {
+  "parts": 2
+ },
+ "rxw-chart-gap04": {
+  "parts": 2
+ },
+ "rxw-chart-gradient01": {
+  "parts": 2
+ },
+ "rxw-chart-gradient02": {
+  "parts": 2
+ },
+ "rxw-chart-gradient03": {
+  "parts": 2
+ },
+ "rxw-chart-gradient04": {
+  "parts": 2
+ },
+ "rxw-chart-gridlines01": {
+  "parts": 2
+ },
+ "rxw-chart-gridlines02": {
+  "parts": 2
+ },
+ "rxw-chart-gridlines03": {
+  "parts": 2
+ },
+ "rxw-chart-gridlines04": {
+  "parts": 2
+ },
+ "rxw-chart-high-low-lines01": {
+  "parts": 2
+ },
+ "rxw-chart-high-low-lines02": {
+  "parts": 2
+ },
+ "rxw-chart-layout01": {
+  "parts": 2
+ },
+ "rxw-chart-layout02": {
+  "parts": 2
+ },
+ "rxw-chart-layout03": {
+  "parts": 2
+ },
+ "rxw-chart-layout04": {
+  "parts": 2
+ },
+ "rxw-chart-legend01": {
+  "parts": 2
+ },
+ "rxw-chart-legend03": {
+  "parts": 2
+ },
+ "rxw-chart-legend04": {
+  "parts": 2
+ },
+ "rxw-chart-legend05": {
+  "parts": 2
+ },
+ "rxw-chart-line01": {
+  "parts": 2
+ },
+ "rxw-chart-line02": {
+  "parts": 2
+ },
+ "rxw-chart-line03": {
+  "parts": 2
+ },
+ "rxw-chart-line04": {
+  "parts": 2
+ },
+ "rxw-chart-name01": {
+  "parts": 2
+ },
+ "rxw-chart-name02": {
+  "parts": 2
+ },
+ "rxw-chart-name03": {
+  "parts": 2
+ },
+ "rxw-chart-pattern01": {
+  "parts": 2
+ },
+ "rxw-chart-pattern02": {
+  "parts": 2
+ },
+ "rxw-chart-pattern03": {
+  "parts": 2
+ },
+ "rxw-chart-pattern04": {
+  "parts": 2
+ },
+ "rxw-chart-pie01": {
+  "parts": 2
+ },
+ "rxw-chart-pie02": {
+  "parts": 2
+ },
+ "rxw-chart-pie03": {
+  "parts": 2
+ },
+ "rxw-chart-pie04": {
+  "parts": 2
+ },
+ "rxw-chart-points01": {
+  "parts": 2
+ },
+ "rxw-chart-points02": {
+  "parts": 2
+ },
+ "rxw-chart-points03": {
+  "parts": 2
+ },
+ "rxw-chart-points04": {
+  "parts": 2
+ },
+ "rxw-chart-radar01": {
+  "parts": 2
+ },
+ "rxw-chart-radar02": {
+  "parts": 2
+ },
+ "rxw-chart-radar03": {
+  "parts": 2
+ },
+ "rxw-chart-scatter01": {
+  "parts": 2
+ },
+ "rxw-chart-scatter02": {
+  "parts": 2
+ },
+ "rxw-chart-scatter03": {
+  "parts": 2
+ },
+ "rxw-chart-scatter04": {
+  "parts": 2
+ },
+ "rxw-chart-size01": {
+  "parts": 2
+ },
+ "rxw-chart-size02": {
+  "parts": 2
+ },
+ "rxw-chart-sparse01": {
+  "parts": 2
+ },
+ "rxw-chart-stock01": {
+  "parts": 2
+ },
+ "rxw-chart-stock02": {
+  "parts": 2
+ },
+ "rxw-chart-stock03": {
+  "parts": 2
+ },
+ "rxw-chart-str01": {
+  "parts": 2
+ },
+ "rxw-chart-str02": {
+  "parts": 2
+ },
+ "rxw-chart-table01": {
+  "parts": 2
+ },
+ "rxw-chart-table02": {
+  "parts": 2
+ },
+ "rxw-chart-table03": {
+  "parts": 2
+ },
+ "rxw-chart-theme01": {
+  "parts": 2
+ },
+ "rxw-chart-theme02": {
+  "parts": 2
+ },
+ "rxw-chart-theme03": {
+  "parts": 2
+ },
+ "rxw-chart-theme04": {
+  "parts": 2
+ },
+ "rxw-chart-title01": {
+  "parts": 2
+ },
+ "rxw-chart-title02": {
+  "parts": 2
+ },
+ "rxw-chart-title03": {
+  "parts": 2
+ },
+ "rxw-chart-title04": {
+  "parts": 2
+ },
+ "rxw-chart-up-down-bars01": {
+  "parts": 2
+ },
+ "rxw-chart-up-down-bars02": {
+  "parts": 2
+ },
+ "rxw-chart-up-down-bars03": {
+  "parts": 2
+ },
+ "rxw-chartsheet01": {
+  "parts": 3,
+  "sheets": 1
+ },
+ "rxw-chartsheet02": {
+  "parts": 3,
+  "sheets": 1
+ },
+ "rxw-chartsheet03": {
+  "parts": 3,
+  "sheets": 1
+ },
+ "rxw-chartsheet04": {
+  "parts": 3,
+  "sheets": 1
+ },
+ "rxw-checkbox01": {
+  "parts": 3
+ },
+ "rxw-checkbox02": {
+  "parts": 3
+ },
+ "rxw-checkbox03": {
+  "parts": 3
+ },
+ "rxw-checkbox04": {
+  "parts": 3
+ },
+ "rxw-comment01": {
+  "parts": 2
+ },
+ "rxw-comment02": {
+  "parts": 2
+ },
+ "rxw-comment04": {
+  "parts": 2
+ },
+ "rxw-cond-format01": {
+  "parts": 2
+ },
+ "rxw-cond-format02": {
+  "conditionalFormat": 2,
+  "parts": 2
+ },
+ "rxw-cond-format03": {
+  "parts": 2
+ },
+ "rxw-cond-format04": {
+  "conditionalFormat": 2,
+  "parts": 2
+ },
+ "rxw-data-validation01": {
+  "parts": 2
+ },
+ "rxw-data-validation02": {
+  "parts": 2
+ },
+ "rxw-data-validation03": {
+  "parts": 2
+ },
+ "rxw-decimal01": {
+  "parts": 2
+ },
+ "rxw-default-format01": {
+  "parts": 2
+ },
+ "rxw-default-format02": {
+  "parts": 2
+ },
+ "rxw-default-format03": {
+  "parts": 2
+ },
+ "rxw-default-format04": {
+  "parts": 2
+ },
+ "rxw-default-row01": {
+  "parts": 2
+ },
+ "rxw-default-row02": {
+  "parts": 2
+ },
+ "rxw-default-row03": {
+  "parts": 2
+ },
+ "rxw-default-row04": {
+  "parts": 2
+ },
+ "rxw-defined-name01": {
+  "definedNames": 1,
+  "parts": 2
+ },
+ "rxw-defined-name02": {
+  "parts": 2
+ },
+ "rxw-defined-name03": {
+  "parts": 2
+ },
+ "rxw-defined-name04": {
+  "parts": 2
+ },
+ "rxw-dynamic-array01": {
+  "parts": 3
+ },
+ "rxw-dynamic-array02": {
+  "parts": 2
+ },
+ "rxw-dynamic-array03": {
+  "parts": 2
+ },
+ "rxw-dynamic-array04": {
+  "parts": 3
+ },
+ "rxw-embed-image01": {
+  "parts": 8,
+  "values": 1
+ },
+ "rxw-embed-image02": {
+  "parts": 8,
+  "values": 2
+ },
+ "rxw-embed-image03": {
+  "parts": 8,
+  "values": 2
+ },
+ "rxw-embed-image04": {
+  "parts": 8,
+  "values": 2
+ },
+ "rxw-escapes01": {
+  "parts": 2
+ },
+ "rxw-escapes02": {
+  "parts": 2
+ },
+ "rxw-escapes03": {
+  "parts": 2
+ },
+ "rxw-escapes04": {
+  "parts": 2
+ },
+ "rxw-firstsheet01": {
+  "parts": 2
+ },
+ "rxw-format01": {
+  "parts": 2
+ },
+ "rxw-format02": {
+  "parts": 2
+ },
+ "rxw-format03": {
+  "parts": 2
+ },
+ "rxw-format05": {
+  "parts": 2
+ },
+ "rxw-formula-results01": {
+  "parts": 2
+ },
+ "rxw-gridlines01": {
+  "parts": 2
+ },
+ "rxw-header-image01": {
+  "parts": 4
+ },
+ "rxw-header-image02": {
+  "parts": 4
+ },
+ "rxw-header-image03": {
+  "parts": 4
+ },
+ "rxw-header-image04": {
+  "parts": 4
+ },
+ "rxw-hide01": {
+  "parts": 2
+ },
+ "rxw-hide02": {
+  "parts": 2
+ },
+ "rxw-hyperlink01": {
+  "parts": 2
+ },
+ "rxw-hyperlink02": {
+  "parts": 2
+ },
+ "rxw-hyperlink03": {
+  "parts": 2
+ },
+ "rxw-hyperlink04": {
+  "parts": 2
+ },
+ "rxw-ignore-error01": {
+  "parts": 2
+ },
+ "rxw-ignore-error02": {
+  "parts": 2
+ },
+ "rxw-ignore-error03": {
+  "parts": 2
+ },
+ "rxw-ignore-error04": {
+  "parts": 2
+ },
+ "rxw-image-scale01": {
+  "parts": 2
+ },
+ "rxw-image-scale02": {
+  "parts": 2
+ },
+ "rxw-image-scale03": {
+  "parts": 2
+ },
+ "rxw-image-scale04": {
+  "parts": 2
+ },
+ "rxw-image01": {
+  "parts": 2
+ },
+ "rxw-image02": {
+  "parts": 2
+ },
+ "rxw-image03": {
+  "parts": 2
+ },
+ "rxw-image04": {
+  "drawing": 1,
+  "parts": 4
+ },
+ "rxw-landscape01": {
+  "parts": 2
+ },
+ "rxw-merge-cells01": {
+  "parts": 2
+ },
+ "rxw-merge-range01": {
+  "parts": 2
+ },
+ "rxw-merge-range02": {
+  "parts": 2
+ },
+ "rxw-merge-range03": {
+  "parts": 2
+ },
+ "rxw-merge-range04": {
+  "parts": 2
+ },
+ "rxw-object-position01": {
+  "parts": 2
+ },
+ "rxw-object-position02": {
+  "parts": 2
+ },
+ "rxw-object-position03": {
+  "parts": 2
+ },
+ "rxw-object-position06": {
+  "parts": 2
+ },
+ "rxw-outline01": {
+  "parts": 2
+ },
+ "rxw-outline02": {
+  "parts": 2
+ },
+ "rxw-outline03": {
+  "parts": 2
+ },
+ "rxw-outline04": {
+  "parts": 2
+ },
+ "rxw-overlay01": {
+  "parts": 2
+ },
+ "rxw-overlay02": {
+  "parts": 2
+ },
+ "rxw-overlay03": {
+  "parts": 2
+ },
+ "rxw-overlay04": {
+  "parts": 2
+ },
+ "rxw-page-breaks01": {
+  "pageBreaks": 1,
+  "parts": 2
+ },
+ "rxw-page-breaks02": {
+  "pageBreaks": 3,
+  "parts": 2
+ },
+ "rxw-page-breaks03": {
+  "pageBreaks": 1023,
+  "parts": 2
+ },
+ "rxw-page-breaks04": {
+  "pageBreaks": 1,
+  "parts": 2
+ },
+ "rxw-page-view01": {
+  "parts": 2
+ },
+ "rxw-page-view02": {
+  "parts": 2
+ },
+ "rxw-page-view03": {
+  "parts": 2
+ },
+ "rxw-print-across01": {
+  "parts": 2
+ },
+ "rxw-print-area01": {
+  "definedNames": 1,
+  "parts": 2
+ },
+ "rxw-print-area02": {
+  "definedNames": 1,
+  "parts": 2
+ },
+ "rxw-print-area03": {
+  "definedNames": 1,
+  "parts": 2
+ },
+ "rxw-print-area04": {
+  "definedNames": 1,
+  "parts": 2
+ },
+ "rxw-print-options01": {
+  "parts": 2
+ },
+ "rxw-print-options02": {
+  "parts": 2
+ },
+ "rxw-print-options03": {
+  "parts": 2
+ },
+ "rxw-print-options04": {
+  "parts": 2
+ },
+ "rxw-properties01": {
+  "parts": 2
+ },
+ "rxw-properties02": {
+  "parts": 2
+ },
+ "rxw-properties03": {
+  "parts": 3
+ },
+ "rxw-properties04": {
+  "parts": 3
+ },
+ "rxw-protect01": {
+  "parts": 2
+ },
+ "rxw-protect02": {
+  "parts": 2
+ },
+ "rxw-protect03": {
+  "parts": 2
+ },
+ "rxw-protect04": {
+  "parts": 2
+ },
+ "rxw-quote-name01": {
+  "parts": 2
+ },
+ "rxw-quote-name02": {
+  "parts": 2
+ },
+ "rxw-quote-name03": {
+  "parts": 2
+ },
+ "rxw-quote-name04": {
+  "parts": 2
+ },
+ "rxw-repeat01": {
+  "definedNames": 1,
+  "parts": 2
+ },
+ "rxw-repeat02": {
+  "definedNames": 1,
+  "parts": 2
+ },
+ "rxw-repeat03": {
+  "definedNames": 1,
+  "parts": 2
+ },
+ "rxw-repeat04": {
+  "parts": 2
+ },
+ "rxw-rich-string01": {
+  "parts": 2
+ },
+ "rxw-rich-string02": {
+  "parts": 2
+ },
+ "rxw-rich-string03": {
+  "parts": 2
+ },
+ "rxw-rich-string04": {
+  "parts": 2
+ },
+ "rxw-row-col-format01": {
+  "parts": 2
+ },
+ "rxw-row-col-format02": {
+  "parts": 2
+ },
+ "rxw-row-col-format03": {
+  "parts": 2
+ },
+ "rxw-row-col-format04": {
+  "parts": 2
+ },
+ "rxw-selection01": {
+  "parts": 2
+ },
+ "rxw-selection02": {
+  "parts": 2
+ },
+ "rxw-set-row01": {
+  "parts": 2
+ },
+ "rxw-set-row02": {
+  "parts": 2
+ },
+ "rxw-set-row03": {
+  "parts": 2
+ },
+ "rxw-shared-strings01": {
+  "parts": 2,
+  "values": 1
+ },
+ "rxw-shared-strings02": {
+  "parts": 2
+ },
+ "rxw-simple03": {
+  "parts": 2
+ },
+ "rxw-styles01": {
+  "parts": 2
+ },
+ "rxw-styles02": {
+  "parts": 2
+ },
+ "rxw-tab-color01": {
+  "parts": 2
+ },
+ "rxw-tab-color02": {
+  "parts": 2,
+  "view": 1
+ },
+ "rxw-tab-color03": {
+  "parts": 2
+ },
+ "rxw-table01": {
+  "parts": 2
+ },
+ "rxw-table02": {
+  "parts": 2
+ },
+ "rxw-table03": {
+  "parts": 2
+ },
+ "rxw-table04": {
+  "parts": 2
+ },
+ "rxw-textbox01": {
+  "parts": 2
+ },
+ "rxw-textbox02": {
+  "parts": 2
+ },
+ "rxw-textbox03": {
+  "parts": 2
+ },
+ "rxw-textbox04": {
+  "parts": 2
+ },
+ "rxw-theme-color01": {
+  "parts": 2
+ },
+ "rxw-theme-color02": {
+  "parts": 2
+ },
+ "rxw-theme-color03": {
+  "parts": 2
+ },
+ "rxw-theme-color04": {
+  "parts": 2
+ },
+ "rxw-theme01": {
+  "parts": 2
+ },
+ "rxw-theme02": {
+  "formats": 15,
+  "parts": 2
+ },
+ "rxw-theme03": {
+  "formats": 15,
+  "parts": 2
+ },
+ "rxw-theme04": {
+  "formats": 15,
+  "parts": 2
+ },
+ "rxw-top-left-cell01": {
+  "parts": 2
+ },
+ "rxw-top-left-cell02": {
+  "parts": 2
+ },
+ "rxw-top-left-cell03": {
+  "parts": 2
+ },
+ "rxw-vml01": {
+  "parts": 2
+ },
+ "rxw-vml02": {
+  "parts": 2
+ },
+ "rxw-vml03": {
+  "parts": 2
+ },
+ "rxw-vml04": {
+  "parts": 2
+ }
+}

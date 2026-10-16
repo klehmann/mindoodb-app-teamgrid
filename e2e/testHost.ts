@@ -63,6 +63,20 @@ export class TeamGridHost {
     return { sheets: context.sheets, streaming: context.streaming === true }
   }
 
+  /** The open workbook as TeamGrid exports it (`workbook_export`). */
+  async exportXlsx(): Promise<Uint8Array> {
+    const { fileRef } = await this.call<{ fileRef: string }>('workbook_export', { format: 'xlsx' })
+    const base64 = await this.page.evaluate((ref) => {
+      const file = window.__havenTestHost!.agent.getFile(ref)
+      if (!file) throw new Error(`No file ${ref}`)
+      const data = new Uint8Array(file.data as ArrayLike<number>)
+      let binary = ''
+      for (let i = 0; i < data.length; i += 0x8000) binary += String.fromCharCode(...data.subarray(i, i + 0x8000))
+      return btoa(binary)
+    }, fileRef)
+    return new Uint8Array(Buffer.from(base64, 'base64'))
+  }
+
   /** Cells of one sheet, 100 per `read_cells` call (the tool's limit). */
   async readCells(sheetId: string, addresses: string[]): Promise<Record<string, ReadCell>> {
     const cells: Record<string, ReadCell> = {}
