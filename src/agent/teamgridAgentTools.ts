@@ -60,6 +60,11 @@ export interface TeamgridAgentDeps {
   open(workbookId: string): Promise<void>
   /** Creates a workbook (blank, from a template or from xlsx bytes), opens it and returns its id. */
   create(request: { title: string; templateId?: string; xlsx?: Uint8Array }): Promise<string>
+  /**
+   * Resolves once the formula engine finished a run that started after `since` (ms), or none
+   * started soon after it: cells that just streamed in are calculated asynchronously.
+   */
+  calculated?(since: number): Promise<void>
   /** Writes pending edits to MindooDB; resolves once the editor shows the saved state with formulas recalculated. */
   save(): Promise<void>
   /** The open workbook as xlsx, after saving pending edits. */
@@ -383,20 +388,26 @@ export function createTeamgridAgentTools(deps: TeamgridAgentDeps): MindooDBAppAg
         fail('NOT_FOUND', `No sheet ${sheetId}.`, `call ${PREFIX}_get_context`)
       }
       // A large imported workbook streams into the grid by viewport; cells outside it read as empty.
+      const since = Date.now()
       for (const block of blocksOf(addresses)) {
         if ((await skill.ensureRangeLoaded?.(block, sheetId)) === false) {
           fail('INVALID_STATE', 'The requested cells could not be fully loaded; retry after workbook indexing completes.')
         }
       }
-      const read = skill.readCells(addresses, sheetId) as Record<
-        string,
-        { value: unknown; formula?: string; rawValue?: unknown }
-      >
+      type Read = Record<string, { value: unknown; formula?: string; rawValue?: unknown }>
+      const valueOf = (cell: Read[string] | undefined) =>
+        cell?.rawValue !== undefined ? cell.rawValue : (cell?.value ?? null)
+      let read = skill.readCells(addresses, sheetId) as Read
+      // Formulas of cells that just streamed in are calculated a moment later.
+      if (deps.calculated && addresses.some((a) => read[a]?.formula && valueOf(read[a]) === null)) {
+        await deps.calculated(since)
+        read = skill.readCells(addresses, sheetId) as Read
+      }
       const cells: Record<string, { value: unknown; text?: unknown; formula?: string }> = {}
       for (const address of addresses) {
         const cell = read[address]
         // GenOffice's lazy reader gives the rendered text as `value` and the model value as `rawValue`.
-        const value = cell?.rawValue !== undefined ? cell.rawValue : (cell?.value ?? null)
+        const value = valueOf(cell)
         cells[address] = {
           value,
           ...(cell && cell.value !== value && cell.value !== null ? { text: cell.value } : {}),

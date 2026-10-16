@@ -168,8 +168,7 @@
       "file": "STATISTICAL/BINOM.xlsx",
       "tags": [
         "statistical"
-      ],
-      "skip": "TeamGrid stops responding after the import (found 2026-10-15)"
+      ]
     },
     {
       "id": "ironcalc-bits",
@@ -1713,8 +1712,7 @@
       "file": "DATE_AND_TIME/WORKDAY_WORKDAY.INTL.xlsx",
       "tags": [
         "date-and-time"
-      ],
-      "skip": "TeamGrid stops responding after the import (found 2026-10-15)"
+      ]
     },
     {
       "id": "ironcalc-wrapcols-rows",
