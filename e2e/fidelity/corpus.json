@@ -63,8 +63,7 @@
       "axes": [
         "values",
         "roundtrip"
-      ],
-      "unstable": "ACCRINT results depend on which workbooks the page opened before (calc_method read as FALSE); not understood yet"
+      ]
     },
     {
       "id": "ironcalc-accrint-extended",
