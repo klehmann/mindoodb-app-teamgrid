@@ -1,0 +1,44 @@
+--- a/apps/sheets/src/renderer/App.tsx
++++ b/apps/sheets/src/renderer/App.tsx
+@@ -637,6 +637,10 @@ export function App({
+   // Ref mirror for callbacks captured when an AI run starts
+   const autoSaveRef = useRef(autoSave)
+   autoSaveRef.current = autoSave
++  // [TeamGrid] the app toolbar shows Save while AutoSave is off (src/haven/toolbar)
++  useEffect(() => {
++    window.dispatchEvent(new CustomEvent('teamgrid:autosave', { detail: autoSave }))
++  }, [autoSave])
+   const saveGateRef = useRef(createSaveGate())
+   // AutoSave tick (docs/slides parity): every 30 s and on window blur, flush
+   // pending edits of the open workbook. The journal is read at tick time so
+--- a/apps/sheets/src/renderer/ExcelShell.tsx
++++ b/apps/sheets/src/renderer/ExcelShell.tsx
+@@ -1163,26 +1163,8 @@ export function ExcelShell({
+           aria-label={t('appScopeWorkbook')}
+           onDoubleClick={phone ? undefined : collapse.onTabsDoubleClick}
+         >
+-          <button
+-            type="button"
+-            className="qa-btn"
+-            data-tip={t('appSaveTitle')}
+-            aria-label={t('appSaveTitle')}
+-            disabled={!canSave}
+-            onClick={onSave}
+-          >
+-            <SaveIcon />
+-          </button>
+-          <button
+-            type="button"
+-            className="qa-btn"
+-            data-tip={saveAsTitle}
+-            aria-label={saveAsTitle}
+-            disabled={!canSaveAs}
+-            onClick={onSaveAs}
+-          >
+-            <SaveAsIcon />
+-          </button>
++          {/* [TeamGrid] no Save / Save As here: the app toolbar above the ribbon has
++              Save and the File menu (src/haven/toolbar) */}
+           <button
+             type="button"
+             className="qa-btn"

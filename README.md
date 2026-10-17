@@ -15,7 +15,7 @@ app with its own grid) lives in the git history before version 2.0.0.
 | `src/xlsx/` | xlsx import (WASM sidecar) and export (vendored xlsx-gateway + JSZip); editor sessions. |
 | `src/model/` | Stored workbook (schema v5): ids, formula references by id, row blocks, save diff → JSON patches. |
 | `src/testing/` | Automerge-backed stand-in for MindooDB, for merge tests with two offline devices. |
-| `src/haven/` | Haven App SDK connection, welcome screen, file menu, dialogs, view sheets. |
+| `src/haven/` | Haven App SDK connection, app toolbar, welcome screen, dialogs, view sheets. |
 | `src/boot.ts` | Landing page when opened outside Haven (`?standalone` opens the editor anyway). |
 | `native/xlsx-wasm/` | wasm-bindgen wrapper around GenOffice's Rust xlsx reader; `pkg/` is committed, so building the app needs no Rust toolchain. |
 | `public/` | App definition (`haven-app.json`), store listing, Cloudflare headers and 404 page; `sw.js` removes TeamGrid 1.x's service worker. |
@@ -43,6 +43,25 @@ workbooks (form `teamgrid-next`), creates new ones and imports xlsx files as
 documents; AutoSave writes JSON patches with `baseHeads`, and an idle editor
 reloads when someone else changed the workbook. Standalone, Cmd/Ctrl+O opens
 an xlsx and Cmd/Ctrl+S downloads it.
+
+## App toolbar
+
+Inside Haven a header sits above GenOffice's ribbon, as in TeamSlides and
+TeamEdit (`src/haven/toolbar/`): the app name, the File menu (new, open, from
+template, import XLSX, save, properties, revisions, export XLSX or the sheet
+as CSV, print), the Window menu, Refresh, the open workbook's title (opens its
+properties, × closes it) and, at the right end, Save while AutoSave is off and
+edits are unsaved, else "Saved" (or "Read only"). The ribbon has no Save
+buttons of its own any more (`patches/sheets-window-toolbar.patch`).
+
+Several workbooks can be open at once (Window menu, `src/haven/windows.ts`).
+The editor shows one of them; switching saves the shown one (with AutoSave off
+after asking) and opens the other from MindooDB at the sheet and selection it
+was left at. Closing one brings the one shown before it forward, closing the
+last one the welcome screen; "All spreadsheets" goes to the welcome screen and
+keeps the workbooks open. Refresh loads the latest stored state (other
+people's changes included) right away instead of waiting for the idle reload.
+Print and "Print to PDF" go through the browser's print dialog.
 
 ## How storage works
 

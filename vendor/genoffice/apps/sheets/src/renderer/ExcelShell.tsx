@@ -1163,26 +1163,8 @@ export function ExcelShell({
           aria-label={t('appScopeWorkbook')}
           onDoubleClick={phone ? undefined : collapse.onTabsDoubleClick}
         >
-          <button
-            type="button"
-            className="qa-btn"
-            data-tip={t('appSaveTitle')}
-            aria-label={t('appSaveTitle')}
-            disabled={!canSave}
-            onClick={onSave}
-          >
-            <SaveIcon />
-          </button>
-          <button
-            type="button"
-            className="qa-btn"
-            data-tip={saveAsTitle}
-            aria-label={saveAsTitle}
-            disabled={!canSaveAs}
-            onClick={onSaveAs}
-          >
-            <SaveAsIcon />
-          </button>
+          {/* [TeamGrid] no Save / Save As here: the app toolbar above the ribbon has
+              Save and the File menu (src/haven/toolbar) */}
           <button
             type="button"
             className="qa-btn"

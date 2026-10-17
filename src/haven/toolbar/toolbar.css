@@ -1,0 +1,443 @@
+/*
+ * App header in the type of TeamSlides', TeamEdit's and Vega's toolbar: edge to edge,
+ * a line below, Figtree 16px, app name in Mindoo blue (text colour in dark), menu names
+ * in the text colour, flat menus.
+ */
+
+/* Figtree — SIL OFL 1.1, https://github.com/erikdkennedy/figtree (same files as Vega/TeamEdit) */
+@font-face {
+  font-family: Figtree;
+  src: url("./fonts/Figtree-latin-ext-wght-normal.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: Figtree;
+  src: url("./fonts/Figtree-latin-wght-normal.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --tg-tb-accent-soft: color-mix(in srgb, var(--tg-mindoo-blue) 12%, transparent);
+  --tg-mindoo-blue: #1f3a8a;
+  --tg-chrome-title: var(--tg-mindoo-blue);
+  --tg-chrome-primary: var(--tg-mindoo-blue);
+  --tg-chrome-primary-hover: #182e70;
+  --tg-chrome-font: Figtree, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+[data-theme="dark"] {
+  --tg-tb-accent-soft: color-mix(in srgb, #7f9cf5 22%, transparent);
+  --tg-chrome-title: var(--text);
+  --tg-chrome-primary: #3d5fc4;
+  --tg-chrome-primary-hover: #4a6cd2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --tg-tb-accent-soft: color-mix(in srgb, #7f9cf5 22%, transparent);
+    --tg-chrome-title: var(--text);
+    --tg-chrome-primary: #3d5fc4;
+    --tg-chrome-primary-hover: #4a6cd2;
+  }
+}
+
+/* The header sits above GenOffice's shell (#root), which takes the rest of the window;
+   screens of our own that cover the editor (welcome, banners) start below it. */
+body.tg-has-toolbar {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
+
+/* Above the editor's "Opening workbook…" screen (35), below its dialogs (40 and up),
+   which cover it like the rest of the app; while a menu is open, above the welcome
+   screen (9000) and the read-only banner, so the menu opens over them (TeamGrid's own
+   dialogs, 10000, stay on top). */
+#tg-toolbar {
+  position: relative;
+  z-index: 38;
+  flex: none;
+}
+
+#tg-toolbar:has(.tg-tb-dropdown) {
+  z-index: 9050;
+}
+
+body.tg-has-toolbar > #root {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+
+body.tg-has-toolbar .app-shell {
+  height: 100%;
+}
+
+.tg-tb {
+  position: relative;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  min-height: 34px;
+  padding: 1px 0.55rem 1px 4px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome-bg);
+  color: var(--text);
+  font: 16px/1.2 var(--tg-chrome-font);
+}
+
+.tg-tb-icon {
+  flex: 0 0 auto;
+  display: block;
+}
+
+.tg-tb-leading {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tg-tb-title {
+  flex: 0 0 auto;
+  margin: 0 0.2rem 0 0.45rem;
+  font-weight: 700;
+  color: var(--tg-chrome-title);
+  white-space: nowrap;
+}
+
+.tg-tb-menubar {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0 2px;
+}
+
+.tg-tb-menu-wrap {
+  position: relative;
+}
+
+.tg-tb-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2rem;
+  padding: 0 0.55rem;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tg-tb-menu-btn .tg-tb-icon,
+.tg-tb-caret {
+  color: var(--text-secondary);
+}
+
+.tg-tb-menu-btn:hover,
+.tg-tb-menu-btn.is-open {
+  background: var(--bg-hover);
+}
+
+.tg-tb-menu-btn:focus-visible,
+.tg-tb-icon-btn:focus-visible,
+.tg-tb-item:focus-visible,
+.tg-tb-doc-title:focus-visible,
+.tg-tb-save:focus-visible {
+  outline: 2px solid var(--tg-chrome-primary);
+  outline-offset: -2px;
+}
+
+.tg-tb-dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  inset-inline-start: 0;
+  z-index: 200;
+  min-width: 200px;
+  max-width: min(22rem, calc(100vw - 1rem));
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--surface);
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.tg-tb-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.4rem 0.75rem;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.tg-tb-item:hover:not(:disabled),
+.tg-tb-item:focus-visible {
+  background: var(--bg-hover);
+}
+
+.tg-tb-item:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.tg-tb-item-icon {
+  display: inline-flex;
+  width: 16px;
+  color: var(--text-secondary);
+}
+
+.tg-tb-item:disabled .tg-tb-item-icon {
+  color: var(--text-tertiary);
+}
+
+.tg-tb-item[aria-checked="true"] .tg-tb-item-icon {
+  color: var(--tg-chrome-primary);
+}
+
+[data-theme="dark"] .tg-tb-item[aria-checked="true"] .tg-tb-item-icon {
+  color: var(--text);
+}
+
+.tg-tb-item-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tg-tb-item-key {
+  margin-inline-start: 1.5rem;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.tg-tb-sep {
+  margin: 4px 0;
+  border-top: 1px solid var(--border);
+}
+
+/* Refresh, icon only (as TeamEdit's) */
+.tg-tb-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tg-tb-icon-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.tg-tb-icon-btn:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+/* The open workbook: title (opens its properties) and × */
+.tg-tb-doc {
+  display: flex;
+  align-items: center;
+  flex: 0 1 min(32rem, 36vw);
+  max-width: min(32rem, 36vw);
+  min-width: 0;
+  padding: 0.08rem 0.18rem 0.08rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.tg-tb-doc:hover,
+.tg-tb-doc:focus-within {
+  border-color: var(--border-strong);
+  background: var(--bg-hover-subtle);
+}
+
+.tg-tb-doc-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.14rem 0.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-align: end;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tg-tb-doc-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.tg-tb-doc-close {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+}
+
+.tg-tb-doc-close:hover,
+.tg-tb-doc-close:focus-visible {
+  background: var(--bg-hover-strong);
+  color: var(--text);
+}
+
+.tg-tb-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.tg-tb-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 1.9rem;
+  padding: 0 0.7rem;
+  border: 0;
+  border-radius: 2px;
+  background: var(--tg-chrome-primary);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tg-tb-save:hover:not(:disabled) {
+  background: var(--tg-chrome-primary-hover);
+}
+
+.tg-tb-save:disabled {
+  opacity: 0.75;
+  cursor: progress;
+}
+
+.tg-tb-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  white-space: nowrap;
+}
+
+/* the status opens time travel (as in TeamEdit) */
+.tg-tb-status--button {
+  border: 0;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tg-tb-status--button:hover {
+  background: var(--tg-tb-accent-soft);
+  color: var(--text);
+}
+
+.tg-tb-status--button:focus-visible {
+  outline: 2px solid var(--tg-chrome-primary);
+  outline-offset: 1px;
+}
+
+.tg-tb-status--readonly {
+  background: var(--tg-tb-accent-soft);
+  color: var(--text);
+}
+
+.tg-tb-status-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 960px) {
+  .tg-tb--ios-multitasking .tg-tb-title {
+    margin-inline-start: 80px;
+  }
+
+  .tg-tb-doc {
+    max-width: 14rem;
+  }
+}
+
+/* Phone: menus as icons, the status as an icon, and the title right of the centre so
+   Haven's app drawer handle (top centre, about 6rem wide) does not cover it. */
+@media (max-width: 720px) {
+  .tg-tb-menu-label,
+  .tg-tb-caret,
+  .tg-tb-status-label,
+  .tg-tb-save-label {
+    display: none;
+  }
+
+  .tg-tb-menu-btn {
+    padding: 0 0.45rem;
+  }
+
+  .tg-tb-save {
+    width: 1.9rem;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .tg-tb-status {
+    width: 1.9rem;
+    height: 1.9rem;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .tg-tb-doc {
+    flex-basis: calc(50vw - 6.75rem);
+    max-width: calc(50vw - 6.75rem);
+  }
+}

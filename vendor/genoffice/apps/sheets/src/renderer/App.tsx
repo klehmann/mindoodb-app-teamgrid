@@ -637,6 +637,10 @@ export function App({
   // Ref mirror for callbacks captured when an AI run starts
   const autoSaveRef = useRef(autoSave)
   autoSaveRef.current = autoSave
+  // [TeamGrid] the app toolbar shows Save while AutoSave is off (src/haven/toolbar)
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('teamgrid:autosave', { detail: autoSave }))
+  }, [autoSave])
   const saveGateRef = useRef(createSaveGate())
   // AutoSave tick (docs/slides parity): every 30 s and on window blur, flush
   // pending edits of the open workbook. The journal is read at tick time so
