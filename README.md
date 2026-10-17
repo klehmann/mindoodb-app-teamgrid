@@ -112,6 +112,19 @@ eight TeamGrid languages (from `Intl`, plus Excel's German "Mrz"/"Mo" style),
 the list that holds every source cell, the UI language first, and the source's
 writing (JANUAR → FEBRUAR).
 
+## Data access
+
+Workbook lists (welcome screen, Open, templates, the agent's `workbooks_list`)
+come from MindooDB's summary buffer with `documents.query`, so no document is
+loaded to list them; title, form, template flag and `copiedFrom` are
+top-level scalars the summary covers by default. While MindooDB is still
+indexing (`coverage: "rebuilding"`) the dialogs say the list may be
+incomplete; a host without `documents.query` is answered by walking the
+database. Only the workbook the user opens is read (`documents.get` of its
+top document and row blocks), and other people's changes are found in the
+changefeed as metadata. New, Import and copying a 1.x workbook need the
+`create` capability (`src/haven/connection.ts`).
+
 ## TeamGrid 1.x workbooks
 
 Workbooks of TeamGrid 1.x (form `teamgrid`) are listed next to the current

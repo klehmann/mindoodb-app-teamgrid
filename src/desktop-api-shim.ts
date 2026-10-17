@@ -379,10 +379,11 @@ async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFil
     const strings = welcomeStrings(welcomeLanguage)
     const all = await listWorkbooks(haven)
     const picked = await chooseWorkbook(
-      all.filter((workbook) => !workbook.istemplate),
+      all.workbooks.filter((workbook) => !workbook.istemplate),
       strings.openTitle,
       strings.empty,
       strings,
+      all.incomplete,
     )
     return picked ? opened(await openStoredWorkbook(haven, picked.id, language)) : null
   }
@@ -394,7 +395,7 @@ async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFil
       answerWelcome = resolve
       void showWelcome({
         language: welcomeLanguage,
-        canCreate: haven.canWrite && !timeTravelDate,
+        canCreate: haven.canCreate,
         listWorkbooks: () => listWorkbooks(haven),
       }).then(resolve)
     })
@@ -639,10 +640,11 @@ async function onToolbarCommand(haven: HavenConnection, command: ToolbarCommand)
     case 'open': {
       const all = await listWorkbooks(haven)
       const picked = await chooseWorkbook(
-        all.filter((workbook) => !workbook.istemplate),
+        all.workbooks.filter((workbook) => !workbook.istemplate),
         strings.openTitle,
         strings.empty,
         strings,
+        all.incomplete,
       )
       if (picked && (await leaveWorkbook())) showWorkbook(picked.id)
       return
@@ -654,8 +656,9 @@ async function onToolbarCommand(haven: HavenConnection, command: ToolbarCommand)
       })
     case 'template':
       return createAndShow(async () => {
-        const templates = (await listWorkbooks(haven)).filter((workbook) => workbook.istemplate)
-        const template = await chooseWorkbook(templates, strings.templateTitle, strings.emptyTemplates, strings)
+        const all = await listWorkbooks(haven)
+        const templates = all.workbooks.filter((workbook) => workbook.istemplate)
+        const template = await chooseWorkbook(templates, strings.templateTitle, strings.emptyTemplates, strings, all.incomplete)
         if (!template) return null
         const subject = await askTitle(strings.newTitle, strings.copyOf.replace('{title}', template.subject), strings)
         return subject === null ? null : () => createFromTemplate(haven, template.id, subject, language)
@@ -945,7 +948,7 @@ export async function installDesktopApiShim(): Promise<void> {
           : undefined,
         hasWorkbook: false,
         title: '',
-        canCreate: connected.canWrite && !timeTravelDate,
+        canCreate: connected.canCreate,
         windows: [],
         pending: false,
         saving: false,
@@ -970,7 +973,7 @@ export async function installDesktopApiShim(): Promise<void> {
     registerTeamgridAgentTools(connected.session, {
       editorReady: editorShowsActiveFile,
       databaseId: () => connected.databaseId,
-      canCreate: () => connected.canWrite && !timeTravelDate,
+      canCreate: () => connected.canCreate,
       openWorkbook() {
         if (!activeSessionId) return null
         // An older revision opens as a plain file session, without a stored document.
@@ -986,7 +989,7 @@ export async function installDesktopApiShim(): Promise<void> {
         }
       },
       async listWorkbooks() {
-        return (await listWorkbooks(connected)).map((entry) => ({
+        return (await listWorkbooks(connected)).workbooks.map((entry) => ({
           workbookId: entry.id,
           title: entry.subject,
           template: entry.istemplate,
