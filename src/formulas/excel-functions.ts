@@ -24,6 +24,10 @@ import {
   StringValueObject,
 } from '@univerjs/engine-formula'
 
+import { accrint } from './accrint'
+import { createComplexExecutors } from './complex'
+import { createConvert } from './convert'
+import { createXlookup } from './xlookup'
 import { criteriaMatcher, type CriteriaCell } from './criteria'
 import { binomialCdf, binomialInverse, binomialPdf, negativeBinomialCdf, negativeBinomialPdf } from './distributions'
 import { addMonths, MAX_DATE_SERIAL } from './dates'
@@ -187,15 +191,30 @@ function createWorkday(): BaseFunction {
 }
 
 /**
- * ACCRINT: Univer reads calc_method straight from the argument, which for a cell
- * reference is a 1×1 array (giving 0, FALSE): the accrued interest then always counted
- * from the first interest date. Single values are handed over instead.
+ * ACCRINT: computed with Excel's coupon schedule and day counts (accrint.ts). Univer's
+ * results were off for several frequency/basis combinations and changed with what the
+ * engine had calculated before. Arrays (spilled calls) stay with Univer.
  */
 function createAccrint(): BaseFunction {
   const Base = univerExecutor('ACCRINT')
   return new (class extends Base {
     override calculate(...args: BaseValueObject[]): CalcResult {
-      return super.calculate(...args.map((arg) => (arg ? single(arg) : arg)))
+      const values = args.map((arg) => (arg ? single(arg) : arg))
+      if (values.some((value) => value?.isArray())) return super.calculate(...values)
+      const numbers: number[] = []
+      for (const [index, value] of values.slice(0, 7).entries()) {
+        if (value?.isError()) return value
+        const number = index === 6 && (!value || value.isNull()) ? 0 : plainNumber(value)
+        if (number === undefined) return ErrorValueObject.create(ErrorType.VALUE)
+        numbers.push(number)
+      }
+      const method = values[7]
+      if (method?.isError()) return method
+      const calcMethod = method === undefined ? true : plainFlag(method)
+      if (calcMethod === undefined) return ErrorValueObject.create(ErrorType.VALUE)
+      const [issue, firstInterest, settlement, rate, par, frequency, basis] = numbers as [number, number, number, number, number, number, number]
+      const result = accrint({ issue, firstInterest, settlement, rate, par, frequency: Math.floor(frequency), basis: Math.floor(basis ?? 0), calcMethod })
+      return result === '#NUM!' ? NUM_ERROR() : num(result)
     }
   })('ACCRINT')
 }
@@ -356,27 +375,6 @@ function createOffset(): BaseFunction {
 }
 
 /**
- * COMPLEX: an empty suffix (a blank cell or "") means "i" in Excel, as an omitted one
- * does; Univer answered #VALUE!, and every IM* function over the result failed with it.
- */
-function createComplex(): BaseFunction {
-  const Base = univerExecutor('COMPLEX')
-  const blank = (value: BaseValueObject | undefined): boolean => {
-    if (!value) return false
-    if (value.isArray()) {
-      const array = value as ArrayValueObject
-      return array.getRowCount() === 1 && array.getColumnCount() === 1 && blank(array.get(0, 0) ?? undefined)
-    }
-    return value.isNull() || (value.isString() && value.getValue() === '')
-  }
-  return new (class extends Base {
-    override calculate(realNum: BaseValueObject, iNum: BaseValueObject, suffix?: BaseValueObject): CalcResult {
-      return super.calculate(realNum, iNum, blank(suffix) ? StringValueObject.create('i') : (suffix as BaseValueObject))
-    }
-  })('COMPLEX')
-}
-
-/**
  * UNICODE of empty text: Excel answers #VALUE! (as CODE does in Univer too), Univer's
  * character code of nothing (NaN) showed as an empty cell.
  */
@@ -390,7 +388,7 @@ function createUnicode(): BaseFunction {
 }
 
 export function createExcelFunctionExecutors(): BaseFunction[] {
-  return [createBinomDist(), createBinomInv('BINOM.INV'), createBinomInv('CRITBINOM'), createNegbinomDist(), createWorkdayIntl(), createWorkday(), createAccrint(), createCountif(), createCountifs(), createIsoCeiling(), createEdate(), createOffset(), createComplex(), createUnicode()]
+  return [createBinomDist(), createBinomInv('BINOM.INV'), createBinomInv('CRITBINOM'), createNegbinomDist(), createWorkdayIntl(), createWorkday(), createAccrint(), createCountif(), createCountifs(), createIsoCeiling(), createEdate(), createOffset(), createUnicode(), ...createComplexExecutors(univerExecutor), createConvert(univerExecutor), createXlookup(univerExecutor)]
 }
 
 /**
