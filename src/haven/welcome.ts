@@ -3,7 +3,7 @@
 // create one from a template or import an xlsx file (like TeamEdit and
 // classic TeamGrid). Plain DOM, so it needs nothing from the editor's React
 // tree; colors come from the suite's theme tokens.
-import type { WorkbookSummary } from './connection'
+import type { WorkbookList, WorkbookSummary } from './connection'
 import { welcomeStrings, type WelcomeStrings } from './welcome-strings'
 
 export type WelcomeChoice =
@@ -36,6 +36,7 @@ const STYLE = `
 .tg-dialog{width:min(520px,calc(100vw - 32px));max-height:min(640px,calc(100vh - 32px));display:flex;flex-direction:column;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;box-shadow:0 8px 32px color-mix(in srgb,var(--text) 25%,transparent);font:14px/1.4 Figtree,Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 .tg-dialog h2{margin:0;padding:16px 20px 8px;font-size:16px;font-weight:600}
 .tg-dialog ul{list-style:none;margin:0;padding:4px 8px;overflow:auto;flex:1;min-height:80px}
+.tg-dialog > div:has(> ul){display:flex;flex-direction:column;min-height:0;flex:1}
 .tg-dialog li button{all:unset;box-sizing:border-box;width:100%;padding:8px 12px;border-radius:var(--tg-radius);cursor:pointer;display:flex;justify-content:space-between;gap:12px}
 .tg-dialog li button:hover,.tg-dialog li button:focus-visible{background:var(--hover)}
 .tg-dialog .tg-date{color:var(--text-secondary);font-size:12px;white-space:nowrap}
@@ -129,8 +130,12 @@ export function chooseWorkbook(
   title: string,
   empty: string,
   strings: WelcomeStrings,
+  /** MindooDB is still indexing the database: say the list may be incomplete. */
+  incomplete = false,
 ): Promise<WorkbookSummary | null> {
   return dialog<WorkbookSummary>(title, strings, (done) => {
+    const body = element('div')
+    if (incomplete) body.append(element('div', 'tg-hint', strings.listIncomplete))
     const list = element('ul')
     if (workbooks.length === 0) list.append(element('li', 'tg-empty', empty))
     for (const workbook of workbooks) {
@@ -143,7 +148,8 @@ export function chooseWorkbook(
       item.append(pick)
       list.append(item)
     }
-    return { body: list }
+    body.append(list)
+    return { body }
   })
 }
 
@@ -229,7 +235,7 @@ export function editProperties(initial: DocumentProperties, strings: WelcomeStri
 export interface WelcomeOptions {
   language: string
   canCreate: boolean
-  listWorkbooks: () => Promise<WorkbookSummary[]>
+  listWorkbooks: () => Promise<WorkbookList>
 }
 
 /**
@@ -265,20 +271,22 @@ export function showWelcome(options: WelcomeOptions): Promise<WelcomeChoice> {
     openButton.addEventListener('click', async () => {
       const all = await options.listWorkbooks()
       const picked = await chooseWorkbook(
-        all.filter((workbook) => !workbook.istemplate),
+        all.workbooks.filter((workbook) => !workbook.istemplate),
         strings.openTitle,
         strings.empty,
         strings,
+        all.incomplete,
       )
       if (picked) resolve({ kind: 'open', id: picked.id })
     })
     templateButton.addEventListener('click', async () => {
       const all = await options.listWorkbooks()
       const template = await chooseWorkbook(
-        all.filter((workbook) => workbook.istemplate),
+        all.workbooks.filter((workbook) => workbook.istemplate),
         strings.templateTitle,
         strings.emptyTemplates,
         strings,
+        all.incomplete,
       )
       if (!template) return
       const subject = await askTitle(strings.newTitle, strings.copyOf.replace('{title}', template.subject), strings)

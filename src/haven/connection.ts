@@ -29,6 +29,8 @@ export interface HavenConnection {
   databaseId: string
   /** False in Haven's time travel, which opens every database read-only. */
   canWrite: boolean
+  /** May create workbooks (the `create` capability; never in Haven's time travel). */
+  canCreate: boolean
 }
 
 let connection: Promise<HavenConnection | null> | undefined
@@ -49,36 +51,103 @@ export function connectHaven(): Promise<HavenConnection | null> {
     const database = await session.openDatabase(databaseId)
     const info = context.databases.find((entry) => entry.id === databaseId)
     const canWrite = !context.timeTravelDate && (info?.capabilities.includes('update') ?? false)
-    return { session, context, database, databaseId, canWrite }
+    const canCreate = !context.timeTravelDate && (info?.capabilities.includes('create') ?? false)
+    return { session, context, database, databaseId, canWrite, canCreate }
   })()
   return connection
 }
 
-/** Documents of one form: id, the listed fields, last change. */
-async function listForm(haven: HavenConnection, form: string) {
-  const items: { id: string; data: Record<string, unknown>; updatedAt?: string }[] = []
+/** Fields a workbook list shows; all are top-level scalars, so the summary buffer covers them. */
+const LIST_FIELDS = ['subject', 'form', 'istemplate', 'copiedFrom']
+/** Rows per `documents.query` page. */
+const QUERY_PAGE = 200
+
+interface FormItem {
+  id: string
+  data: Record<string, unknown>
+  updatedAt?: string
+}
+
+/** A `documents.query` filter: every field equals its value (formula source, parsed by the SDK). */
+export function equalsFilter(fields: Record<string, string>): string {
+  const terms = Object.entries(fields).map(([field, value]) => `v.eq(v.field(${JSON.stringify(field)}), ${JSON.stringify(value)})`)
+  return terms.length === 1 ? terms[0]! : `v.and(${terms.join(', ')})`
+}
+
+/**
+ * Documents matching `fields`, from the database's summary buffer
+ * (`documents.query`): no document is loaded. `complete` is false while the
+ * summary is still being built, when the answer may miss documents
+ * (MindooDB best practices §4.3). A host without query support is answered
+ * by walking the database instead.
+ */
+export async function queryDocuments(
+  haven: HavenConnection,
+  fields: Record<string, string>,
+  options: { limit?: number } = {},
+): Promise<{ items: FormItem[]; complete: boolean }> {
+  try {
+    const items: FormItem[] = []
+    let complete = true
+    for (let offset = 0; ; ) {
+      const page = await haven.database.documents.query({
+        filter: equalsFilter(fields),
+        fields: LIST_FIELDS,
+        limit: Math.min(QUERY_PAGE, options.limit ?? QUERY_PAGE),
+        offset,
+      })
+      if (page.coverage === 'rebuilding') complete = false
+      for (const row of page.rows) {
+        items.push({ id: row.docId, data: row.fields, updatedAt: new Date(row.lastModified).toISOString() })
+      }
+      offset += page.rows.length
+      if (page.rows.length === 0 || offset >= page.total || (options.limit !== undefined && offset >= options.limit)) break
+    }
+    return { items, complete }
+  } catch (error) {
+    console.warn('[newui] documents.query failed; walking the database instead', error)
+    return { items: await scanDocuments(haven, fields), complete: true }
+  }
+}
+
+/** The same by walking the database (loads every document): hosts without `documents.query`. */
+export async function scanDocuments(haven: HavenConnection, fields: Record<string, string>): Promise<FormItem[]> {
+  const items: FormItem[] = []
   let cursor: string | null = null
   do {
     const page = await haven.database.documents.list({
       cursor,
       limit: 200,
-      filter: { form },
-      fields: ['subject', 'form', 'istemplate', 'copiedFrom'],
+      filter: fields,
+      fields: LIST_FIELDS,
     })
     for (const item of page.items) {
-      if (item.data?.form === form) items.push({ id: item.id, data: item.data, ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}) })
+      if (Object.entries(fields).every(([field, value]) => item.data?.[field] === value)) {
+        items.push({ id: item.id, data: item.data ?? {}, ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}) })
+      }
     }
     cursor = page.items.length > 0 ? page.nextCursor : null
   } while (cursor)
   return items
 }
 
+export interface WorkbookList {
+  workbooks: WorkbookSummary[]
+  /** The summary buffer is still being built: workbooks may be missing (show a hint, not an error). */
+  incomplete: boolean
+}
+
 /**
  * The workbooks to offer: the current ones, plus TeamGrid 1.x workbooks that
  * have no copy yet (opening one copies it, see legacy-copy.ts).
  */
-export async function listWorkbooks(haven: HavenConnection): Promise<WorkbookSummary[]> {
-  const [current, legacy] = await Promise.all([listForm(haven, TEAMGRID_FORM), listForm(haven, LEGACY_FORM)])
+export async function listWorkbooks(haven: HavenConnection): Promise<WorkbookList> {
+  const [currentList, legacyList] = await Promise.all([
+    queryDocuments(haven, { form: TEAMGRID_FORM }),
+    queryDocuments(haven, { form: LEGACY_FORM }),
+  ])
+  const current = currentList.items
+  const legacy = legacyList.items
   const copied = new Set(current.map((item) => item.data.copiedFrom).filter((id): id is string => typeof id === 'string'))
   const summary = (item: (typeof current)[number], isLegacy: boolean): WorkbookSummary => ({
     id: item.id,
@@ -87,10 +156,13 @@ export async function listWorkbooks(haven: HavenConnection): Promise<WorkbookSum
     ...(item.updatedAt ? { updatedAt: item.updatedAt } : {}),
     ...(isLegacy ? { legacy: true } : {}),
   })
-  return [
-    ...current.map((item) => summary(item, false)),
-    ...legacy.filter((item) => !copied.has(item.id)).map((item) => summary(item, true)),
-  ].sort((left, right) => left.subject.localeCompare(right.subject))
+  return {
+    workbooks: [
+      ...current.map((item) => summary(item, false)),
+      ...legacy.filter((item) => !copied.has(item.id)).map((item) => summary(item, true)),
+    ].sort((left, right) => left.subject.localeCompare(right.subject)),
+    incomplete: !currentList.complete || !legacyList.complete,
+  }
 }
 
 export interface WorkbookProperties {

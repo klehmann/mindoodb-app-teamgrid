@@ -29,7 +29,8 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tags",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Enter one tag per line. Use a backslash to create hierarchy, for example Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "listIncomplete": "MindooDB is still indexing this database, so the list may be incomplete for a moment."
   },
   "de": {
     "title": "Gemeinsame Tabellen",
@@ -57,7 +58,8 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tags",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Gib pro Zeile einen Tag ein. Verwende einen Backslash für Hierarchien, zum Beispiel Work\\Planning.",
-    "useAsTemplate": "Diese Tabelle als Vorlage verwenden"
+    "useAsTemplate": "Diese Tabelle als Vorlage verwenden",
+    "listIncomplete": "MindooDB indiziert diese Datenbank noch, die Liste kann daher kurz unvollständig sein."
   },
   "fr": {
     "title": "Collaborative spreadsheets",
@@ -85,7 +87,8 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Étiquettes",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Saisissez une étiquette par ligne. Utilisez une barre oblique inverse pour créer une hiérarchie, par exemple Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "listIncomplete": "MindooDB indexe encore cette base de données ; la liste peut être incomplète pendant un instant."
   },
   "it": {
     "title": "Collaborative spreadsheets",
@@ -113,7 +116,8 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tag",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Inserisci un tag per riga. Usa una barra rovesciata per creare una gerarchia, ad esempio Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "listIncomplete": "MindooDB sta ancora indicizzando questo database, quindi per un momento l’elenco potrebbe essere incompleto."
   },
   "es": {
     "title": "Collaborative spreadsheets",
@@ -141,7 +145,8 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Etiquetas",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Introduce una etiqueta por línea. Usa una barra invertida para crear una jerarquía, por ejemplo Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "listIncomplete": "MindooDB todavía está indexando esta base de datos, así que la lista puede estar incompleta por un momento."
   },
   "nl": {
     "title": "Collaborative spreadsheets",
@@ -169,7 +174,8 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tags",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Voer één tag per regel in. Gebruik een backslash om een hiërarchie te maken, bijvoorbeeld Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "listIncomplete": "MindooDB indexeert deze database nog, dus de lijst kan even onvolledig zijn."
   },
   "nb": {
     "title": "Collaborative spreadsheets",
@@ -197,7 +203,8 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tagger",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Skriv inn én tagg per linje. Bruk bakoverstrek for å lage hierarki, for eksempel Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "listIncomplete": "MindooDB indekserer fortsatt denne databasen, så listen kan være ufullstendig en liten stund."
   },
   "pl": {
     "title": "Collaborative spreadsheets",
@@ -225,7 +232,8 @@ export const WELCOME_STRINGS = {
     "tagsLabel": "Tagi",
     "tagsPlaceholder": "Work\\Planning\nCustomer\\ABC",
     "tagsHint": "Wpisz jeden tag w wierszu. Użyj ukośnika wstecznego, aby utworzyć hierarchię, na przykład Work\\Planning.",
-    "useAsTemplate": "Use this spreadsheet as a template"
+    "useAsTemplate": "Use this spreadsheet as a template",
+    "listIncomplete": "MindooDB wciąż indeksuje tę bazę danych, więc lista może przez chwilę być niepełna."
   }
 } as const
 

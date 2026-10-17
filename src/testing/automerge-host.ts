@@ -169,6 +169,7 @@ export class AutomergeTestHost {
 
   readonly connection: HavenConnection = {
     canWrite: true,
+    canCreate: true,
     databaseId: 'test',
     session: {} as HavenConnection['session'],
     context: {} as HavenConnection['context'],

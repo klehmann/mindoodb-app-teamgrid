@@ -5,7 +5,7 @@
 import { convertLegacyWorkbook, legacyWorkbookOf } from '../model/legacy'
 import { TEAMGRID_FORM } from '../model/schema'
 import { emptyStoredWorkbook, writesFor } from '../model/sync'
-import type { HavenConnection } from './connection'
+import { queryDocuments, scanDocuments, type HavenConnection } from './connection'
 import { createWorkbook } from './store'
 
 /** The id to open for `id`: itself, or the current-format copy of a 1.x workbook (made on first open). */
@@ -16,7 +16,7 @@ export async function workbookToOpen(haven: HavenConnection, id: string): Promis
   if (!legacy) return id
   const existing = await findCopy(haven, id)
   if (existing) return existing
-  if (!haven.canWrite) throw new Error('This TeamGrid 1 workbook can only be opened by someone who may create workbooks.')
+  if (!haven.canCreate) throw new Error('This TeamGrid 1 workbook can only be opened by someone who may create workbooks.')
   const workbook = convertLegacyWorkbook(legacy)
   const tags = Array.isArray(data.tags) ? data.tags.filter((tag): tag is string => typeof tag === 'string') : []
   return createWorkbook(
@@ -29,17 +29,10 @@ export async function workbookToOpen(haven: HavenConnection, id: string): Promis
 }
 
 async function findCopy(haven: HavenConnection, legacyId: string): Promise<string | undefined> {
-  let cursor: string | null = null
-  do {
-    const page = await haven.database.documents.list({
-      cursor,
-      limit: 200,
-      filter: { form: TEAMGRID_FORM, copiedFrom: legacyId },
-      fields: ['form', 'copiedFrom'],
-    })
-    const hit = page.items.find((item) => item.data?.copiedFrom === legacyId)
-    if (hit) return hit.id
-    cursor = page.items.length > 0 ? page.nextCursor : null
-  } while (cursor)
+  const fields = { form: TEAMGRID_FORM, copiedFrom: legacyId }
+  const { items, complete } = await queryDocuments(haven, fields, { limit: 1 })
+  if (items[0]) return items[0].id
+  // A summary still being built may not know the copy yet; a second copy must not be made.
+  if (!complete) return (await scanDocuments(haven, fields))[0]?.id
   return undefined
 }
