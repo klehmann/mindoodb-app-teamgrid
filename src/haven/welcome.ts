@@ -19,7 +19,7 @@ const STYLE = `
 :root{--tg-primary:#1f3a8a;--tg-primary-hover:#243c8f;--tg-primary-active:#182a63;--tg-on-primary:#ffffff;--tg-secondary-bg:#f4f6f8;--tg-secondary-hover:#e8eaee;--tg-secondary-active:#d5d9e0;--tg-secondary-text:#475569;--tg-focus-ring:rgba(212,160,23,.38);--tg-muted:#667795;--tg-radius:2px}
 :root[data-theme="dark"]{--tg-secondary-bg:#27272a;--tg-secondary-hover:#3f3f46;--tg-secondary-active:#52525b;--tg-secondary-text:#d4d4d8;--tg-muted:#a7b4cf}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--tg-secondary-bg:#27272a;--tg-secondary-hover:#3f3f46;--tg-secondary-active:#52525b;--tg-secondary-text:#d4d4d8;--tg-muted:#a7b4cf}}
-.tg-welcome{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.25rem 1.5rem;background:var(--surface);color:var(--text);font:16px/1.55 Figtree,Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.tg-welcome{position:fixed;inset:var(--tg-toolbar-height,0px) 0 0 0;z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.25rem 1.5rem;background:var(--surface);color:var(--text);font:16px/1.55 Figtree,Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 .tg-welcome__inner{max-width:36rem;display:grid;gap:.85rem;text-align:center}
 .tg-welcome h1{margin:0;font-size:clamp(1.5rem,3.5vw,2.4rem);line-height:1.15;font-weight:700}
 .tg-welcome p{margin:0;color:var(--tg-muted)}
@@ -179,6 +179,25 @@ export function chooseRevision<T extends RevisionChoice>(
     }
     body.append(list)
     return { body }
+  })
+}
+
+/** A question with buttons (the last one primary); resolves with the picked key or null (Cancel). */
+export function askChoice<K extends string>(
+  title: string,
+  message: string,
+  choices: readonly { key: K; label: string }[],
+  strings: WelcomeStrings,
+): Promise<K | null> {
+  return dialog<K>(title, strings, (done) => {
+    const body = element('p', 'tg-message', message)
+    const actions = choices.map((choice, index) => {
+      const action = button(choice.label, index === choices.length - 1 ? 'tg-btn--primary' : '')
+      action.addEventListener('click', () => done(choice.key))
+      return action
+    })
+    queueMicrotask(() => actions[actions.length - 1]?.focus())
+    return { body, actions }
   })
 }
 
