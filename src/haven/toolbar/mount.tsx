@@ -3,13 +3,19 @@
 import { useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
 
+import type { HistoryStrings } from '../history-strings'
 import type { ToolbarStrings } from '../toolbar-strings'
 import type { WelcomeStrings } from '../welcome-strings'
 import { AppToolbar, type ToolbarCommand, type ToolbarState } from './AppToolbar'
+import { TimeTravelPanel, type TimeTravelApi } from './TimeTravelPanel'
 
 export interface ToolbarView extends ToolbarState {
   t: ToolbarStrings
   w: WelcomeStrings
+  h: HistoryStrings
+  language: string
+  /** Time travel is open, for the workbook with this id (its panel remounts per workbook). */
+  historyFor: string | null
 }
 
 export interface ToolbarHandle {
@@ -19,7 +25,12 @@ export interface ToolbarHandle {
 
 export function mountToolbar(
   initial: ToolbarView,
-  handlers: { onCommand: (command: ToolbarCommand) => void; onSwitch: (id: string) => void },
+  handlers: {
+    onCommand: (command: ToolbarCommand) => void
+    onSwitch: (id: string) => void
+    timeTravel: TimeTravelApi
+    onCloseHistory: () => void
+  },
 ): ToolbarHandle {
   let state = initial
   const listeners = new Set<() => void>()
@@ -39,7 +50,20 @@ export function mountToolbar(
 
   function Host() {
     const view = useSyncExternalStore(subscribe, () => state)
-    return <AppToolbar {...view} onCommand={handlers.onCommand} onSwitch={handlers.onSwitch} />
+    return (
+      <>
+        <AppToolbar {...view} onCommand={handlers.onCommand} onSwitch={handlers.onSwitch} />
+        {view.historyFor && (
+          <TimeTravelPanel
+            key={view.historyFor}
+            t={view.h}
+            language={view.language}
+            api={handlers.timeTravel}
+            onClose={handlers.onCloseHistory}
+          />
+        )}
+      </>
+    )
   }
   createRoot(host).render(<Host />)
 

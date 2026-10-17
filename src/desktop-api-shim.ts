@@ -28,17 +28,17 @@ import { installTextValues } from './formulas/text-values'
 import { installExcelFunctions } from './formulas/excel-functions'
 import { installImplicitIntersection } from './formulas/implicit-intersection'
 import { activeWorkbook, installUniverAccess } from './univer-access'
-import { hideBanner, showBanner } from './haven/banner'
+import { showBanner } from './haven/banner'
 import type { ToolbarCommand } from './haven/toolbar/AppToolbar'
+import type { HistoryPoint, HistoryScope, TimeTravelApi } from './haven/toolbar/TimeTravelPanel'
 import { mountToolbar, type ToolbarHandle } from './haven/toolbar/mount'
 import { toolbarStrings } from './haven/toolbar-strings'
 import { WorkbookWindows, type WindowView } from './haven/windows'
-import { canBrowseHistory, listRevisions } from './haven/history'
+import { canBrowseHistory, listRevisions, listSheetRevisions } from './haven/history'
 import { historyStrings } from './haven/history-strings'
 import {
   askChoice,
   askTitle,
-  chooseRevision,
   chooseWorkbook,
   closeWelcome,
   editProperties,
@@ -211,9 +211,16 @@ function toUiTheme(mode: string | undefined): UiTheme {
   return mode === 'light' || mode === 'dark' ? mode : 'system'
 }
 
-/** A revision to open next (File → Browse revisions), and the workbook the open session shows an older state of. */
-let pendingRevision: { id: string; timestamp: number } | null = null
+/**
+ * An earlier version to open next (time travel): the workbook, the instant,
+ * and the sheet when only that one travels. The open session then shows an
+ * older state of `historicalOf`, as of `historicalAt`.
+ */
+let pendingRevision: { id: string; timestamp: number; sheetId?: string | undefined } | null = null
 let historicalOf: string | null = null
+let historicalAt: number | null = null
+/** The revision the last time-travel request opened, or why it failed. */
+let revisionShown: { request: object; error?: unknown } | null = null
 /** Haven's time travel: everything is read-only as of this time (ms). */
 let timeTravelDate: number | null = null
 
@@ -242,19 +249,16 @@ function editorShowsActiveFile(): boolean {
   return activeFile!.sheets.every((sheet, index) => info.sheets[index]?.id === sheet.id && info.sheets[index]?.name === sheet.name)
 }
 
-function opened(file: WorkbookFile, revisionOf: string | null = null): WorkbookFile {
+function opened(file: WorkbookFile, revisionOf: string | null = null, at: number | null = null): WorkbookFile {
   if (activeSessionId !== file.sessionId) arrayFormulaCells.clear()
   activeSessionId = file.sessionId
   activeFile = file
   historicalOf = revisionOf
-  if (revisionOf) {
-    const strings = historyStrings(welcomeLanguage)
-    showBanner(strings.historicalBanner, { label: strings.returnToCurrent, run: () => openInEditor(revisionOf) })
-  } else if (!timeTravelDate) {
-    hideBanner()
-  }
+  historicalAt = revisionOf ? at : null
   const stored = storedDocumentOf(file.sessionId)
   const id = revisionOf ?? stored?.loaded.id
+  // Time travel belongs to the workbook it was opened for.
+  if (toolbar?.get().historyFor && toolbar.get().historyFor !== id) toolbar.update({ historyFor: null })
   if (id) {
     const entry = windows.show(id, stored?.loaded.subject ?? file.name)
     if (entry.view && !pendingView) pendingView = { id, view: entry.view }
@@ -323,6 +327,10 @@ function syncToolbar(): void {
     pending: !autoSaveOn && pendingEdits > 0,
     saving: explicitSaving,
     readOnly: activeFile?.readOnly ?? false,
+    travelLabel:
+      historicalAt === null
+        ? undefined
+        : `${historyStrings(welcomeLanguage).badge} · ${new Intl.DateTimeFormat(welcomeLanguage, { dateStyle: 'short', timeStyle: 'short' }).format(historicalAt)}`,
   })
 }
 
@@ -330,30 +338,6 @@ function showTimeTravelBanner(): void {
   if (!timeTravelDate) return
   const date = new Intl.DateTimeFormat(welcomeLanguage, { dateStyle: 'medium', timeStyle: 'short' }).format(timeTravelDate)
   showBanner(historyStrings(welcomeLanguage).timeTravelBanner.replace('{date}', date))
-}
-
-/** Lists the open workbook's revisions and opens the picked one read-only (or the current state). */
-async function browseRevisions(haven: HavenConnection): Promise<void> {
-  const id = historicalOf ?? (activeSessionId ? storedDocumentOf(activeSessionId)?.loaded.id : undefined)
-  if (!id) return
-  const strings = historyStrings(welcomeLanguage)
-  await waitForSave()
-  let revisions
-  try {
-    revisions = await listRevisions(haven, await loadWorkbook(haven, id))
-  } catch (error) {
-    console.error('[newui] listing revisions failed', error)
-    showBanner(strings.listFailed)
-    return
-  }
-  const picked = await chooseRevision(revisions, strings, welcomeStrings(welcomeLanguage), welcomeLanguage)
-  if (!picked) return
-  if (picked.current) {
-    openInEditor(id)
-    return
-  }
-  pendingRevision = { id, timestamp: picked.timestamp }
-  devHooks.menu('open')
 }
 
 /** Creates or picks the workbook a welcome-screen or file-menu choice stands for. */
@@ -373,13 +357,14 @@ async function workbookForChoice(haven: HavenConnection, choice: WelcomeChoice):
  */
 async function selectStoredWorkbook(haven: HavenConnection): Promise<WorkbookFile | null> {
   if (pendingRevision) {
-    const { id, timestamp } = pendingRevision
+    const request = pendingRevision
     pendingRevision = null
     try {
-      return opened(await openHistoricalWorkbook(haven, id, timestamp, language), id)
+      const file = await openHistoricalWorkbook(haven, request.id, request.timestamp, language, request.sheetId)
+      revisionShown = { request }
+      return opened(file, request.id, request.timestamp)
     } catch (error) {
-      console.error('[newui] opening the revision failed', error)
-      showBanner(historyStrings(welcomeLanguage).loadFailed)
+      revisionShown = { request, error }
       return null
     }
   }
@@ -483,21 +468,101 @@ async function explicitSave(): Promise<void> {
 
 /** Opens `id` through the editor's own open flow (callers save pending edits first). */
 function openInEditor(id: string): void {
+  pendingRevision = null
   pendingDocumentId = id
+  askEditorToOpen(
+    () => pendingDocumentId === id,
+    () => (pendingDocumentId = null),
+  )
+}
+
+/**
+ * Sends the editor Open. It ignores Open while it loads a workbook, or reloads
+ * one after a save; ask again until the request was taken, and drop it if it
+ * never is.
+ */
+function askEditorToOpen(pending: () => boolean, drop: () => void): void {
   devHooks.menu('open')
-  // The editor ignores Open while it loads a workbook, or reloads one after a
-  // save; ask again until the request was taken, and drop it if it never is.
   if (openRetry) clearInterval(openRetry)
   const started = Date.now()
   openRetry = setInterval(() => {
-    if (pendingDocumentId === id && Date.now() - started < 30_000) {
+    if (pending() && Date.now() - started < 30_000) {
       devHooks.menu('open')
       return
     }
-    if (pendingDocumentId === id) pendingDocumentId = null
+    if (pending()) drop()
     clearInterval(openRetry!)
     openRetry = null
   }, 1_000)
+}
+
+/** Resolves once `done` holds (checked every 100 ms), or fails after `timeoutMs`. */
+async function until(done: () => boolean, timeoutMs = 30_000): Promise<void> {
+  for (const started = Date.now(); !done(); ) {
+    if (Date.now() - started > timeoutMs) throw new Error('The editor did not show the workbook in time.')
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+}
+
+/** Time travel's view of the shim: the panel lists versions and asks for one to be shown. */
+function timeTravelApi(haven: HavenConnection): TimeTravelApi {
+  /** The workbook travelled in: the shown one, or the one an older version is shown of. */
+  const workbookId = () => historicalOf ?? (activeSessionId ? storedDocumentOf(activeSessionId)?.loaded.id : undefined)
+  let sheetIds = new Map<string, string>()
+  return {
+    activeSheet() {
+      const name = activeWorkbook()?.getActiveSheet()?.getSheetName()
+      const stored = activeSessionId ? storedDocumentOf(activeSessionId) : undefined
+      if (stored) {
+        sheetIds = new Map(
+          Object.values(stored.loaded.stored.workbook.worksheetsById)
+            .filter((sheet) => !sheet.deletedAt)
+            .map((sheet) => [sheet.name, sheet.id]),
+        )
+      }
+      const id = name ? sheetIds.get(name) : undefined
+      return name && id ? { id, name } : undefined
+    },
+    async timeline(scope: HistoryScope, sheetId: string | undefined): Promise<HistoryPoint[]> {
+      const id = workbookId()
+      if (!id) return []
+      if (!historicalOf) await waitForSave()
+      const loaded = await loadWorkbook(haven, id)
+      const revisions =
+        scope === 'sheet' && sheetId ? await listSheetRevisions(haven, loaded, sheetId) : await listRevisions(haven, loaded)
+      // Newest first, and the newest is the workbook as it is ("Now").
+      return revisions
+        .slice(1)
+        .reverse()
+        .map(({ timestamp, author }) => ({ at: timestamp, ...(author ? { author } : {}) }))
+    },
+    async show(at: number | null, scope: HistoryScope, sheetId: string | undefined) {
+      const id = workbookId()
+      if (!id) return
+      if (at === null) {
+        if (!historicalOf) return
+        openInEditor(id)
+        await until(() => !historicalOf && storedDocumentOf(activeSessionId ?? '')?.loaded.id === id && editorShowsActiveFile())
+        return
+      }
+      if (!historicalOf) {
+        // Leaving the present: its edits are saved, and the view is where every version opens.
+        await waitForSave()
+        rememberView()
+      }
+      const request = { id, timestamp: at, ...(scope === 'sheet' && sheetId ? { sheetId } : {}) }
+      pendingDocumentId = null
+      pendingRevision = request
+      revisionShown = null
+      askEditorToOpen(
+        () => pendingRevision === request,
+        () => (pendingRevision = null),
+      )
+      const outcome = () => revisionShown as { request: object; error?: unknown } | null // set by the open flow
+      await until(() => outcome()?.request === request && (outcome()!.error !== undefined || editorShowsActiveFile()))
+      if (outcome()?.error) throw outcome()!.error
+    },
+  }
 }
 
 /**
@@ -616,14 +681,18 @@ async function onToolbarCommand(haven: HavenConnection, command: ToolbarCommand)
     case 'print':
       if (activeSessionId && !welcomeShown) devHooks.menu(command)
       return
-    case 'revisions':
-      return browseRevisions(haven)
+    case 'history': {
+      const id = windows.active?.id
+      if (!id || welcomeShown) return
+      toolbar?.update({ historyFor: toolbar.get().historyFor ? null : id })
+      return
+    }
     case 'refresh': {
       const id = windows.active?.id
       if (!id || welcomeShown) return
-      // An older revision: back to the current state.
-      if (!historicalOf && !(await leaveWorkbook())) return
-      if (historicalOf) rememberView()
+      // An earlier version: back to the current one (time travel closes).
+      if (historicalOf) toolbar?.update({ historyFor: null })
+      else if (!(await leaveWorkbook())) return
       pendingView = windows.active?.view ? { id, view: windows.active.view } : null
       openInEditor(id)
       return
@@ -703,7 +772,17 @@ function createApi(haven: HavenConnection | null): Partial<DesktopApi> {
       haven?.session.onLocaleChange((locale) => {
         language = toLang(locale)
         welcomeLanguage = locale.slice(0, 2).toLowerCase()
-        toolbar?.update({ t: toolbarStrings(welcomeLanguage), w: welcomeStrings(welcomeLanguage) })
+        const history = historyStrings(welcomeLanguage)
+        toolbar?.update({
+          t: toolbarStrings(welcomeLanguage),
+          w: welcomeStrings(welcomeLanguage),
+          h: history,
+          language: welcomeLanguage,
+          ...(toolbar.get().history
+            ? { history: { currentLabel: history.currentSaved, tip: history.tip, historicalTip: history.historicalTip } }
+            : {}),
+        })
+        syncToolbar()
         handler(language as Parameters<typeof handler>[0])
       }) ?? (() => {}),
     onThemeChanged: (handler) => haven?.session.onThemeChange((theme) => handler(toUiTheme(theme.mode))) ?? (() => {}),
@@ -855,7 +934,15 @@ export async function installDesktopApiShim(): Promise<void> {
       {
         t: toolbarStrings(welcomeLanguage),
         w: welcomeStrings(welcomeLanguage),
-        revisionsLabel: historyAvailable ? historyStrings(welcomeLanguage).browseRevisions : undefined,
+        h: historyStrings(welcomeLanguage),
+        language: welcomeLanguage,
+        historyFor: null,
+        history: historyAvailable
+          ? (() => {
+              const strings = historyStrings(welcomeLanguage)
+              return { currentLabel: strings.currentSaved, tip: strings.tip, historicalTip: strings.historicalTip }
+            })()
+          : undefined,
         hasWorkbook: false,
         title: '',
         canCreate: connected.canWrite && !timeTravelDate,
@@ -872,6 +959,8 @@ export async function installDesktopApiShim(): Promise<void> {
         onSwitch: (id) => {
           switchWindow(id).catch((error) => console.error('[newui] switching workbooks failed', error))
         },
+        timeTravel: timeTravelApi(connected),
+        onCloseHistory: () => toolbar?.update({ historyFor: null }),
       },
     )
     connected.session.onUiPreferencesChange?.((preferences) =>

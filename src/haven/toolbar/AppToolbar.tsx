@@ -19,7 +19,7 @@ export type ToolbarCommand =
   | 'export-csv'
   | 'print'
   | 'refresh'
-  | 'revisions'
+  | 'history'
   | 'close'
   | 'list'
 
@@ -42,8 +42,13 @@ export interface ToolbarState {
   iosMultitasking: boolean
   /** The open workbook cannot be changed (no write access, time travel, an older revision). */
   readOnly: boolean
-  /** The File menu's revisions entry, when the workbook's history can be browsed. */
-  revisionsLabel?: string | undefined
+  /**
+   * The database keeps history: the status at the right end opens time travel
+   * (as in TeamSlides and TeamEdit), with these texts.
+   */
+  history?: { currentLabel: string; tip: string; historicalTip: string } | undefined
+  /** An earlier version is shown (time travel): the status says so instead of "Read only". */
+  travelLabel?: string | undefined
 }
 
 export interface AppToolbarProps extends ToolbarState {
@@ -317,7 +322,7 @@ function MenuBar({ menus }: { menus: MenuSpec[] }) {
 }
 
 export function AppToolbar(props: AppToolbarProps) {
-  const { t, w, hasWorkbook, onCommand } = props
+  const { t, w, hasWorkbook, history, onCommand } = props
   const command = (key: ToolbarCommand) => () => onCommand(key)
 
   const fileEntries: MenuEntry[] = [
@@ -332,11 +337,6 @@ export function AppToolbar(props: AppToolbarProps) {
           { key: 'save', label: t.save, icon: ICONS.save, shortcut: shortcut('S'), disabled: !hasWorkbook, onSelect: command('save') },
         ] satisfies MenuEntry[])),
     { key: 'properties', label: `${w.propertiesTitle}…`, icon: ICONS.properties, disabled: !hasWorkbook, onSelect: command('properties') },
-    ...(props.revisionsLabel
-      ? ([
-          { key: 'revisions', label: `${props.revisionsLabel}…`, icon: ICONS.history, disabled: !hasWorkbook, onSelect: command('revisions') },
-        ] satisfies MenuEntry[])
-      : []),
     'separator',
     { key: 'export-xlsx', label: w.exportXlsx, icon: ICONS.download, disabled: !hasWorkbook, onSelect: command('export-xlsx') },
     { key: 'export-csv', label: t.exportCsv, icon: ICONS.csv, disabled: !hasWorkbook, onSelect: command('export-csv') },
@@ -409,10 +409,24 @@ export function AppToolbar(props: AppToolbarProps) {
       <div className="tg-tb-meta">
         {hasWorkbook &&
           (props.readOnly ? (
-            <span className="tg-tb-status tg-tb-status--readonly" role="status" title={t.readOnlyHint} data-testid="teamgrid-read-only">
-              {ICONS.lock}
-              <span className="tg-tb-status-label">{t.readOnly}</span>
-            </span>
+            history ? (
+              <button
+                type="button"
+                className="tg-tb-status tg-tb-status--readonly tg-tb-status--button"
+                data-tip={props.travelLabel ? history.historicalTip : t.readOnlyHint}
+                aria-label={props.travelLabel ?? t.readOnly}
+                data-testid="teamgrid-read-only"
+                onClick={command('history')}
+              >
+                {props.travelLabel ? ICONS.history : ICONS.lock}
+                <span className="tg-tb-status-label">{props.travelLabel ?? t.readOnly}</span>
+              </button>
+            ) : (
+              <span className="tg-tb-status tg-tb-status--readonly" role="status" title={t.readOnlyHint} data-testid="teamgrid-read-only">
+                {ICONS.lock}
+                <span className="tg-tb-status-label">{t.readOnly}</span>
+              </span>
+            )
           ) : props.pending || props.saving ? (
             <button
               type="button"
@@ -425,6 +439,18 @@ export function AppToolbar(props: AppToolbarProps) {
             >
               {ICONS.save}
               <span className="tg-tb-save-label">{saveLabel}</span>
+            </button>
+          ) : history ? (
+            <button
+              type="button"
+              className="tg-tb-status tg-tb-status--button"
+              data-tip={history.tip}
+              aria-label={history.currentLabel}
+              data-testid="teamgrid-saved"
+              onClick={command('history')}
+            >
+              {ICONS.saved}
+              <span className="tg-tb-status-label">{history.currentLabel}</span>
             </button>
           ) : (
             <span className="tg-tb-status" role="status" title={t.saved} data-testid="teamgrid-saved">
