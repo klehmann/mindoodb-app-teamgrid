@@ -48,10 +48,11 @@ an xlsx and Cmd/Ctrl+S downloads it.
 
 Inside Haven a header sits above GenOffice's ribbon, as in TeamSlides and
 TeamEdit (`src/haven/toolbar/`): the app name, the File menu (new, open, from
-template, import XLSX, save, properties, revisions, export XLSX or the sheet
+template, import XLSX, save, properties, export XLSX or the sheet
 as CSV, print), the Window menu, Refresh, the open workbook's title (opens its
 properties, × closes it) and, at the right end, Save while AutoSave is off and
-edits are unsaved, else "Saved" (or "Read only"). The ribbon has no Save
+edits are unsaved, else "Saved" (with history: "Current · Saved", which
+opens time travel; or "Read only"). The ribbon has no Save
 buttons of its own any more (`patches/sheets-window-toolbar.patch`).
 
 Several workbooks can be open at once (Window menu, `src/haven/windows.ts`).
@@ -121,17 +122,23 @@ the original. The conversion keeps all ids, so formulas, chart ranges and
 view sheets stay bound (`src/model/legacy.ts`, `src/haven/legacy-copy.ts`).
 The test host seeds a 1.x sample workbook ("Umsatz 2025").
 
-## Revisions
+## Time travel
 
-File → Browse revisions lists the open workbook's revisions: the timelines
-of the top document and its row blocks merged, the writes of one save (same
-author, within 1.5 s) counted once. Picking one opens the workbook as every
-document stood at that time, read-only and detached from the stored
-document, with a banner leading back to the current state
-(`src/haven/history.ts`). In Haven's time travel the whole app is read-only
-and a banner names the date. The mock only keeps document history from
-App SDK PR klehmann/mindoodb-app-sdk#20 on (`pnpm dev:local` with that
-branch checked out).
+With the history capability, the status at the right end of the toolbar reads
+"Current · Saved" and opens time travel, as in TeamSlides and TeamEdit: a
+slider over the earlier versions of the open workbook, or of the sheet in
+view. Moving it shows that version in the editor, read-only, and the status
+says "Earlier version · date"; the right end ("Now") and closing the panel go
+back to the workbook as it is.
+
+A workbook is a top document plus row-block documents, and a save writes
+only the documents it changed, so the workbook's timeline is the merge of
+all their timelines, the writes of one save (same author, within 1.5 s)
+counted once; a version is every document as of that time. A sheet's
+timeline holds the writes of its row blocks and the top-document writes that
+changed this sheet's part; its versions show that sheet as it was and every
+other sheet as it is (`src/haven/history.ts`, `src/haven/toolbar/TimeTravelPanel.tsx`).
+In Haven's time travel the whole app is read-only and a banner names the date.
 
 ## Agent tools
 

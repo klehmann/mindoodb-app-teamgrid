@@ -141,3 +141,48 @@ test('File menu exports the sheet as CSV', async ({ page }) => {
   const file = await download
   expect(file.suggestedFilename()).toBe('Plan.csv')
 })
+
+test('time travel from the status shows earlier versions read-only, of the workbook or of one sheet', async ({ page }) => {
+  const host = new TeamGridHost(page)
+  const frame = app(host)
+  // Saves more than a moment apart are versions of their own.
+  await page.waitForTimeout(2_000)
+  await cells(host, { A1: 'Task v2' })
+  await page.waitForTimeout(2_000)
+  await cells(host, { A1: 'Task v3' })
+
+  await frame.getByTestId('teamgrid-saved').click()
+  const panel = frame.getByTestId('teamgrid-history')
+  await expect(panel).toBeVisible()
+  await expect(frame.getByTestId('teamgrid-history-info')).toContainText('Now')
+  const slider = frame.getByTestId('teamgrid-history-slider')
+  const versions = Number(await slider.getAttribute('max'))
+  expect(versions).toBeGreaterThanOrEqual(2)
+
+  await panel.getByRole('button', { name: 'Earlier version' }).click()
+  await expect(frame.getByTestId('teamgrid-read-only')).toContainText('Earlier version')
+  await expect.poll(async () => (await host.readCells('sheet-1', ['A1'])).A1?.value).toBe('Task v2')
+  expect((await host.call<Context & { workbook: { readOnly: boolean } }>('get_context')).workbook?.readOnly).toBe(true)
+
+  await panel.getByRole('button', { name: 'Earlier version' }).click()
+  await expect.poll(async () => (await host.readCells('sheet-1', ['A1'])).A1?.value).toBe('Task')
+
+  // Back to now: editable again, the latest state.
+  await frame.getByTestId('teamgrid-history-now').click()
+  await expect(frame.getByTestId('teamgrid-saved')).toContainText('Current · Saved')
+  await expect.poll(async () => (await host.readCells('sheet-1', ['A1'])).A1?.value).toBe('Task v3')
+
+  // The sheet scope names the sheet in view and has the same saves here (one sheet).
+  await frame.getByTestId('teamgrid-history-scope-sheet').click()
+  await expect(frame.getByTestId('teamgrid-history-scope-sheet')).toHaveText('Sheet “Tabelle1”')
+  await expect(frame.getByTestId('teamgrid-history-slider')).toHaveAttribute('max', String(versions))
+  await frame.getByTestId('teamgrid-history-slider').fill('0')
+  await expect(frame.getByTestId('teamgrid-read-only')).toContainText('Earlier version')
+  await expect.poll(async () => (await host.readCells('sheet-1', ['A1'])).A1?.value).toBe('Task')
+
+  // Closing the panel returns to the current version.
+  await panel.getByRole('button', { name: 'Close' }).click()
+  await expect(panel).toHaveCount(0)
+  await expect(frame.getByTestId('teamgrid-saved')).toBeVisible()
+  await expect.poll(async () => (await host.readCells('sheet-1', ['A1'])).A1?.value).toBe('Task v3')
+})

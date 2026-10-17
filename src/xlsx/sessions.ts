@@ -16,7 +16,7 @@ import {
   type WorkbookSaveRequest,
 } from '../../vendor/genoffice/apps/sheets/src/shared/desktop-api'
 import type { HavenConnection } from '../haven/connection'
-import { loadWorkbookAt } from '../haven/history'
+import { loadSheetAt, loadWorkbookAt } from '../haven/history'
 import { workbookToOpen } from '../haven/legacy-copy'
 import {
   createWorkbook,
@@ -126,10 +126,19 @@ async function openLoaded(haven: HavenConnection, loaded: LoadedWorkbook, engine
 
 /**
  * Opens a workbook as it was at `timestamp`, read-only and detached from its
- * document: nothing the editor does reaches the stored workbook.
+ * document: nothing the editor does reaches the stored workbook. With
+ * `sheetId`, only that sheet is as it was; the others are as they are.
  */
-export async function openHistoricalWorkbook(haven: HavenConnection, id: string, timestamp: number, locale: string) {
-  const { subject, workbook } = await loadWorkbookAt(haven, id, timestamp)
+export async function openHistoricalWorkbook(
+  haven: HavenConnection,
+  id: string,
+  timestamp: number,
+  locale: string,
+  sheetId?: string,
+) {
+  const { subject, workbook } = sheetId
+    ? await loadSheetAt(haven, await loadWorkbook(haven, id), sheetId, timestamp)
+    : await loadWorkbookAt(haven, id, timestamp)
   const { bytes } = await workbookToXlsx(workbook, await loadXlsxEngine(), {
     loadImage: (attachment) => readAttachmentBase64(haven, id, attachment).catch(() => undefined),
   })

@@ -1,5 +1,5 @@
-// A slim notice over the editor's status bar: "you are looking at an older
-// revision / at Haven's time travel — read-only", optionally with a button.
+// A slim notice over the editor's status bar: "you are looking at Haven's
+// time travel — read-only", optionally with a button.
 const STYLE = `
 .tg-banner{--tg-banner-action:#1f3a8a;--tg-banner-action-hover:#243c8f;--tg-banner-on-action:#ffffff;--tg-banner-focus:rgba(212,160,23,.38);position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:8500;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:8px 14px;border-radius:4px;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);box-shadow:0 6px 24px color-mix(in srgb,var(--text) 20%,transparent);font:13px/1.4 system-ui,sans-serif}
 .tg-banner svg{flex:none;width:16px;height:16px}

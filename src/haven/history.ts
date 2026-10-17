@@ -30,11 +30,55 @@ export function canBrowseHistory(haven: HavenConnection): boolean {
 /** The workbook's revisions, newest first. */
 export async function listRevisions(haven: HavenConnection, loaded: LoadedWorkbook): Promise<WorkbookRevision[]> {
   const ids = [loaded.id, ...loaded.stored.chunks.keys()]
-  const timelines = await Promise.all(
-    ids.map((id) => haven.database.documents.listHistory(id).catch((): MindooDBAppDocumentHistoryEntry[] => [])),
+  return revisionsOf((await Promise.all(ids.map((id) => historyOf(haven, id)))).flat())
+}
+
+/** Top-document writes a sheet's timeline looks at, newest first (each is read back). */
+const SHEET_TOP_ENTRIES = 300
+
+/**
+ * One sheet's revisions, newest first: the writes of its row blocks, and of
+ * the top document where they changed this sheet (columns, merges, formats,
+ * name, …), not the ones that only changed other sheets.
+ */
+export async function listSheetRevisions(
+  haven: HavenConnection,
+  loaded: LoadedWorkbook,
+  sheetId: string,
+): Promise<WorkbookRevision[]> {
+  const chunkIds = loaded.stored.workbook.worksheetsById[sheetId]?.chunkOrder ?? []
+  const [top, ...chunks] = await Promise.all([loaded.id, ...chunkIds].map((id) => historyOf(haven, id)))
+  const topEntries = top!
+    .filter((entry) => !entry.isDeleted)
+    .sort((left, right) => right.timestamp - left.timestamp)
+    .slice(0, SHEET_TOP_ENTRIES)
+  const sheetParts = await Promise.all(
+    topEntries.map(async (entry) => {
+      const state = await haven.database.documents.getAtTimestamp(loaded.id, entry.timestamp).catch(() => null)
+      if (state?.state !== 'exists' || !state.data) return undefined
+      try {
+        const sheet = topWorkbookOf({ data: state.data }).worksheetsById[sheetId]
+        return sheet && !sheet.deletedAt ? JSON.stringify(sheet) : undefined
+      } catch {
+        return undefined
+      }
+    }),
   )
+  // A top write counts when this sheet's part differs from the write before it (the next older one).
+  const changedSheet = topEntries.filter((_, index) => {
+    const part = sheetParts[index]
+    return part !== undefined && part !== sheetParts[index + 1]
+  })
+  return revisionsOf([...changedSheet, ...chunks.flat()])
+}
+
+function historyOf(haven: HavenConnection, id: string): Promise<MindooDBAppDocumentHistoryEntry[]> {
+  return haven.database.documents.listHistory(id).catch((): MindooDBAppDocumentHistoryEntry[] => [])
+}
+
+/** Merges document timelines into revisions: the writes of one save count once. */
+function revisionsOf(timelines: MindooDBAppDocumentHistoryEntry[]): WorkbookRevision[] {
   const entries = timelines
-    .flat()
     .filter((entry) => !entry.isDeleted)
     .sort((left, right) => right.timestamp - left.timestamp)
   const revisions: (WorkbookRevision & { publicKey: string })[] = []
@@ -72,5 +116,25 @@ export async function loadWorkbookAt(
   return {
     subject: typeof top.data.subject === 'string' ? top.data.subject : id,
     workbook: assembleWorkbook(workbook, chunks).workbook,
+  }
+}
+
+/**
+ * The workbook as it is, with one sheet as it was at `timestamp` (its columns,
+ * formats and rows then). Throws when the sheet did not exist at that time.
+ */
+export async function loadSheetAt(
+  haven: HavenConnection,
+  current: LoadedWorkbook,
+  sheetId: string,
+  timestamp: number,
+): Promise<{ subject: string; workbook: Workbook }> {
+  const then = await loadWorkbookAt(haven, current.id, timestamp)
+  const sheet = then.workbook.worksheetsById[sheetId]
+  if (!sheet || sheet.deletedAt) throw new Error('The sheet did not exist at that time.')
+  const now = current.stored.workbook
+  return {
+    subject: current.subject,
+    workbook: { ...now, worksheetsById: { ...now.worksheetsById, [sheetId]: sheet } },
   }
 }
